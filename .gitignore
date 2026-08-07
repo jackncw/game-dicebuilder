@@ -6,3 +6,5 @@ export/
 *.aab
 *.pck
 .godot-prompter-cache/
+art_iterations/
+__pycache__/
