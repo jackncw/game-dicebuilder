@@ -24,15 +24,23 @@ extends Node2D
 ##
 ## ── Tiers ────────────────────────────────────────────────────────
 ## The same minion is fought in all three chapters, and the chapter is its tier.
-## Tier is drawn, not just tabulated: a T1 slime is a smaller animal with dim
-## eyes and no smoke, a T3 slime is a bigger one alight along its cracks and
-## trailing it. Four dials move together — bulk (`TIER_BULK`), eye heat and
-## crack glow (`EYE_GAIN`, `VEIN_GAIN`) and the mist (`MIST_COUNT`) — which is
-## what makes the three read apart at a glance rather than needing a
-## side-by-side. The rim is the one setting keyed to the chapter's card instead
-## of the creature; `UITheme.rot_rim_for` owns it. Bosses have no tier of their
-## own — `battle_core` files them under the chapter they are met in — and they
-## are always all the way gone, so they run the top row of every dial.
+## Tier is meant to be drawn, not just tabulated: a T1 minion should read as a
+## smaller animal with dim eyes and no smoke, a T3 one as bigger and alight
+## along whatever eyes and cracks its `rot_mask_texture` carries. Five dials
+## move together — body scale (`TIER_BULK`), eye glow (`EYE_GAIN`), crack glow
+## (`VEIN_GAIN`), the mist (`MIST_COUNT`), and the rim (`UITheme.rot_rim_for`,
+## the one dial keyed to the chapter's card instead of the creature) — which is
+## what is meant to make the three tiers read apart at a glance rather than
+## needing a side-by-side. Bosses have no tier of their own — `battle_core`
+## files them under the chapter they are met in — and they are always all the
+## way gone, so they run the top row of every dial.
+##
+## That intent is only as good as each plate's mask: eight of the seventeen
+## sprites (the sheet-sourced minions — see `task-2-report.md`'s `PENDING_ART`
+## table) have thin or empty eye/vein masks and are awaiting replacement art,
+## so the eye-glow/crack-glow half of the dial is muted or absent on them
+## today. `EYE_GAIN`/`VEIN_GAIN` must not be raised to compensate — that would
+## overcorrect the nine plates that already have real masks.
 
 ## Painted heroes, by id.
 const HERO_TEX := {
@@ -361,14 +369,20 @@ func _c(p: Vector2) -> Vector2:
 ## The smoke coming off a corrupted thing — `[x, y, height]` per wisp, drawn
 ## BEFORE the body so it rises from behind. Tier 1 has none, and that absence is
 ## most of what makes a T1 minion look merely sick rather than lost.
+##
+## The spot count is not decided here. `_auto_mist` is this function's only
+## caller and it already sizes `spots` to `MIST_COUNT[_dial_row()]`; this used
+## to re-trim that count again by `t`, and the two only ever agreed because
+## both were fed by the same `_dial_row()` — a future edit to `MIST_COUNT`
+## alone would have been silently clipped here. One place (`_auto_mist`) owns
+## how many spots there are; this only sets how strongly they read.
 func _mist(spots: Array) -> void:
-	var t := rot_level()
-	if t <= 0.01:
+	if spots.is_empty():
 		return
+	var t := rot_level()
 	var a := 0.34 + 0.30 * t
-	var n := mini(int(ceil(spots.size() * (0.5 + 0.5 * t))), spots.size())
 	var step := floorf(fmod(_t * 2.2 + _bob_seed, 2.0))
-	for i in n:
+	for i in spots.size():
 		var s: Array = spots[i]
 		_wisp(Vector2(float(s[0]), float(s[1])), float(s[2]), float(i) * 1.1 + step * 0.7, a)
 

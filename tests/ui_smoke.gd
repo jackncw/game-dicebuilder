@@ -380,25 +380,75 @@ func _t_enemy_sprites() -> void:
 			_check(tex.get_width() > 40 and tex.get_height() > 40,
 					"%s sprite is %dx%d, too small to be a real cut"
 					% [k, tex.get_width(), tex.get_height()])
-	# the pawn actually carries the corruption shader
+		# the corruption mask IS the glow mechanism (red=eye, green=vein,
+		# blue=ember). A missing one is silent — set_shader_parameter(null) on a
+		# hint_default_black uniform just reads as "no glow", not an error — so
+		# it has to be checked here, not inferred from the glow being visible.
+		_check(PawnArt.rot_mask_texture(k) != null,
+				"%s has no corruption mask — rot_mask_texture() returned null" % k)
+
+	# the pawn actually carries the corruption shader, and the shader itself
+	# actually loaded (a ShaderMaterial with shader == null still stores and
+	# returns shader parameters, so a dead ROT_SHADER load would pass every
+	# get_shader_parameter() check below unless this is checked directly)
 	var pa := PawnArt.make("E01", 140.0, false, 3, 3)
 	add_child(pa)
 	await get_tree().process_frame
 	_check(pa.material is ShaderMaterial, "E01 pawn has no ShaderMaterial")
+	var rim3 := -1.0
 	if pa.material is ShaderMaterial:
 		var m: ShaderMaterial = pa.material
-		_check(float(m.get_shader_parameter("rim_strength")) > 0.0,
-				"chapter 3 pawn got no rim strength")
+		_check(m.shader != null,
+				"chapter 3 pawn's ShaderMaterial has no shader — ROT_SHADER failed to load")
+		rim3 = float(m.get_shader_parameter("rim_strength"))
+		_check(is_equal_approx(rim3, UITheme.rot_rim_for(3)),
+				"chapter 3 rim_strength is %.3f, must equal UITheme.rot_rim_for(3) = %.3f"
+				% [rim3, UITheme.rot_rim_for(3)])
 		_check(float(m.get_shader_parameter("vein_gain")) > 0.0,
 				"tier 3 pawn got no vein glow")
+
+	# a chapter-1 pawn, so rim_strength has something to differ from — the old
+	# `> 0.0` check passed at any chapter because rot_rim_for(1) is 0.35
 	var t1 := PawnArt.make("E01", 140.0, false, 1, 1)
 	add_child(t1)
 	await get_tree().process_frame
+	var rim1 := -1.0
 	if t1.material is ShaderMaterial:
-		_check(float((t1.material as ShaderMaterial).get_shader_parameter("vein_gain")) == 0.0,
+		var m1: ShaderMaterial = t1.material
+		_check(m1.shader != null,
+				"chapter 1 pawn's ShaderMaterial has no shader — ROT_SHADER failed to load")
+		rim1 = float(m1.get_shader_parameter("rim_strength"))
+		_check(is_equal_approx(rim1, UITheme.rot_rim_for(1)),
+				"chapter 1 rim_strength is %.3f, must equal UITheme.rot_rim_for(1) = %.3f"
+				% [rim1, UITheme.rot_rim_for(1)])
+		_check(float(m1.get_shader_parameter("vein_gain")) == 0.0,
 				"tier 1 must have no vein glow — it is one of the five tier dials")
+	_check(not is_equal_approx(rim1, rim3),
+			"chapter 1 (%.3f) and chapter 3 (%.3f) rim_strength must differ — otherwise the 5th p_chapter parameter is doing nothing"
+			% [rim1, rim3])
 	pa.queue_free()
 	t1.queue_free()
+
+	# a boss, at the tier battle_core actually gives it. battle_core.gd:179
+	# files a boss under "tier": int(def.chapter), so B1 (met in chapter 1)
+	# arrives here carrying tier 1 — the same call a real battle makes. If
+	# _dial_row() ever regresses to reading the raw tier instead of rot_of(),
+	# B1/B2 would silently drop to the T1 dial row (cold eyes, no smoke) while
+	# every other boss stayed fully corrupted.
+	var boss1 := PawnArt.make("B1", 140.0, false, 1)
+	add_child(boss1)
+	await get_tree().process_frame
+	_check(boss1.material is ShaderMaterial, "B1 pawn has no ShaderMaterial")
+	if boss1.material is ShaderMaterial:
+		var bm: ShaderMaterial = boss1.material
+		_check(is_equal_approx(float(bm.get_shader_parameter("eye_gain")), PawnArt.EYE_GAIN[2]),
+				"B1 at tier 1 got eye_gain %.2f, must be EYE_GAIN[2]=%.2f — a boss always runs the top dial row"
+				% [float(bm.get_shader_parameter("eye_gain")), PawnArt.EYE_GAIN[2]])
+		_check(is_equal_approx(float(bm.get_shader_parameter("vein_gain")), PawnArt.VEIN_GAIN[2]),
+				"B1 at tier 1 got vein_gain %.2f, must be VEIN_GAIN[2]=%.2f — a boss is never on the T1 row"
+				% [float(bm.get_shader_parameter("vein_gain")), PawnArt.VEIN_GAIN[2]])
+	boss1.queue_free()
+
 	# extents come off the sprites now: trimmed art always fills its height
 	for k2 in keys:
 		_check(is_equal_approx(PawnArt.extent(k2).x, 1.0),
