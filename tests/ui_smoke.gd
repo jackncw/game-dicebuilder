@@ -34,6 +34,8 @@ func _ready() -> void:
 	await _t_float_anchors()
 	await _t_die_render()
 	_t_contrast()
+	_t_no_player_magenta()
+	_t_enemy_legibility()
 	if fails == 0:
 		print("UI SMOKE OK")
 	else:
@@ -253,6 +255,94 @@ func _t_contrast() -> void:
 func _ratio(fg: Color, bg: Color, what: String) -> void:
 	var r := UITheme.contrast(fg, bg)
 	_check(r >= 4.5, "%s is %.2f:1, needs 4.5:1" % [what, r])
+
+
+## Magenta belongs to the enemy. Nothing the player owns — no theme token, no
+## die, no button, no status icon, no pixel of a hero plate — may sit inside
+## `UITheme.is_magenta()`, because a magenta pixel on screen is supposed to mean
+## "this is not yours" without anyone having to be told.
+##
+## The theme half walks `ui_theme.gd`'s constant map rather than a hand-written
+## list, so a colour added next month is covered the day it is added. The
+## `ROT_*` family is the exception, and the test asserts those ARE magenta —
+## a rule only worth having if the reserved side actually uses it.
+func _t_no_player_magenta() -> void:
+	var theme: Script = load("res://scripts/ui/ui_theme.gd")
+	var consts: Dictionary = theme.get_script_constant_map()
+	var checked := 0
+	for name in consts:
+		var v: Variant = consts[name]
+		var enemy_side := String(name).begins_with("ROT_")
+		for entry in _colors_in(v):
+			var c: Color = entry
+			checked += 1
+			if enemy_side:
+				continue
+			_check(not UITheme.is_magenta(c),
+					"UITheme.%s %s is in the enemy magenta wedge (h=%.0f s=%.2f v=%.2f)"
+							% [name, c.to_html(false), c.h * 360.0, c.s, c.v])
+	_check(checked > 40, "walked the whole theme, got %d colours" % checked)
+	# and the reserved family really is reserved
+	for rot in [UITheme.ROT_VEIN, UITheme.ROT_VEIN_DIM, UITheme.ROT_EYE, UITheme.ROT_EYE_DIM]:
+		_check(UITheme.is_magenta(rot),
+				"%s should be inside the enemy wedge" % rot.to_html(false))
+
+	# the painted heroes, pixel by pixel — the plates are the one player-side
+	# surface the theme cannot speak for
+	for id in PawnArt.HERO_TEX:
+		var tex := PawnArt.hero_texture(String(id))
+		_check(tex != null, "hero plate %s loads" % id)
+		if tex == null:
+			continue
+		var img := tex.get_image()
+		var hits := 0
+		var worst := Color.BLACK
+		for y in range(0, img.get_height(), 3):
+			for x in range(0, img.get_width(), 3):
+				var px := img.get_pixel(x, y)
+				if px.a < 0.16 or not UITheme.is_magenta(px):
+					continue
+				hits += 1
+				if px.s > worst.s:
+					worst = px
+		_check(hits == 0, "hero plate %s has %d magenta pixels (worst %s)"
+				% [id, hits, worst.to_html(false)])
+
+
+## Colours reachable from one theme constant: a Color, or the values of a
+## dictionary of them (the category tables).
+func _colors_in(v: Variant) -> Array:
+	if v is Color:
+		return [v]
+	if v is Dictionary:
+		var out := []
+		for k in v:
+			if v[k] is Color:
+				out.append(v[k])
+		return out
+	return []
+
+
+## Every enemy has to be visible against the card it fights on. The corrupted
+## palette is deliberately dark and chapter 3's card is `#1e1429`, so this is
+## the line that stops "darker = more corrupted" from walking a creature into
+## the background. 2.4:1 is a silhouette threshold, not the 4.5:1 text one:
+## the body only has to separate from the panel, not carry type.
+##
+## Tier 3 is the one measured because it is the darkest a design ever gets.
+func _t_enemy_legibility() -> void:
+	var worst := 99.0
+	var worst_what := ""
+	for kind in PawnArt.BODY:
+		var body := PawnArt.rot_body(String(kind), 3)
+		for ch in [1, 2, 3]:
+			var r := UITheme.contrast(body, UITheme.surface(ch))
+			if r < worst:
+				worst = r
+				worst_what = "%s on chapter %d" % [kind, ch]
+			_check(r >= 2.4, "%s body %s on chapter %d card is %.2f:1, needs 2.4:1"
+					% [kind, body.to_html(false), ch, r])
+	print("enemy legibility: worst is %s at %.2f:1" % [worst_what, worst])
 
 
 ## The floating-number regression: a damage number has to land inside the rect

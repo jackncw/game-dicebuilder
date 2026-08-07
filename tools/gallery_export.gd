@@ -171,6 +171,21 @@ func _all_shots() -> void:
 	for mode in ["both", "zh", "en"]:
 		await _battle_shots(mode)
 
+	# ---- the same minions fought in each chapter. Enemy tier is drawn as depth
+	# ---- of corruption, and the corrupted palette is dark, so this row is where
+	# ---- both halves of that get checked at once: three tiers of the same
+	# ---- creature, each against the chapter sky and card it actually meets.
+	_lang("both")
+	for ch2 in [1, 2, 3]:
+		if _wanted("15_battle_ch%d" % ch2):
+			_prepare_run(ch2)
+			var bc := _make_battle(["E01", "E05", "E08"], ch2)
+			await _mount(bc)
+			for i in 30:
+				await get_tree().process_frame
+			await _grab("15_battle_ch%d" % ch2)
+	_prepare_run(1)
+
 	# ---- bosses (chapter-correct backgrounds), bilingual
 	_lang("both")
 	await _boss_shots()

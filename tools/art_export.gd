@@ -104,7 +104,7 @@ func _custom_shots() -> void:
 	var kinds := ["HARE", "BADGER", "OWL", "HEDGE", "BOAR", "FOX",
 			"E01", "E02", "E03", "E04", "E05", "E06",
 			"E07", "E08", "E09", "E10", "B1", "B2",
-			"B3", "B4", "B5", "B6"]
+			"B3", "B3P2", "B4", "B5", "B6"]
 	for i in kinds.size():
 		var col_i := i % 4
 		var row_i := i / 4

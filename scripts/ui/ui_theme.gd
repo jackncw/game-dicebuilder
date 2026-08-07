@@ -107,6 +107,46 @@ const CHAPTER_ACCENT := {1: Color("7fc46a"), 2: Color("e0a25c"), 3: Color("b48ce
 const NEUTRAL_SURFACE := Color("232326")
 const DANGER_BG := Color("2a1e1e")
 
+# ── corruption — THE ENEMY SIDE ONLY ───────────────────────────────
+## Everything hostile in the grove is the same story: an animal gone over to
+## the rot. Its body is pulled towards `ROT_UNDER`, magenta cracks the surface,
+## the eyes light up, and black mist comes off it.
+##
+## Magenta is the enemy's colour and nobody else's. A hero, a die, a button, a
+## player status icon may not be tinted anywhere inside `is_magenta()` — that
+## is what makes a magenta pixel on screen mean "this is not yours" without a
+## legend. `_t_no_player_magenta()` in `ui_smoke` enforces it.
+const ROT_UNDER := Color("2c2038")      # the dead violet every body sinks toward
+const ROT_VEIN := Color("e13cc0")       # corruption crack, at full depth
+const ROT_VEIN_DIM := Color("a83a90")   # the same crack where the rot is young
+const ROT_EYE := Color("ff5ad8")        # lit eye
+const ROT_EYE_DIM := Color("d34aae")    # eye at tier 1: awake, not yet burning
+## The smoke, laid down at low alpha. Grey-violet rather than the near-black it
+## started as: black smoke over a chapter-3 card (`#1e1429`) is invisible, and
+## the mist is one of the four things telling a tier-3 minion from a tier-1 one.
+const ROT_MIST := Color("4a4055")
+const ROT_RIM := Color("cfa8dd")        # rim light that keeps a dark body legible
+
+## The magenta wedge, in Godot's 0–1 hue. 285°–342°: everything from violet-
+## magenta through to rose. Below it sits the game's existing purple family
+## (the `resource` category and the chapter-3 palette all land at 260°–270°),
+## which is why the band starts at 285 and not at 270 — the guard gap is
+## deliberate, so a hue nudge cannot slide a player colour into enemy territory
+## without the test noticing.
+const MAGENTA_H_LO := 285.0 / 360.0
+const MAGENTA_H_HI := 342.0 / 360.0
+## Below these a hue is not read as a colour at all — near-grey or near-black —
+## so the ban only covers pixels saturated and bright enough to actually say
+## "magenta" to the player.
+const MAGENTA_S_MIN := 0.35
+const MAGENTA_V_MIN := 0.30
+
+
+## Is this colour inside the reserved enemy wedge?
+static func is_magenta(c: Color) -> bool:
+	return (c.s >= MAGENTA_S_MIN and c.v >= MAGENTA_V_MIN
+			and c.h >= MAGENTA_H_LO and c.h <= MAGENTA_H_HI)
+
 # ── forest materials ───────────────────────────────────────────────
 ## Added in the second art pass. Buttons are planks, paths are trodden earth
 ## and map nodes are ringed with stones, so those three materials get named

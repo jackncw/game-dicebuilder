@@ -635,6 +635,16 @@ func _enemy_metrics(n: int, is_boss: bool) -> Dictionary:
 	return {"art": minf(art, _enemy_art_budget()), "w": w}
 
 
+## Which `PawnArt` design draws this enemy. Only Sir Croak needs the indirection
+## — he keeps the key `B3` all through the fight (the codex, the "met" flags and
+## his stat block are all filed under it) but stops looking like a man on a
+## goose the moment the goose goes down.
+func _art_key(e: Dictionary) -> String:
+	if String(e.get("boss_key", "")) == "B3" and int(e.get("phase", 1)) >= 2:
+		return "B3P2"
+	return String(e.key)
+
+
 func _make_enemy_card(j: int, e: Dictionary, is_target: bool, spec: Dictionary) -> Control:
 	var border := UIKit.GREEN if is_target else UIKit.OUTLINE
 	var chapter := int(args.get("opts", {}).get("chapter", 1))
@@ -663,10 +673,12 @@ func _make_enemy_card(j: int, e: Dictionary, is_target: bool, spec: Dictionary) 
 	var art_holder := Control.new()
 	var art_h: float = m.art
 	art_holder.custom_minimum_size = Vector2(inner_w, art_h + 10.0)
+	var art_key := _art_key(e)
+	var art_tier := int(e.get("tier", 1))
 	art_holder.add_child(_ground_shadow(inner_w * 0.5, art_h + 4.0,
-			PawnArt.extent(String(e.key)).y * PawnArt.fit_height(String(e.key),
+			PawnArt.half_width(art_key, art_tier) * PawnArt.fit_height(art_key,
 					Vector2(inner_w, art_h)) * 0.95))
-	var art := PawnArt.fitted(String(e.key), Vector2(inner_w, art_h), true)
+	var art := PawnArt.fitted(art_key, Vector2(inner_w, art_h), true, art_tier)
 	art.position = Vector2(inner_w * 0.5, art_h + 4.0)
 	art_holder.add_child(art)
 	vb.add_child(art_holder)

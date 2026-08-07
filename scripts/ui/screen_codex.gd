@@ -227,6 +227,62 @@ func _build_mobs() -> void:
 		body.add_child(_affix_panel(key3))
 
 
+## The three tiers of one minion, side by side and to scale. Tier is drawn as
+## depth of corruption — bulk, tone, cracks, eye heat, mist — and the codex is
+## the only place in the game where you get to hold the three up against each
+## other. A tier not yet fought stays a silhouette, same as a locked hero.
+func _tier_strip(key: String) -> Control:
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", UIKit.S5)
+	for tier in [1, 2, 3]:
+		var cell := VBoxContainer.new()
+		cell.add_theme_constant_override("separation", 0)
+		var holder := Control.new()
+		holder.custom_minimum_size = Vector2(96, 100)
+		var art := PawnArt.fitted(key, Vector2(96, 92.0), false, tier)
+		art.position = Vector2(48, 96)
+		if not Game.enemy_tier_seen(key, tier):
+			art.modulate = Color(0.05, 0.04, 0.06, 1.0)
+		holder.add_child(art)
+		cell.add_child(holder)
+		var cap := UIKit.label("T%d" % tier, UIKit.F_CAPTION, UIKit.CREAM_DARK)
+		cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cap.custom_minimum_size = Vector2(96, 0)
+		cell.add_child(cap)
+		hb.add_child(cell)
+	var cc := CenterContainer.new()
+	cc.add_child(hb)
+	return cc
+
+
+## A boss's own art, from the same `PawnArt` the fight uses. Sir Croak takes two
+## slots: the codex is where you find out that the thing you killed was only the
+## goose.
+func _boss_strip(key: String) -> Control:
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", UIKit.S5)
+	var art_keys := ["B3", "B3P2"] if key == "B3" else [key]
+	for i in art_keys.size():
+		var cell := VBoxContainer.new()
+		cell.add_theme_constant_override("separation", 0)
+		var holder := Control.new()
+		holder.custom_minimum_size = Vector2(140, 150)
+		var art := PawnArt.fitted(String(art_keys[i]), Vector2(140, 142.0))
+		art.position = Vector2(70, 146)
+		holder.add_child(art)
+		cell.add_child(holder)
+		if art_keys.size() > 1:
+			var cap := UIKit.label(Data.bi("第 %d 階段" % (i + 1), "Phase %d" % (i + 1)),
+					UIKit.F_CAPTION, UIKit.CREAM_DARK)
+			cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			cap.custom_minimum_size = Vector2(140, 0)
+			cell.add_child(cap)
+		hb.add_child(cell)
+	var cc := CenterContainer.new()
+	cc.add_child(hb)
+	return cc
+
+
 func _mob_panel(key: String) -> Control:
 	var def: Dictionary = GameData.enemies[key]
 	var any: bool = Game.enemy_seen(key)
@@ -235,6 +291,7 @@ func _mob_panel(key: String) -> Control:
 		rows.append(_line("%s  %s" % [key, Data.t("ui_unknown")], 22, UIKit.CREAM_DARK))
 		return _panel(rows)
 	rows.append(_line(Data.bi(String(def.zh), String(def.en)), 23))
+	rows.append(_tier_strip(key))
 	# each tier is its own unlock: fight the T2 version to read the T2 numbers
 	for tier in [1, 2, 3]:
 		var ti: int = int(tier) - 1
@@ -256,6 +313,7 @@ func _boss_panel(key: String) -> Control:
 		rows.append(_line("%s  %s" % [key, Data.t("ui_unknown")], 22, UIKit.CREAM_DARK))
 		return _panel(rows)
 	rows.append(_line(Data.bi(String(def.zh), String(def.en)), 23, UIKit.RED.lightened(0.35)))
+	rows.append(_boss_strip(key))
 	rows.append(_line("  HP %d   %s×%d   %s %d" % [int(def.hp), Data.t("ui_roll"),
 			int(def.dice), Data.t("ui_chapter"), int(def.chapter)], 18))
 	rows.append(_line("  %s: %s" % [Data.t("ui_boss_gimmick"),
