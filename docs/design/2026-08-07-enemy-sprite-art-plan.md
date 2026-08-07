@@ -1388,9 +1388,12 @@ Expected: `ALL SUITES PASSED`。
 - [ ] **Step 8: Commit**
 
 ```bash
-git add tools/pawn_extents.gd scripts/ui/pawn_art.gd art_iterations/sprite_1
+git add tools/pawn_extents.gd scripts/ui/pawn_art.gd
 git commit -m "chore(art): 由 sprite alpha bounds 覆核 extents,射 37 張 gallery 同三章實戰"
 ```
+
+**唔准 `git add art_iterations/`。** 佢係 gitignored 嘅截圖產物(已經 86MB),
+同 `art_export/` 一樣係跑出嚟嘅嘢,唔入 history。截圖係用嚟睇同判斷,唔係交付物。
 
 ---
 
