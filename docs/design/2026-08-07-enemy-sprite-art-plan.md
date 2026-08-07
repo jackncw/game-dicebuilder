@@ -67,7 +67,7 @@
   - `assets/enemies/<KEY>.png`,KEY ∈ `E01…E10, B1…B6, B3P2`(17 個)
   - `assets/enemies/enemies.json`:`{KEY: {"size":[w,h], "aspect":float, "edge_rgb":[r,g,b]}}`
   - stdout 印一行 `PAWN_EXTENT: { "E01": Vector2(1.00, 0.42), ... }`
-  - `qa/enemy_cutout_contact.png`(洋紅格仔)、`qa/enemy_cutout_alpha.png`
+  - `qa/enemy_cutout_contact.png`(洋紅格仔 —— 格仔底已經足以曝露白邊、殘留奶白同浮空碎片,唔使另出一張 alpha 圖)
   - Python API:`subject_mask(rgb: np.ndarray) -> np.ndarray`、`cut_subject(img: Image) -> Image`、`edge_band_rgb(rgba: np.ndarray, px:int=3) -> tuple[int,int,int]`
 
 ### 分割演算法(核心判斷)
