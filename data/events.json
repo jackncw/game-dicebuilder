@@ -1,0 +1,235 @@
+{
+  "V01": {
+    "zh": "受傷的鹿",
+    "en": "The Wounded Deer",
+    "text_zh": "林間空地上,一隻腿部受傷的鹿望著你們,眼神溫馴。牠身邊有個旅人遺落的背囊。",
+    "text_en": "In a clearing, a deer with an injured leg watches you with gentle eyes. Beside it lies a traveler's lost pack.",
+    "options": [
+      {
+        "zh": "治療牠的傷口(全隊回復 8 點 HP)",
+        "en": "Tend its wound (party heals 8)",
+        "effect": "team_heal",
+        "value": 8
+      },
+      {
+        "zh": "搜查背囊(+30 金幣)",
+        "en": "Search the pack (+30 gold)",
+        "effect": "gold",
+        "value": 30
+      }
+    ]
+  },
+  "V02": {
+    "zh": "神秘骰匠",
+    "en": "The Mysterious Dicewright",
+    "text_zh": "一位蒙面工匠在樹樁上攤開工具:「讓我看看你的骰子……我可以免費為它添一點『趣味』。」",
+    "text_en": "A masked artisan spreads tools on a stump: 'Show me a die... I can add a little spice, free of charge.'",
+    "options": [
+      {
+        "zh": "選一個骰面附魔(隨機關鍵字)",
+        "en": "Enchant a chosen face (random keyword)",
+        "effect": "enchant_face"
+      },
+      {
+        "zh": "離開",
+        "en": "Leave",
+        "effect": "none"
+      }
+    ]
+  },
+  "V03": {
+    "zh": "賭骰攤",
+    "en": "The Dice Gamble",
+    "text_zh": "狐狸攤主搖著骰盅:「30 金幣一注,擲出 4、5、6 就贏 60 金幣,擲出 1、2、3 就全部輸掉。要玩嗎?」",
+    "text_en": "A fox rattles a dice cup: '30 gold a bet. Roll 4-6, win 60. Roll 1-3, lose it all. Care to play?'",
+    "options": [
+      {
+        "zh": "下注 30 金幣",
+        "en": "Bet 30 gold",
+        "effect": "gamble",
+        "cost": 30,
+        "win": 60,
+        "requires_gold": 30
+      },
+      {
+        "zh": "不賭",
+        "en": "Walk away",
+        "effect": "none"
+      }
+    ]
+  },
+  "V04": {
+    "zh": "遺跡祭壇",
+    "en": "The Ruin Altar",
+    "text_zh": "苔蘚覆蓋的古老祭壇滲出微光,上面刻著:「以血為祭,以寶為酬。」",
+    "text_en": "An ancient moss-covered altar glows faintly. The carving reads: 'Blood for tribute, treasure for reward.'",
+    "options": [
+      {
+        "zh": "犧牲全隊各 4 點 HP,獲得一件普通遺物",
+        "en": "Sacrifice 4 HP from each hero for a Common relic",
+        "effect": "sacrifice_relic",
+        "value": 4
+      },
+      {
+        "zh": "離開",
+        "en": "Leave",
+        "effect": "none"
+      }
+    ]
+  },
+  "V05": {
+    "zh": "迷路小妖",
+    "en": "The Lost Imp",
+    "text_zh": "一隻小小的妖精拉著你的斗篷:「我迷路了……送我回家,我的家人會重重有賞!」",
+    "text_en": "A tiny imp tugs your cloak: 'I'm lost... take me home and my family will reward you handsomely!'",
+    "options": [
+      {
+        "zh": "護送牠(下場戰鬥敵人 +1,勝利可得額外遺物)",
+        "en": "Escort it (next battle +1 enemy, bonus relic on win)",
+        "effect": "escort_imp"
+      },
+      {
+        "zh": "為牠指路(+15 金幣)",
+        "en": "Point the way (+15 gold)",
+        "effect": "gold",
+        "value": 15
+      }
+    ]
+  },
+  "V06": {
+    "zh": "毒沼",
+    "en": "The Poison Marsh",
+    "text_zh": "前路被一片冒泡的毒沼攔住。直行可以省時,但毒氣會滲入皮膚;繞路則要多走很遠。",
+    "text_en": "A bubbling toxic marsh blocks the path. Wading through is fast but the fumes seep in; going around takes far longer.",
+    "options": [
+      {
+        "zh": "涉水直行(下場戰鬥全隊開局中毒 2 層)",
+        "en": "Wade through (party starts next battle with Poison 2)",
+        "effect": "marsh_poison",
+        "value": 2
+      },
+      {
+        "zh": "繞路(跳過下一排節點)",
+        "en": "Go around (skip the next row of nodes)",
+        "effect": "skip_row"
+      }
+    ]
+  },
+  "V07": {
+    "zh": "訓練場",
+    "en": "The Training Ground",
+    "text_zh": "廢棄的訓練場仍留著一個木人樁,還有一位隱居的老教頭願意指點一二。",
+    "text_en": "An abandoned training ground with a battered dummy. A retired drillmaster offers a quick lesson.",
+    "options": [
+      {
+        "zh": "免費鍛造:一個骰面 +1",
+        "en": "Free forge: a chosen face +1",
+        "effect": "free_forge"
+      },
+      {
+        "zh": "休整(全隊回復 10% 最大 HP)",
+        "en": "Rest up (party heals 10% max HP)",
+        "effect": "team_heal_pct",
+        "value": 10
+      }
+    ]
+  },
+  "V08": {
+    "zh": "骰之泉",
+    "en": "The Dice Spring",
+    "text_zh": "清澈的泉水閃著虹光。傳說將骰面浸入泉中,會蛻變成更珍稀的型態——但沒有人知道會變成什麼。",
+    "text_en": "A spring shimmers with prismatic light. They say a die face dipped here transforms into something rarer — though none can say what.",
+    "options": [
+      {
+        "zh": "浸泡一個骰面(重鑄成高一級稀有度的隨機骰面)",
+        "en": "Dip a face (reforge into a random face of higher rarity)",
+        "effect": "reforge_up"
+      },
+      {
+        "zh": "離開",
+        "en": "Leave",
+        "effect": "none"
+      }
+    ]
+  },
+  "V09": {
+    "zh": "流浪商隊",
+    "en": "The Wandering Caravan",
+    "text_zh": "一隊騾車商隊停在路邊,貨箱大開,琳瑯滿目:「路過的朋友,全部七折!」",
+    "text_en": "A mule caravan rests by the road, crates open and gleaming: 'For travelers only — everything 30% off!'",
+    "options": [
+      {
+        "zh": "看貨(骰面三選一,七折)",
+        "en": "Browse (choose 1 of 3 faces at 70% price)",
+        "effect": "caravan_shop"
+      },
+      {
+        "zh": "離開",
+        "en": "Leave",
+        "effect": "none"
+      }
+    ]
+  },
+  "V10": {
+    "zh": "古樹祝福",
+    "en": "The Elder Tree's Blessing",
+    "text_zh": "千年古樹的樹洞滲出溫暖金光,樹靈的聲音在你們腦海中響起:「選一位,受我祝福。」",
+    "text_en": "Warm golden light pours from the hollow of an ancient tree. A voice echoes: 'Choose one to receive my blessing.'",
+    "options": [
+      {
+        "zh": "一位英雄最大 HP +4 並回復滿",
+        "en": "One hero gains +4 max HP and fully heals",
+        "effect": "bless_hero",
+        "value": 4
+      },
+      {
+        "zh": "全隊回復 15% 最大 HP",
+        "en": "Party heals 15% max HP",
+        "effect": "team_heal_pct",
+        "value": 15
+      }
+    ]
+  },
+  "V11": {
+    "zh": "森林小偷",
+    "en": "The Forest Thief",
+    "text_zh": "一個黑影手腳俐落地搶走你的錢袋,朝密林深處逃去!",
+    "text_en": "A shadowy figure snatches your coin purse and darts into the thicket!",
+    "options": [
+      {
+        "zh": "追捕(立即進入精英戰,勝利可得普通遺物 +40 金幣)",
+        "en": "Give chase (elite battle now; win a Common relic +40 gold)",
+        "effect": "thief_battle"
+      },
+      {
+        "zh": "由他去(失去 40 金幣)",
+        "en": "Let it go (lose 40 gold)",
+        "effect": "lose_gold",
+        "value": 40
+      }
+    ]
+  },
+  "V12": {
+    "zh": "雙面神像",
+    "en": "The Two-Faced Idol",
+    "text_zh": "一座半明半暗的古老神像。光明的一面莊嚴肅穆,黑暗的一面深邃誘人。你感覺到兩股力量正在等你選擇。",
+    "text_en": "An ancient idol, half light, half shadow. Both faces hum with power, waiting for your choice.",
+    "options": [
+      {
+        "zh": "光明面(本次冒險攻擊面全部 +1,全隊最大 HP -3)",
+        "en": "Light face (all attack faces +1 this run, party max HP -3)",
+        "effect": "idol_light"
+      },
+      {
+        "zh": "黑暗面(全隊最大 HP +6,金幣獎勵 -20%)",
+        "en": "Dark face (party max HP +6, gold rewards -20%)",
+        "effect": "idol_dark"
+      },
+      {
+        "zh": "什麼都不碰",
+        "en": "Touch nothing",
+        "effect": "none"
+      }
+    ]
+  }
+}

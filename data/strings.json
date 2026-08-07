@@ -1,0 +1,422 @@
+{
+  "ui_roll": {
+    "zh": "擲骰",
+    "en": "Roll"
+  },
+  "ui_reroll": {
+    "zh": "重擲",
+    "en": "Reroll"
+  },
+  "ui_end_turn": {
+    "zh": "結束回合",
+    "en": "End Turn"
+  },
+  "ui_undo": {
+    "zh": "復原",
+    "en": "Undo"
+  },
+  "ui_turn": {
+    "zh": "回合",
+    "en": "Turn"
+  },
+  "ui_mana": {
+    "zh": "靈息",
+    "en": "Essence"
+  },
+  "ui_gold": {
+    "zh": "金幣",
+    "en": "Gold"
+  },
+  "ui_victory": {
+    "zh": "勝利!",
+    "en": "Victory!"
+  },
+  "ui_defeat": {
+    "zh": "全軍覆沒",
+    "en": "Defeat"
+  },
+  "ui_new_run": {
+    "zh": "新冒險",
+    "en": "New Run"
+  },
+  "ui_continue": {
+    "zh": "繼續",
+    "en": "Continue"
+  },
+  "ui_meta": {
+    "zh": "冒險者名冊",
+    "en": "Roster"
+  },
+  "ui_settings": {
+    "zh": "設定",
+    "en": "Settings"
+  },
+  "ui_battle": {
+    "zh": "戰鬥",
+    "en": "Battle"
+  },
+  "ui_elite": {
+    "zh": "精英",
+    "en": "Elite"
+  },
+  "ui_boss": {
+    "zh": "頭目",
+    "en": "Boss"
+  },
+  "ui_event": {
+    "zh": "事件",
+    "en": "Event"
+  },
+  "ui_shop": {
+    "zh": "商店",
+    "en": "Shop"
+  },
+  "ui_rest": {
+    "zh": "營地",
+    "en": "Rest"
+  },
+  "ui_treasure": {
+    "zh": "寶箱",
+    "en": "Treasure"
+  },
+  "ui_skip": {
+    "zh": "跳過",
+    "en": "Skip"
+  },
+  "ui_take": {
+    "zh": "拿取",
+    "en": "Take"
+  },
+  "ui_buy": {
+    "zh": "購買",
+    "en": "Buy"
+  },
+  "ui_leave": {
+    "zh": "離開",
+    "en": "Leave"
+  },
+  "ui_camp": {
+    "zh": "露營",
+    "en": "Camp"
+  },
+  "ui_forge": {
+    "zh": "鍛造",
+    "en": "Forge"
+  },
+  "ui_confirm": {
+    "zh": "確認",
+    "en": "Confirm"
+  },
+  "ui_cancel": {
+    "zh": "取消",
+    "en": "Cancel"
+  },
+  "ui_potions": {
+    "zh": "藥水",
+    "en": "Potions"
+  },
+  "ui_relics": {
+    "zh": "遺物",
+    "en": "Relics"
+  },
+  "ui_start": {
+    "zh": "出發",
+    "en": "Embark"
+  },
+  "ui_select_team": {
+    "zh": "選擇 4 位英雄",
+    "en": "Choose 4 heroes"
+  },
+  "ui_chapter": {
+    "zh": "章",
+    "en": "Chapter"
+  },
+  "ui_locked": {
+    "zh": "未解鎖",
+    "en": "Locked"
+  },
+  "ui_replaces": {
+    "zh": "取代",
+    "en": "replaces"
+  },
+  "ui_downed": {
+    "zh": "倒下",
+    "en": "Downed"
+  },
+  "ui_stolen": {
+    "zh": "被偷",
+    "en": "Stolen"
+  },
+  "ui_bound": {
+    "zh": "束縛",
+    "en": "Bound"
+  },
+  "ui_reroll_left": {
+    "zh": "重擲次數",
+    "en": "Rerolls"
+  },
+  "ui_abandon": {
+    "zh": "放棄冒險",
+    "en": "Abandon Run"
+  },
+  "ui_stats": {
+    "zh": "統計",
+    "en": "Stats"
+  },
+  "ui_volume": {
+    "zh": "音量",
+    "en": "Volume"
+  },
+  "ui_lang_mode": {
+    "zh": "語言顯示",
+    "en": "Language"
+  },
+  "ui_lang_both": {
+    "zh": "雙語",
+    "en": "Bilingual"
+  },
+  "ui_lang_zh": {
+    "zh": "純中文",
+    "en": "Chinese only"
+  },
+  "ui_lang_en": {
+    "zh": "純英文",
+    "en": "English only"
+  },
+  "ui_reset_data": {
+    "zh": "重置所有數據",
+    "en": "Reset All Data"
+  },
+  "ui_tutorial": {
+    "zh": "教學",
+    "en": "Tutorial"
+  },
+  "ui_xp": {
+    "zh": "經驗",
+    "en": "XP"
+  },
+  "ui_level": {
+    "zh": "等級",
+    "en": "Level"
+  },
+  "ui_hp": {
+    "zh": "生命",
+    "en": "HP"
+  },
+  "ui_passive": {
+    "zh": "被動",
+    "en": "Passive"
+  },
+  "ui_run_stats_battles": {
+    "zh": "總場次",
+    "en": "Total Runs"
+  },
+  "ui_run_stats_winrate": {
+    "zh": "勝率",
+    "en": "Win Rate"
+  },
+  "ui_run_stats_fastest": {
+    "zh": "最快通關",
+    "en": "Fastest Clear"
+  },
+  "ui_next_node": {
+    "zh": "選擇下一個節點",
+    "en": "Choose the next node"
+  },
+  "ui_offer_title": {
+    "zh": "戰利品:三選一",
+    "en": "Spoils: pick one"
+  },
+  "ui_gold_reward": {
+    "zh": "獲得金幣",
+    "en": "Gold earned"
+  },
+  "ui_no_mana": {
+    "zh": "靈息不足",
+    "en": "Not enough Essence"
+  },
+  "ui_dmg_preview": {
+    "zh": "預計傷害",
+    "en": "Damage preview"
+  },
+  "ui_codex": {
+    "zh": "圖鑑",
+    "en": "Codex"
+  },
+  "ui_codex_chars": {
+    "zh": "角色",
+    "en": "Characters"
+  },
+  "ui_codex_mobs": {
+    "zh": "怪物",
+    "en": "Monsters"
+  },
+  "ui_die_a": {
+    "zh": "A骰",
+    "en": "Die A"
+  },
+  "ui_die_b": {
+    "zh": "B骰",
+    "en": "Die B"
+  },
+  "ui_cast_zone": {
+    "zh": "施放",
+    "en": "Cast"
+  },
+  "ui_die_locked": {
+    "zh": "鎖定",
+    "en": "Locked"
+  },
+  "ui_pick_replace": {
+    "zh": "選擇一個要被取代的骰面",
+    "en": "Choose a face to replace"
+  },
+  "ui_confirm_swap": {
+    "zh": "確認替換",
+    "en": "Confirm swap"
+  },
+  "ui_unknown": {
+    "zh": "???",
+    "en": "???"
+  },
+  "ui_unseen_face": {
+    "zh": "未使用過",
+    "en": "Not yet used"
+  },
+  "ui_boss_gimmick": {
+    "zh": "機制",
+    "en": "Gimmick"
+  },
+  "ui_affixes": {
+    "zh": "精英詞綴",
+    "en": "Elite affixes"
+  },
+  "ui_tier": {
+    "zh": "階",
+    "en": "Tier"
+  },
+  "ui_unlock_cond": {
+    "zh": "解鎖條件",
+    "en": "Unlock"
+  },
+  "ui_all_faces": {
+    "zh": "可獲得骰面",
+    "en": "Obtainable faces"
+  },
+  "ui_start_faces": {
+    "zh": "初始 12 面",
+    "en": "Starting 12 faces"
+  },
+  "ui_back": {
+    "zh": "返回",
+    "en": "Back"
+  },
+  "ui_on": {
+    "zh": "開",
+    "en": "On"
+  },
+  "ui_off": {
+    "zh": "關",
+    "en": "Off"
+  },
+  "ui_faceswap": {
+    "zh": "換骰面",
+    "en": "Swap a face"
+  },
+  "ui_view_only": {
+    "zh": "只可查看",
+    "en": "View only"
+  },
+  "ui_swap_done": {
+    "zh": "已換上",
+    "en": "Installed"
+  },
+  "ui_essence_bar": {
+    "zh": "靈息",
+    "en": "Essence"
+  },
+  "ui_relics_mine": {
+    "zh": "我的遺物",
+    "en": "My Relics"
+  },
+  "ui_no_relics": {
+    "zh": "尚未取得任何遺物",
+    "en": "No relics yet"
+  },
+  "ui_relic_gained": {
+    "zh": "獲得遺物",
+    "en": "Relic gained"
+  },
+  "ui_relic_common": {
+    "zh": "普通",
+    "en": "Common"
+  },
+  "ui_relic_advanced": {
+    "zh": "高級",
+    "en": "Advanced"
+  },
+  "ui_relic_pick": {
+    "zh": "高級遺物:二選一",
+    "en": "Advanced relic: pick one"
+  },
+  "ui_relic_pick_note": {
+    "zh": "高級遺物只會在頭目戰後出現,每個都能撐起一種流派。",
+    "en": "Advanced relics only appear after a boss. Each one can carry a whole build."
+  },
+  "ui_showcase_only": {
+    "zh": "通關展示,不會實際獲得",
+    "en": "Showcase only — not actually granted"
+  },
+  "ui_actions_this_turn": {
+    "zh": "本回合行動",
+    "en": "Actions this turn"
+  },
+  "ui_action_done": {
+    "zh": "已執行",
+    "en": "resolved"
+  },
+  "ui_action_cancelled": {
+    "zh": "已取消",
+    "en": "cancelled"
+  },
+  "ui_target_label": {
+    "zh": "目標",
+    "en": "Target"
+  },
+  "ui_rolled": {
+    "zh": "擲出",
+    "en": "Rolled"
+  },
+  "ui_all_enemies": {
+    "zh": "全體",
+    "en": "all enemies"
+  },
+  "ui_whole_party": {
+    "zh": "全隊",
+    "en": "the whole party"
+  },
+  "ui_random_hero": {
+    "zh": "隨機一位英雄",
+    "en": "a random hero"
+  },
+  "ui_boss_incoming": {
+    "zh": "預告行動",
+    "en": "Announced"
+  },
+  "ui_view_dice": {
+    "zh": "檢視 12 面",
+    "en": "View all 12 faces"
+  },
+  "ui_hold_for_details": {
+    "zh": "長按可看詳情",
+    "en": "Hold for details"
+  },
+  "ui_tap_die_swap": {
+    "zh": "點骰子切換 A / B",
+    "en": "Tap a die to switch A / B"
+  },
+  "ui_ok": {
+    "zh": "知道了",
+    "en": "Got it"
+  }
+}

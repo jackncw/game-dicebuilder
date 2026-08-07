@@ -1,0 +1,341 @@
+{
+  "B1": {
+    "zh": "釘棒兔",
+    "en": "Basher Bunny",
+    "chapter": 1,
+    "hp": 71,
+    "dice": 2,
+    "gimmick": "rage_combo",
+    "gimmick_zh": "怒濤連擊:第 3、6、9…回合開始時預告,回合結束時額外攻擊 6 點兩次;可被暈眩取消",
+    "gimmick_en": "Raging Combo: announced on turns 3, 6, 9…; at end of turn attacks 6 twice; can be cancelled by Stun",
+    "faces": [
+      {
+        "id": "b1_club",
+        "zh": "掄棒",
+        "en": "Club Swing",
+        "atk": 7,
+        "count": 2
+      },
+      {
+        "id": "b1_flail",
+        "zh": "亂棒",
+        "en": "Wild Flail",
+        "aoe": true,
+        "atk": 4,
+        "count": 1
+      },
+      {
+        "id": "b1_charge",
+        "zh": "蓄力",
+        "en": "Wind Up",
+        "charge": 4,
+        "count": 1
+      },
+      {
+        "id": "b1_hide",
+        "zh": "硬皮",
+        "en": "Tough Hide",
+        "block": 5,
+        "count": 1
+      },
+      {
+        "id": "b1_stomp",
+        "zh": "踐踏",
+        "en": "Stomp",
+        "atk": 5,
+        "count": 1
+      }
+    ]
+  },
+  "B2": {
+    "zh": "拳擊兔",
+    "en": "Boxer Hare",
+    "chapter": 1,
+    "hp": 65,
+    "dice": 2,
+    "gimmick": "combo_chain",
+    "gimmick_zh": "連段:本回合每次攻擊都比上一次 +1",
+    "gimmick_en": "Combo Chain: each attack this turn hits +1 harder than the last",
+    "faces": [
+      {
+        "id": "b2_jab",
+        "zh": "刺拳",
+        "en": "Jab",
+        "atk": 3,
+        "count": 3
+      },
+      {
+        "id": "b2_hook",
+        "zh": "勾拳",
+        "en": "Hook",
+        "atk": 6,
+        "count": 1
+      },
+      {
+        "id": "b2_dodge",
+        "zh": "閃避",
+        "en": "Dodge",
+        "block": 6,
+        "count": 1
+      },
+      {
+        "id": "b2_counter",
+        "zh": "反擊架式",
+        "en": "Counter Stance",
+        "counter": 4,
+        "count": 1
+      }
+    ]
+  },
+  "B3": {
+    "zh": "騎鵝蛙劍士",
+    "en": "Sir Croak",
+    "chapter": 2,
+    "hp": 51,
+    "dice": 2,
+    "gimmick": "two_phase",
+    "gimmick_zh": "雙階段:騎鵝階段被擊倒後落地(HP 48,每回合擲 3 顆骰子)",
+    "gimmick_en": "Two Phases: when the goose falls he dismounts (HP 45, rolls 3 dice per turn)",
+    "phase2_hp": 51,
+    "phase2_dice": 3,
+    "faces": [
+      {
+        "id": "b3_dive",
+        "zh": "俯衝",
+        "en": "Dive",
+        "atk": 8,
+        "count": 1
+      },
+      {
+        "id": "b3_thrust",
+        "zh": "突刺",
+        "en": "Thrust",
+        "atk": 6,
+        "pierce": true,
+        "count": 1
+      },
+      {
+        "id": "b3_flap",
+        "zh": "振翅",
+        "en": "Wing Flap",
+        "aoe": true,
+        "atk": 3,
+        "count": 1
+      },
+      {
+        "id": "b3_wing",
+        "zh": "護翼",
+        "en": "Wing Guard",
+        "block": 6,
+        "count": 1
+      },
+      {
+        "id": "b3_honk",
+        "zh": "嘎嘎",
+        "en": "Honk",
+        "weaken": 2,
+        "count": 1
+      },
+      {
+        "id": "b3_charge",
+        "zh": "蓄力",
+        "en": "Gather",
+        "charge": 3,
+        "count": 1
+      }
+    ],
+    "phase2_faces": [
+      {
+        "id": "b3_dance",
+        "zh": "劍舞",
+        "en": "Sword Dance",
+        "atk": 5,
+        "boss_combo": true,
+        "count": 2
+      },
+      {
+        "id": "b3_thrust2",
+        "zh": "突刺",
+        "en": "Thrust",
+        "atk": 6,
+        "pierce": true,
+        "count": 2
+      },
+      {
+        "id": "b3_guard2",
+        "zh": "格擋",
+        "en": "Guard",
+        "block": 5,
+        "count": 1
+      },
+      {
+        "id": "b3_taunt2",
+        "zh": "挑釁",
+        "en": "Provoke",
+        "expose": true,
+        "count": 1
+      }
+    ]
+  },
+  "B4": {
+    "zh": "魚骨貓",
+    "en": "Fishbone Filcher",
+    "chapter": 2,
+    "hp": 88,
+    "dice": 2,
+    "gimmick": "die_steal",
+    "gimmick_zh": "每回合開始時輪流偷走一位英雄的骰子(下回合歸還,不會連續偷同一位)",
+    "gimmick_en": "At the start of each turn steals a hero's die in rotation (returned next turn, never the same hero twice in a row)",
+    "faces": [
+      {
+        "id": "b4_spike",
+        "zh": "骨刺",
+        "en": "Bone Spike",
+        "atk": 6,
+        "pierce": true,
+        "count": 2
+      },
+      {
+        "id": "b4_frenzy",
+        "zh": "亂舞",
+        "en": "Wild Dance",
+        "aoe": true,
+        "atk": 3,
+        "count": 1
+      },
+      {
+        "id": "b4_spin",
+        "zh": "魚骨迴旋",
+        "en": "Fishbone Whirl",
+        "atk": 7,
+        "count": 1
+      },
+      {
+        "id": "b4_sneak",
+        "zh": "潛行",
+        "en": "Prowl",
+        "block": 7,
+        "count": 1
+      },
+      {
+        "id": "b4_catwalk",
+        "zh": "貓步",
+        "en": "Catwalk",
+        "expose": true,
+        "count": 1
+      }
+    ]
+  },
+  "B5": {
+    "zh": "鎧甲貓騎士",
+    "en": "Sir Purrceval",
+    "chapter": 3,
+    "hp": 75,
+    "dice": 2,
+    "gimmick": "heavy_armor",
+    "gimmick_zh": "每回合開始時獲得格擋;HP≤50% 時卸甲 — 格擋下降,所有攻擊面 +2",
+    "gimmick_en": "Gains Block 12 at start of each turn; at ≤50% HP sheds armor — Block becomes 6, all attack faces +3",
+    "passive": {
+      "type": "start_block",
+      "value": 6
+    },
+    "unarmored_block": 4,
+    "unarmored_atk_bonus": 2,
+    "faces": [
+      {
+        "id": "b5_sword",
+        "zh": "重劍",
+        "en": "Great Sword",
+        "atk": 6,
+        "count": 2
+      },
+      {
+        "id": "b5_judge",
+        "zh": "審判",
+        "en": "Judgement",
+        "atk": 5,
+        "pierce": true,
+        "count": 1
+      },
+      {
+        "id": "b5_bash",
+        "zh": "盾擊",
+        "en": "Shield Bash",
+        "atk": 4,
+        "cancel_die": 1,
+        "count": 1
+      },
+      {
+        "id": "b5_bulwark",
+        "zh": "神聖壁壘",
+        "en": "Holy Bulwark",
+        "block": 8,
+        "count": 1
+      },
+      {
+        "id": "b5_charge",
+        "zh": "騎士衝鋒",
+        "en": "Knight's Charge",
+        "aoe": true,
+        "atk": 3,
+        "count": 1
+      }
+    ]
+  },
+  "B6": {
+    "zh": "蛙大巫師",
+    "en": "Croakomancer",
+    "chapter": 3,
+    "hp": 69,
+    "dice": 2,
+    "gimmick": "summoner_doom",
+    "gimmick_zh": "開戰時召喚 2 隻第三階小怪;第 2、4、6…回合預告「滅世咒」:回合結束時對全體造成 5 點傷害;可被暈眩取消",
+    "gimmick_en": "Summons 2 T3 minions at battle start; on turns 2, 4, 6… casts Doomsday (7 damage to all) at end of turn; can be cancelled by Stun",
+    "summon_pool": [
+      "E01",
+      "E03"
+    ],
+    "doom_damage": 5,
+    "doom_turns": 2,
+    "faces": [
+      {
+        "id": "b6_bolt",
+        "zh": "奧術彈",
+        "en": "Arcane Bolt",
+        "atk": 4,
+        "count": 2
+      },
+      {
+        "id": "b6_storm",
+        "zh": "烈焰風暴",
+        "en": "Flame Storm",
+        "aoe": true,
+        "atk": 2,
+        "burn": 2,
+        "count": 1
+      },
+      {
+        "id": "b6_drain",
+        "zh": "靈息汲取",
+        "en": "Essence Drain",
+        "mana_drain": 3,
+        "heal": 5,
+        "count": 1
+      },
+      {
+        "id": "b6_shield",
+        "zh": "魔盾",
+        "en": "Arcane Shield",
+        "block": 8,
+        "count": 1
+      },
+      {
+        "id": "b6_summon",
+        "zh": "召喚",
+        "en": "Summon",
+        "summon": 1,
+        "count": 1
+      }
+    ]
+  }
+}

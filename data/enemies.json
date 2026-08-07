@@ -1,0 +1,495 @@
+{
+  "E01": {
+    "zh": "綠史萊姆",
+    "en": "Slime",
+    "hp": [
+      14,
+      20,
+      26
+    ],
+    "dice": 1,
+    "faces": [
+      {
+        "id": "e01_bash",
+        "zh": "撞擊",
+        "en": "Bash",
+        "atk": [
+          4,
+          5,
+          5
+        ],
+        "count": 3
+      },
+      {
+        "id": "e01_goo",
+        "zh": "黏液",
+        "en": "Goo",
+        "weaken": [
+          1,
+          1,
+          2
+        ],
+        "count": 1
+      },
+      {
+        "id": "e01_bounce",
+        "zh": "軟彈",
+        "en": "Bounce",
+        "block": [
+          2,
+          3,
+          4
+        ],
+        "count": 2
+      }
+    ]
+  },
+  "E02": {
+    "zh": "尖牙鼠",
+    "en": "Fang Rat",
+    "hp": [
+      9,
+      13,
+      18
+    ],
+    "dice": 1,
+    "faces": [
+      {
+        "id": "e02_nip",
+        "zh": "快咬",
+        "en": "Quick Nip",
+        "atk": [
+          3,
+          4,
+          3
+        ],
+        "count": 4
+      },
+      {
+        "id": "e02_scurry",
+        "zh": "逃竄",
+        "en": "Scurry",
+        "block": [
+          2,
+          3,
+          4
+        ],
+        "count": 1
+      },
+      {
+        "id": "e02_bite",
+        "zh": "撕咬",
+        "en": "Bite",
+        "atk": [
+          5,
+          7,
+          7
+        ],
+        "count": 1
+      }
+    ]
+  },
+  "E03": {
+    "zh": "毒菇怪",
+    "en": "Sporecap",
+    "hp": [
+      16,
+      22,
+      30
+    ],
+    "dice": 1,
+    "faces": [
+      {
+        "id": "e03_spore",
+        "zh": "毒孢",
+        "en": "Toxic Spore",
+        "atk": [
+          1,
+          3,
+          2
+        ],
+        "poison": [
+          2,
+          3,
+          4
+        ],
+        "count": 3
+      },
+      {
+        "id": "e03_cloud",
+        "zh": "孢子雲",
+        "en": "Spore Cloud",
+        "aoe": true,
+        "poison": [
+          1,
+          2,
+          2
+        ],
+        "count": 1
+      },
+      {
+        "id": "e03_cap",
+        "zh": "菌傘",
+        "en": "Cap Guard",
+        "block": [
+          3,
+          4,
+          5
+        ],
+        "count": 2
+      }
+    ]
+  },
+  "E04": {
+    "zh": "石甲蟲",
+    "en": "Stone Beetle",
+    "hp": [
+      18,
+      24,
+      31
+    ],
+    "dice": 1,
+    "passive": {
+      "type": "start_block",
+      "value": [
+        2,
+        3,
+        4
+      ]
+    },
+    "faces": [
+      {
+        "id": "e04_pinch",
+        "zh": "鉗擊",
+        "en": "Pinch",
+        "atk": [
+          5,
+          6,
+          5
+        ],
+        "count": 3
+      },
+      {
+        "id": "e04_harden",
+        "zh": "硬化",
+        "en": "Harden",
+        "block": [
+          4,
+          6,
+          8
+        ],
+        "count": 2
+      },
+      {
+        "id": "e04_ram",
+        "zh": "衝撞",
+        "en": "Ram",
+        "atk": [
+          7,
+          9,
+          7
+        ],
+        "count": 1
+      }
+    ]
+  },
+  "E05": {
+    "zh": "暗影蛾",
+    "en": "Gloom Moth",
+    "hp": [
+      12,
+      16,
+      23
+    ],
+    "dice": 1,
+    "faces": [
+      {
+        "id": "e05_dust",
+        "zh": "鱗粉",
+        "en": "Scale Dust",
+        "weaken": [
+          1,
+          2,
+          2
+        ],
+        "count": 2
+      },
+      {
+        "id": "e05_swoop",
+        "zh": "撲擊",
+        "en": "Swoop",
+        "atk": [
+          4,
+          5,
+          5
+        ],
+        "count": 3
+      },
+      {
+        "id": "e05_phase",
+        "zh": "虛影",
+        "en": "Phase",
+        "block": [
+          3,
+          5,
+          7
+        ],
+        "count": 1
+      }
+    ]
+  },
+  "E06": {
+    "zh": "荊棘藤",
+    "en": "Bramble Vine",
+    "hp": [
+      17,
+      23,
+      26
+    ],
+    "dice": 1,
+    "passive": {
+      "type": "thorns",
+      "value": [
+        2,
+        3,
+        4
+      ]
+    },
+    "faces": [
+      {
+        "id": "e06_lash",
+        "zh": "鞭打",
+        "en": "Lash",
+        "atk": [
+          4,
+          6,
+          5
+        ],
+        "count": 3
+      },
+      {
+        "id": "e06_entangle",
+        "zh": "纏繞",
+        "en": "Entangle",
+        "bind": 1,
+        "count": 2
+      },
+      {
+        "id": "e06_bark",
+        "zh": "木甲",
+        "en": "Bark Armor",
+        "block": [
+          3,
+          4,
+          5
+        ],
+        "count": 1
+      }
+    ]
+  },
+  "E07": {
+    "zh": "骨狼",
+    "en": "Bone Wolf",
+    "hp": [
+      17,
+      26,
+      30
+    ],
+    "dice": 1,
+    "faces": [
+      {
+        "id": "e07_bite",
+        "zh": "撕咬",
+        "en": "Pack Bite",
+        "atk": [
+          5,
+          7,
+          5
+        ],
+        "pack_bonus": 2,
+        "count": 3
+      },
+      {
+        "id": "e07_howl",
+        "zh": "嚎叫",
+        "en": "Howl",
+        "howl": [
+          1,
+          2,
+          2
+        ],
+        "count": 1
+      },
+      {
+        "id": "e07_pounce",
+        "zh": "突襲",
+        "en": "Pounce",
+        "atk": [
+          6,
+          9,
+          6
+        ],
+        "count": 2
+      }
+    ]
+  },
+  "E08": {
+    "zh": "怨靈",
+    "en": "Wraith",
+    "hp": [
+      13,
+      21,
+      24
+    ],
+    "dice": 1,
+    "faces": [
+      {
+        "id": "e08_claw",
+        "zh": "穿刺爪",
+        "en": "Phase Claw",
+        "atk": [
+          4,
+          5,
+          4
+        ],
+        "pierce": true,
+        "count": 3
+      },
+      {
+        "id": "e08_curse",
+        "zh": "詛咒",
+        "en": "Curse",
+        "curse": 1,
+        "count": 1
+      },
+      {
+        "id": "e08_fade",
+        "zh": "虛化",
+        "en": "Fade",
+        "block": [
+          4,
+          6,
+          8
+        ],
+        "count": 2
+      }
+    ]
+  },
+  "E09": {
+    "zh": "熔岩蟾",
+    "en": "Magma Toad",
+    "hp": [
+      18,
+      29,
+      32
+    ],
+    "dice": 1,
+    "faces": [
+      {
+        "id": "e09_spit",
+        "zh": "噴火",
+        "en": "Fire Spit",
+        "aoe": true,
+        "atk": [
+          3,
+          4,
+          3
+        ],
+        "burn": [
+          1,
+          2,
+          2
+        ],
+        "count": 2
+      },
+      {
+        "id": "e09_tongue",
+        "zh": "舌擊",
+        "en": "Tongue Lash",
+        "atk": [
+          6,
+          8,
+          6
+        ],
+        "count": 2
+      },
+      {
+        "id": "e09_breath",
+        "zh": "灼燒吐息",
+        "en": "Scorch Breath",
+        "atk": [
+          5,
+          7,
+          5
+        ],
+        "burn": [
+          2,
+          3,
+          4
+        ],
+        "count": 1
+      },
+      {
+        "id": "e09_puff",
+        "zh": "鼓脹",
+        "en": "Puff Up",
+        "block": [
+          3,
+          4,
+          5
+        ],
+        "count": 1
+      }
+    ]
+  },
+  "E10": {
+    "zh": "雙頭蛇",
+    "en": "Twin Viper",
+    "hp": [
+      20,
+      32,
+      38
+    ],
+    "dice": 2,
+    "faces": [
+      {
+        "id": "e10_fang",
+        "zh": "毒牙",
+        "en": "Venom Fang",
+        "atk": [
+          4,
+          5,
+          4
+        ],
+        "poison": [
+          1,
+          2,
+          2
+        ],
+        "count": 3
+      },
+      {
+        "id": "e10_coil",
+        "zh": "絞纏",
+        "en": "Constrict",
+        "atk": [
+          5,
+          7,
+          5
+        ],
+        "count": 2
+      },
+      {
+        "id": "e10_shed",
+        "zh": "蛻皮",
+        "en": "Shed Skin",
+        "heal": [
+          3,
+          4,
+          6
+        ],
+        "count": 1
+      }
+    ]
+  }
+}

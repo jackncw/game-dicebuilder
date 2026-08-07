@@ -1,0 +1,8 @@
+.godot/
+art_export/
+*.tmp
+export/
+*.apk
+*.aab
+*.pck
+.godot-prompter-cache/

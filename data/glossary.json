@@ -1,0 +1,619 @@
+{
+  "_comment": "Single source for every keyword/mechanic explanation in the game. Battle tooltips, the face-swap screen, the codex and the shop all read from here — nowhere else keeps its own copy of these sentences. Each entry: zh/en name, d_zh/d_en full explanation, glyph (icon key), hue (category colour key). All player-facing Chinese here is standard written Traditional Chinese.",
+  "atk": {
+    "zh": "攻擊",
+    "en": "Attack",
+    "glyph": "atk",
+    "hue": "attack",
+    "d_zh": "對目標造成 X 點傷害;先扣格擋,剩餘的才扣 HP",
+    "d_en": "Deals X damage to the target — Block absorbs first, the rest comes off HP"
+  },
+  "block": {
+    "zh": "格擋",
+    "en": "Block",
+    "glyph": "block",
+    "hue": "defense",
+    "d_zh": "本回合抵擋 X 點傷害。回合結束時未用完的格擋會清空(刺蝟盾衛的被動除外)",
+    "d_en": "Prevents X damage this turn. Unspent Block is cleared at end of turn (except by the Hedgehog Bulwark's passive)"
+  },
+  "heal": {
+    "zh": "治療",
+    "en": "Heal",
+    "glyph": "heal",
+    "hue": "heal",
+    "d_zh": "回復 X 點 HP,不會超過上限;治療已倒下的隊友會令他復活",
+    "d_en": "Restores X HP up to the maximum; healing a downed ally revives them"
+  },
+  "mana": {
+    "zh": "靈息",
+    "en": "Essence",
+    "glyph": "mana",
+    "hue": "resource",
+    "d_zh": "汲取 X 點森林靈息。靈息由全隊共用,上限 10,只有靈術面會消耗它",
+    "d_en": "Draw X Essence from the forest. Essence is shared by the whole party, caps at 10, and is only spent by Ritual faces"
+  },
+  "poison": {
+    "zh": "中毒",
+    "en": "Poison",
+    "glyph": "poison",
+    "hue": "resource",
+    "d_zh": "回合結束時受到等同層數的傷害(無視格擋),之後層數 -1",
+    "d_en": "At end of turn, take damage equal to the stack count (ignores Block), then the stack drops by 1"
+  },
+  "burn": {
+    "zh": "灼燒",
+    "en": "Burn",
+    "glyph": "burn",
+    "hue": "special",
+    "d_zh": "下一次回合結束時受到 X 點傷害,然後整個效果移除(不會逐層遞減)",
+    "d_en": "At the end of the next turn take X damage, then the effect is removed entirely (it does not tick down)"
+  },
+  "stun": {
+    "zh": "暈眩",
+    "en": "Stun",
+    "glyph": "stun",
+    "hue": "control",
+    "d_zh": "取消敵人一顆已擲但未執行的骰子。被取消的意圖本回合不會發生",
+    "d_en": "Cancels one rolled but unresolved enemy die — that intent simply never happens this turn"
+  },
+  "weaken": {
+    "zh": "弱化",
+    "en": "Weaken",
+    "glyph": "weaken",
+    "hue": "control",
+    "d_zh": "目標本回合所有骰面數值 -X(最低 0),攻擊、格擋、治療一律計算在內",
+    "d_en": "Target's die face values are reduced by X this turn (minimum 0) — attack, block and heal alike"
+  },
+  "expose": {
+    "zh": "易傷",
+    "en": "Expose",
+    "glyph": "expose",
+    "hue": "control",
+    "d_zh": "目標本回合受到的傷害 +50%(向上取整)",
+    "d_en": "The target takes 50% more damage this turn (rounded up)"
+  },
+  "taunt": {
+    "zh": "嘲諷",
+    "en": "Taunt",
+    "glyph": "taunt",
+    "hue": "defense",
+    "d_zh": "本回合敵人所有單體攻擊都必須以這位英雄為目標;全體攻擊不受影響",
+    "d_en": "Enemy single-target attacks must all target this hero this turn; area attacks are unaffected"
+  },
+  "thorns": {
+    "zh": "荊棘",
+    "en": "Thorns",
+    "glyph": "thorns",
+    "hue": "special",
+    "d_zh": "被攻擊命中時反彈 X 點傷害給攻擊者(無視格擋)。回合結束時層數 -1,除非你持有荊棘王冠,或該回合用過「堅守」",
+    "d_en": "Reflects X damage back at any attacker that hits you (ignores Block). The stack drops by 1 at end of turn, unless you hold the Bramble Crown or used Hold Fast that turn"
+  },
+  "regen": {
+    "zh": "再生",
+    "en": "Regen",
+    "glyph": "regen",
+    "hue": "heal",
+    "d_zh": "回合結束時回復等同層數的 HP,之後層數 -1",
+    "d_en": "At end of turn, heal HP equal to the stack count, then the stack drops by 1"
+  },
+  "lifesteal": {
+    "zh": "吸血",
+    "en": "Lifesteal",
+    "glyph": "lifesteal",
+    "hue": "attack",
+    "d_zh": "回復實際造成傷害的 50%(向下取整);被格擋掉的部分不計算在內",
+    "d_en": "Heals for 50% of the damage actually dealt (rounded down) — damage soaked by Block does not count"
+  },
+  "combo": {
+    "zh": "連擊",
+    "en": "Combo",
+    "glyph": "combo",
+    "hue": "attack",
+    "d_zh": "如果本回合已經使用過其他攻擊面,此面數值 +2",
+    "d_en": "If another attack face has already been used this turn, this face gets +2"
+  },
+  "pierce": {
+    "zh": "穿透",
+    "en": "Pierce",
+    "glyph": "pierce",
+    "hue": "attack",
+    "d_zh": "完全無視目標的格擋,傷害直接扣 HP",
+    "d_en": "Ignores the target's Block completely — the damage goes straight to HP"
+  },
+  "cleave": {
+    "zh": "橫掃",
+    "en": "Cleave",
+    "glyph": "cleave",
+    "hue": "attack",
+    "d_zh": "除了目標之外,同時命中他左右相鄰的敵人",
+    "d_en": "Also hits the enemies standing immediately either side of the target"
+  },
+  "aoe": {
+    "zh": "全體",
+    "en": "Sweep",
+    "glyph": "aoe",
+    "hue": "attack",
+    "d_zh": "命中場上所有存活的敵人,不必指定目標",
+    "d_en": "Hits every living enemy at once — no target needs to be picked"
+  },
+  "sweep": {
+    "zh": "全體",
+    "en": "Sweep",
+    "glyph": "aoe",
+    "hue": "attack",
+    "d_zh": "命中場上所有存活的敵人,不必指定目標",
+    "d_en": "Hits every living enemy at once — no target needs to be picked"
+  },
+  "wild": {
+    "zh": "百搭",
+    "en": "Wild",
+    "glyph": "wild",
+    "hue": "special",
+    "d_zh": "複製隊伍本回合任何一顆已擲出的骰面(包括已經使用過的),然後以複製到的那個面的規則結算",
+    "d_en": "Copies any die face your party has rolled this turn (even ones already spent), then resolves exactly as that face"
+  },
+  "spell": {
+    "zh": "靈術",
+    "en": "Ritual",
+    "glyph": "spell",
+    "hue": "resource",
+    "d_zh": "需消耗 N 點靈息方可施展;靈息不足時無法使用",
+    "d_en": "Casting this face costs N Essence — without enough Essence it cannot be used at all"
+  },
+  "growth": {
+    "zh": "成長",
+    "en": "Growth",
+    "glyph": "growth",
+    "hue": "special",
+    "d_zh": "每使用一次,這個面的數值在本次冒險中永久 +1(不會增加「+」符號,但數字會上升)",
+    "d_en": "Every use permanently raises this face's value by 1 for the rest of the run (no \"+\" mark is earned, but the number climbs)"
+  },
+  "pain": {
+    "zh": "自損",
+    "en": "Recoil",
+    "glyph": "pain",
+    "hue": "attack",
+    "d_zh": "結算時使用者自己扣 X 點 HP,不受格擋減免,而且在效果結算之前先扣(可以令自己倒下,效果仍然生效)",
+    "d_en": "The user loses X HP as this resolves. Block does not reduce it, and it is paid before the effect goes off — it can down you, and the effect still happens"
+  },
+  "lucky": {
+    "zh": "幸運",
+    "en": "Lucky",
+    "glyph": "lucky",
+    "hue": "control",
+    "d_zh": "這個面一被擲出就立即 +1 重擲,不必使用它",
+    "d_en": "The moment this face is rolled you gain +1 reroll — you do not have to use it"
+  },
+  "rerolls": {
+    "zh": "洞察",
+    "en": "Insight",
+    "glyph": "insight",
+    "hue": "resource",
+    "d_zh": "獲得 X 次重擲。本作沒有免費重擲,全部要靠骰面、遺物和藥水",
+    "d_en": "Gain X rerolls. There are no free rerolls in this game — they only come from faces, relics and potions"
+  },
+  "buff_next_atk": {
+    "zh": "蓄勢",
+    "en": "Focus",
+    "glyph": "charge",
+    "hue": "defense",
+    "d_zh": "這位英雄「下一回合」所有攻擊骰面數值 +X。只限下一回合,回合完結就消失,也不會累積到之後",
+    "d_en": "This hero's attack faces get +X on the NEXT turn only. It expires at the end of that turn and does not carry further"
+  },
+  "echo": {
+    "zh": "迴響",
+    "en": "Reverb",
+    "glyph": "echo",
+    "hue": "resource",
+    "d_zh": "使用之後,全隊下一個使用的骰面數值 +X。再之後就消失",
+    "d_en": "After this is used, the party's very next face gets +X. It is gone after that one face"
+  },
+  "cleanse_self": {
+    "zh": "淨化",
+    "en": "Cleanse",
+    "glyph": "cleanse",
+    "hue": "defense",
+    "d_zh": "清除自己身上的中毒、灼燒、弱化和易傷",
+    "d_en": "Removes Poison, Burn, Weaken and Expose from yourself"
+  },
+  "cleanse_target": {
+    "zh": "淨化",
+    "en": "Cleanse",
+    "glyph": "cleanse",
+    "hue": "heal",
+    "d_zh": "清除目標身上的中毒、灼燒、弱化和易傷",
+    "d_en": "Removes Poison, Burn, Weaken and Expose from the target"
+  },
+  "self_heal": {
+    "zh": "自療",
+    "en": "Self-heal",
+    "glyph": "heal",
+    "hue": "heal",
+    "d_zh": "使用者自己回復 X 點 HP",
+    "d_en": "The user restores X HP to themselves"
+  },
+  "steal_die": {
+    "zh": "奪骰",
+    "en": "Die Theft",
+    "glyph": "steal",
+    "hue": "special",
+    "d_zh": "奪取敵人一顆已擲的骰子,再指定一個敵人,用那顆骰子的效果攻擊他",
+    "d_en": "Takes one of the enemy's rolled dice, then fires that die's effect at an enemy of your choice"
+  },
+  "curse": {
+    "zh": "詛咒",
+    "en": "Curse",
+    "glyph": "curse",
+    "hue": "resource",
+    "d_zh": "玩家隨機一個骰面在本場戰鬥中變成空白面,戰鬥結束後回復",
+    "d_en": "One random player die face turns blank for the rest of this battle, and comes back afterwards"
+  },
+  "bind": {
+    "zh": "束縛",
+    "en": "Bind",
+    "glyph": "bind",
+    "hue": "control",
+    "d_zh": "被束縛的英雄下回合無法重擲",
+    "d_en": "The bound hero cannot reroll next turn"
+  },
+  "steal": {
+    "zh": "偷骰",
+    "en": "Steal",
+    "glyph": "steal",
+    "hue": "special",
+    "d_zh": "該英雄本回合沒有骰子可用,下回合歸還",
+    "d_en": "That hero has no dice this turn; they are returned next turn"
+  },
+  "charge": {
+    "zh": "凝力",
+    "en": "Gather Power",
+    "glyph": "charge",
+    "hue": "special",
+    "d_zh": "敵人本回合不出手,改為積蓄力量,之後的攻擊會強很多",
+    "d_en": "The enemy skips acting this turn to build power — its later attack hits far harder"
+  },
+  "counter": {
+    "zh": "反擊",
+    "en": "Counter",
+    "glyph": "counter",
+    "hue": "special",
+    "d_zh": "敵人擺出反擊姿態:本回合攻擊他會受到 X 點反傷",
+    "d_en": "The enemy braces to counter — attacking it this turn deals X damage back to you"
+  },
+  "howl": {
+    "zh": "嚎叫",
+    "en": "Howl",
+    "glyph": "howl",
+    "hue": "special",
+    "d_zh": "敵人嚎叫,強化己方全體的攻擊",
+    "d_en": "The enemy howls, strengthening every enemy's attacks"
+  },
+  "summon": {
+    "zh": "召喚",
+    "en": "Summon",
+    "glyph": "summon",
+    "hue": "resource",
+    "d_zh": "敵人召喚一隻新的小怪到場上",
+    "d_en": "The enemy calls another minion onto the field"
+  },
+  "cancel_die": {
+    "zh": "消骰",
+    "en": "Nullify",
+    "glyph": "cancel",
+    "hue": "control",
+    "d_zh": "敵人取消玩家一顆已擲的骰子",
+    "d_en": "The enemy cancels one of your rolled dice"
+  },
+  "mana_drain": {
+    "zh": "靈息汲取",
+    "en": "Essence Drain",
+    "glyph": "mana",
+    "hue": "resource",
+    "d_zh": "敵人抽走隊伍 X 點靈息",
+    "d_en": "The enemy drains X Essence from your party"
+  },
+  "down": {
+    "zh": "倒下",
+    "en": "Downed",
+    "glyph": "down",
+    "hue": "attack",
+    "d_zh": "HP 歸零的英雄倒下,不會擲骰也不會行動,直到被治療復活;全隊倒下就戰鬥失敗",
+    "d_en": "A hero at 0 HP is downed: no dice, no actions, until a heal revives them. The battle is lost when the whole party is down"
+  },
+  "blank": {
+    "zh": "空白面",
+    "en": "Blank Face",
+    "glyph": "blank",
+    "hue": "special",
+    "d_zh": "沒有任何效果的面。擲到空白面即是這顆骰子本回合沒有用處",
+    "d_en": "A face with no effect at all — rolling it means that die does nothing this turn"
+  },
+  "lock": {
+    "zh": "鎖定",
+    "en": "Lock",
+    "glyph": "lock",
+    "hue": "control",
+    "d_zh": "點骰子上的鎖就可以把它釘住。被鎖住的骰不會被重擲,而且會一直保留到下一個回合——直到你解鎖它,或者把它用掉。蓄力、呼應、換位和雙舞全部建基於這條規則",
+    "d_en": "Tap the pin on a die to lock it. A locked die is never rerolled and keeps its face into the following turns — until you unlock it or spend it. Charge, Echo, Switch and Twin Dance all build on this rule"
+  },
+  "charge_up": {
+    "zh": "蓄力",
+    "en": "Charge",
+    "glyph": "chargeup",
+    "hue": "attack",
+    "d_zh": "這個面每在鎖定位渡過一個完整回合,使用時數值 +X(最多累積到 +3X);一使用就歸零,解鎖或重擲亦會歸零",
+    "d_en": "For every full turn this face spends locked, it is worth +X more when spent (stacking up to +3X). Using it resets the stack to zero, and so does unlocking or rerolling the die"
+  },
+  "resonate": {
+    "zh": "呼應",
+    "en": "Echo",
+    "glyph": "resonate",
+    "hue": "attack",
+    "d_zh": "使用這個面時,如果同一位英雄另一顆骰處於鎖定狀態,而且它當時的面屬於指定類別(預設為攻擊面),此面數值 +X",
+    "d_en": "When this face is spent, if the same hero's other die is locked and the face showing on it is of the named kind (an attack face unless stated otherwise), this face gets +X"
+  },
+  "resonate_req": {
+    "zh": "呼應條件",
+    "en": "Echo Requirement",
+    "glyph": "resonate",
+    "hue": "control",
+    "d_zh": "這個面只有在呼應條件成立時才可以使用:同一位英雄另一顆骰必須處於鎖定狀態,而且顯示指定類別的面",
+    "d_en": "This face can only be used while its Echo condition holds: the same hero's other die must be locked and showing a face of the named kind"
+  },
+  "hits": {
+    "zh": "多重攻擊",
+    "en": "Multi-hit",
+    "glyph": "multi",
+    "hue": "attack",
+    "d_zh": "寫作「X×N」:以 X 的數值連續攻擊 N 次。每一次都獨立扣格擋,所以對高格擋敵人較吃虧,對荊棘和反擊則會被彈 N 次",
+    "d_en": "Written \"X×N\": strikes N separate times for X each. Every hit is blocked separately, so it fares badly into high Block — and it takes Thorns and Counter damage once per hit"
+  },
+  "team_atk": {
+    "zh": "戰吼",
+    "en": "Rally",
+    "glyph": "atk",
+    "hue": "attack",
+    "d_zh": "本回合全隊所有攻擊面 +X,回合結束時消失",
+    "d_en": "Every hero's attack faces get +X for the rest of this turn, then it wears off"
+  },
+  "all_pierce": {
+    "zh": "全體穿透",
+    "en": "Total Pierce",
+    "glyph": "pierce",
+    "hue": "attack",
+    "d_zh": "本回合隊伍所有攻擊一律無視格擋",
+    "d_en": "Every attack your party makes this turn ignores Block"
+  },
+  "thorn_hold": {
+    "zh": "荊棘不衰",
+    "en": "Quills Held",
+    "glyph": "thorns",
+    "hue": "defense",
+    "d_zh": "本回合結束時,這位英雄的荊棘不會減少",
+    "d_en": "This hero's Thorns do not decay at the end of this turn"
+  },
+  "thorns_double": {
+    "zh": "荊棘倍化",
+    "en": "Quill Surge",
+    "glyph": "thorns",
+    "hue": "defense",
+    "d_zh": "當前荊棘層數翻倍,單次最多增加 X 層",
+    "d_en": "Doubles your current Thorns, adding at most X layers in one go"
+  },
+  "atk_from_block": {
+    "zh": "盾能轉化",
+    "en": "Shield Force",
+    "glyph": "block",
+    "hue": "attack",
+    "d_zh": "傷害等於你當前的格擋值(上限 X)。格擋不會因此消耗",
+    "d_en": "Deals damage equal to your current Block, capped at X. The Block itself is not spent"
+  },
+  "block_from_mana": {
+    "zh": "靈息轉化",
+    "en": "Essence Ward",
+    "glyph": "mana",
+    "hue": "defense",
+    "d_zh": "獲得等同隊伍當前靈息的格擋(上限 X)。靈息不會因此消耗",
+    "d_en": "Gain Block equal to the party's current Essence, capped at X. The Essence itself is not spent"
+  },
+  "lock_boost": {
+    "zh": "磨刃",
+    "en": "Whet",
+    "glyph": "lock",
+    "hue": "defense",
+    "d_zh": "這位英雄目前鎖定中的那顆骰,下回合數值 +X",
+    "d_en": "Whichever die this hero currently has locked is worth +X next turn"
+  },
+  "twin_dance": {
+    "zh": "雙舞",
+    "en": "Twin Dance",
+    "glyph": "lock",
+    "hue": "special",
+    "d_zh": "本回合這位英雄可以額外使用他鎖定中的那顆骰,而且用完之後那顆骰仍然保持鎖定、保持同一個面",
+    "d_en": "This turn the hero may also spend the die they have locked — and that die stays locked, on the same face, afterwards"
+  },
+  "self_atk_now": {
+    "zh": "暴走",
+    "en": "Rampage",
+    "glyph": "charge",
+    "hue": "attack",
+    "d_zh": "本回合這位英雄所有攻擊面 +X",
+    "d_en": "This hero's attack faces get +X for the rest of this turn"
+  },
+  "heal_on_hit": {
+    "zh": "嗜血",
+    "en": "Bloodthirst",
+    "glyph": "lifesteal",
+    "hue": "heal",
+    "d_zh": "只要這一擊真的扣到目標的 HP,使用者回復 X 點 HP(被格擋完全吸收就沒有回復)",
+    "d_en": "If the blow actually took HP off the target, the user restores X HP — fully blocked, it heals nothing"
+  },
+  "next_dice_boost": {
+    "zh": "孤注",
+    "en": "All In",
+    "glyph": "chargeup",
+    "hue": "special",
+    "d_zh": "下回合這位英雄兩顆骰的數值都 +X",
+    "d_en": "Next turn both of this hero's dice are worth +X"
+  },
+  "low_hp_atk": {
+    "zh": "背水",
+    "en": "Last Ditch",
+    "glyph": "pain",
+    "hue": "attack",
+    "d_zh": "HP 在 50% 或以下時,這個面的攻擊數值改為 X",
+    "d_en": "While at 50% HP or less, this face's attack value becomes X instead"
+  },
+  "act_once": {
+    "zh": "每回合一次",
+    "en": "One action a turn",
+    "glyph": "cancel",
+    "hue": "control",
+    "d_zh": "每位英雄每回合只可以使用一顆骰子。使用了 A 骰,B 骰即時鎖住,下回合才解鎖",
+    "d_en": "Each hero may spend only one die a turn. Spending the A die locks the B die out until next turn"
+  },
+  "relic": {
+    "zh": "遺物",
+    "en": "Relic",
+    "glyph": "relic",
+    "hue": "special",
+    "d_zh": "整場冒險持續生效的被動寶物。普通遺物來自精英戰、事件、商店和寶箱;高級遺物只會在第 1、2 章擊敗頭目後二選一獲得",
+    "d_en": "A passive treasure that lasts the whole run. Common relics come from elites, events, the shop and chests; Advanced relics only ever come from the 2-pick after the chapter 1 and 2 bosses"
+  },
+  "twin_dice": {
+    "zh": "雙骰",
+    "en": "Twin Dice",
+    "glyph": "r_twinmoon",
+    "hue": "special",
+    "d_zh": "雙月徽記的效果:每回合有一位英雄可以連續使用兩顆骰子,不受「每回合一次」限制。誰享有這個待遇由你在使用第一顆骰子時決定",
+    "d_en": "The Twin Moon Seal's effect: one hero a turn may spend both of their dice, ignoring the one-action-a-turn rule. Whoever acts first with the Seal in play claims it for that turn"
+  },
+  "old_sergeant": {
+    "zh": "老班長",
+    "en": "Old Sergeant",
+    "glyph": "block",
+    "hue": "defense",
+    "d_zh": "獾斧衛士專屬:他所有攻擊面數值 +1,而且每回合開始時獲得 2 點格擋,不必花骰子",
+    "d_en": "Badger Vanguard only: all his attack faces get +1, and he gains 2 Block at the start of every turn without spending a die"
+  },
+  "held_breath": {
+    "zh": "屏息",
+    "en": "Held Breath",
+    "glyph": "pierce",
+    "hue": "attack",
+    "d_zh": "野兔神射手專屬:他所有帶「穿透」的攻擊面數值 +2。「鷹眼」令全隊本回合攻擊穿透時,他自己的攻擊也吃到這個加成",
+    "d_en": "Hare Marksman only: every attack face of his that has Pierce gets +2. While Hawkeye makes the party's attacks pierce, his own attacks pick the bonus up too"
+  },
+  "quilled_hide": {
+    "zh": "棘甲",
+    "en": "Quilled Hide",
+    "glyph": "block",
+    "hue": "defense",
+    "d_zh": "刺蝟盾衛專屬:回合結束時未消耗的格擋不會清空,最多保留 10 點到下回合",
+    "d_en": "Hedgehog Bulwark only: unspent Block is not cleared at end of turn — up to 10 of it carries into the next turn"
+  },
+  "ancient_warden": {
+    "zh": "古老守林者",
+    "en": "Ancient Warden",
+    "glyph": "mana",
+    "hue": "resource",
+    "d_zh": "梟賢者專屬:每場戰鬥開始時全隊獲得 3 點靈息。而且只要隊伍靈息維持在 6 點或以上,他所有骰面(攻擊、格擋、治療)數值 +2——風暴要靈息滿溢才落得下來",
+    "d_en": "Owl Sage only: the party draws 3 Essence at the start of every battle. And while the shared pool sits at 6 or more, all his face values — attack, Block and Heal alike — get +2: the storm only breaks once the essence overflows"
+  },
+  "call_and_answer": {
+    "zh": "一唱一和",
+    "en": "Call and Answer",
+    "glyph": "resonate",
+    "hue": "attack",
+    "d_zh": "狐影雙刃專屬:他的「呼應」條件成立時,加成比骰面寫的再多 +1",
+    "d_en": "Fox Duelist only: whenever one of his Echo conditions is met, the bonus is 1 higher than the face prints"
+  },
+  "cornered_fury": {
+    "zh": "背水之勢",
+    "en": "Cornered Fury",
+    "glyph": "pain",
+    "hue": "attack",
+    "d_zh": "蠻豬破軍專屬:HP 在 50% 或以下時,他所有攻擊面 +2。他的自損面就是把自己推到那條線的手段",
+    "d_en": "Boar Berserker only: while at 50% HP or less all his attack faces get +2. His Recoil faces are how he gets himself down there"
+  },
+  "ruling_atk_plus": {
+    "zh": "遺物裁定:磨刀石 vs 多重攻擊",
+    "en": "Ruling: Whetstone vs Multi-hit",
+    "glyph": "atk",
+    "hue": "attack",
+    "d_zh": "「所有攻擊面 +1」加在傷害數值上,而多重攻擊(X×N)每一下都用同一個數值 —— 所以磨刀石令「絕影 1×4」多打 4 點,而不是 1 點。獸王戰鼓、戰吼、暴走同藥水的全隊攻擊加成一樣照此放大。這是刻意的:把固定加成放大 N 倍正是多重攻擊面的定位。",
+    "d_en": "\"All attack faces +1\" raises the damage VALUE, and every strike of a multi-hit (X×N) face uses that same value — so the Whetstone adds 4 to Phantom Flurry 1×4, not 1. The Warlord's Drum, War Cry, Rampage and the attack potion all scale the same way. This is intended: soaking flat bonuses up N times over is what multi-hit faces are for."
+  },
+  "ruling_drum_multi": {
+    "zh": "遺物裁定:獸王戰鼓 vs 多重攻擊",
+    "en": "Ruling: Warlord's Drum vs Multi-hit",
+    "glyph": "r_drum",
+    "hue": "attack",
+    "d_zh": "戰鼓每「一次使用攻擊面」儲一層,不是每一下。「連珠 2×2」打兩下,但只令戰鼓 +1。",
+    "d_en": "The Drum banks once per attack FACE spent, not once per strike. Rapid Volley 2×2 lands twice but only advances the Drum by one."
+  },
+  "ruling_chalice_recoil": {
+    "zh": "遺物裁定:血之聖杯 vs 自損",
+    "en": "Ruling: Crimson Chalice vs Recoil",
+    "glyph": "r_chalice",
+    "hue": "attack",
+    "d_zh": "聖杯令所有自損 -1(最低 0),所以「猛擊(自損1)」在持有聖杯時完全免費。對蠻豬破軍是雙刃劍:自損正是他把自己推到「背水之勢」門檻的手段,聖杯會令他更難主動掉到一半血。",
+    "d_en": "The Chalice cuts every Recoil cost by 1 (minimum 0), so Smash (Recoil 1) becomes free while you hold it. It cuts both ways for the Boar Berserker: Recoil is how he gets himself under the Cornered Fury line, and the Chalice makes that harder, not easier."
+  },
+  "ruling_crown_thorns": {
+    "zh": "遺物裁定:荊棘王冠 vs 堅守/豎刺",
+    "en": "Ruling: Bramble Crown vs Hold Fast / Bristle",
+    "glyph": "r_crown",
+    "hue": "defense",
+    "d_zh": "王冠令荊棘完全不衰減,而「堅守」只令荊棘本回合不衰減 —— 兩者重疊時堅守的荊棘部分沒有作用,只剩格擋 2。「豎刺」相反:王冠令基數不再回落,每次翻倍都是實質累積。",
+    "d_en": "The Crown stops Thorns decaying at all; Hold Fast only stops it for one turn — held together, Hold Fast's Thorns clause does nothing and you are spending a die on Block 2. Bristle is the opposite: with the base no longer falling back, every doubling compounds."
+  },
+  "ruling_twin_moon_lock": {
+    "zh": "遺物裁定:雙月徽記 vs 鎖定機制",
+    "en": "Ruling: Twin Moon Seal vs the lock",
+    "glyph": "r_twinmoon",
+    "hue": "special",
+    "d_zh": "徽記讓一位英雄一回合用兩顆骰,所以他可以「開火 + 續蓄」:用鎖定中的蓄力面,同一回合再用另一顆。「雙舞」不會佔用徽記的名額 —— 兩者可以在同一回合疊加,那是狐影雙刃最強的一手。",
+    "d_en": "The Seal lets one hero spend both dice, so they can fire a banked Charge and still act with the other die. Twin Dance does NOT consume the Seal's one-hero slot — the two stack in a single turn, and that is the Fox Duelist's best hand."
+  },
+  "ruling_bone_lock": {
+    "zh": "遺物裁定:賭徒之骨 vs 蓄力",
+    "en": "Ruling: Gambler's Bone vs Charge",
+    "glyph": "r_bone",
+    "hue": "special",
+    "d_zh": "鎖定中的骰永遠不會被重擲,所以無限重擲不會洗走蓄力層數 —— 但每次重擲全隊各扣 1 點 HP,而蓄力要三個回合才滿。同時帶自損面的隊伍要自己算清楚這條數。",
+    "d_en": "A pinned die is never rerolled, so unlimited rerolls cannot wash a Charge stack away — but each reroll costs every hero 1 HP, and a full Charge takes three turns. A party also running Recoil faces has to do that arithmetic itself."
+  },
+  "ruling_forest_heart_ward": {
+    "zh": "遺物裁定:森之心 vs 靈息護體",
+    "en": "Ruling: Heart of the Forest vs Essence Aegis",
+    "glyph": "r_heart",
+    "hue": "resource",
+    "d_zh": "森之心每回合 +1 靈息,而「靈息護體」讀的是靈息池而不會消耗它 —— 兩者相乘,而且靈息在 6 點以上時梟賢者的被動同時生效。這是靈息流派最實在的一條線。",
+    "d_en": "The Heart adds 1 Essence a turn, and Essence Aegis reads the pool without spending it — they multiply, and at 6 Essence the Owl Sage's passive is live at the same time. This is the Essence build's straightest line."
+  },
+  "ruling_pierce_block_relics": {
+    "zh": "遺物裁定:盾徽 vs 穿透/盾擊",
+    "en": "Ruling: Shield Crest vs Pierce / Shield Bash",
+    "glyph": "r_crest",
+    "hue": "defense",
+    "d_zh": "盾徽的「所有格擋面 +1」會提高你當前的格擋值,而「盾擊」的傷害等於當前格擋(封頂 6)—— 所以盾徽間接幫刺蝟盾衛加傷害。敵人的穿透則完全無視格擋,盾徽對它毫無幫助。",
+    "d_en": "The Crest's \"+1 to all Block faces\" raises the Block you are standing on, and Shield Bash deals damage equal to that Block (capped at 6) — so the Crest indirectly buys the Hedgehog damage. Enemy Pierce ignores Block outright, and the Crest does nothing against it."
+  },
+  "team_block": {
+    "zh": "全隊格擋",
+    "en": "Party Block",
+    "glyph": "block",
+    "hue": "defense",
+    "d_zh": "全隊每位未倒下嘅英雄各獲得 X 點格擋(唔係共用一份)",
+    "d_en": "Every hero still standing gains X Block each — it is not one pool shared between them"
+  },
+  "team_heal": {
+    "zh": "全隊治療",
+    "en": "Party Heal",
+    "glyph": "heal",
+    "hue": "heal",
+    "d_zh": "全隊每位未倒下嘅英雄各回復 X 點 HP。已倒下嘅隊友唔會被呢種治療復活",
+    "d_en": "Every hero still standing restores X HP each. A downed ally is NOT revived by a party heal"
+  }
+}
