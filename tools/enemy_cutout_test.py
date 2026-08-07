@@ -16,6 +16,34 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "assets", "enemies")
 KEYS = ["E%02d" % i for i in range(1, 11)] + ["B1", "B2", "B3", "B4", "B5", "B6", "B3P2"]
 
+# The eight sheet-sourced minions (`SHEET_CELLS` in enemy_cutout.py) come from
+# ~250px cells of a 3x3 collection JPEG. JPEG compression at that size mashes
+# fine cracks and small eyes into flat grey, so their measured eye+vein share
+# of the body falls well under the 1.5% floor below — measured by running
+# this file's own check (2026-08-07, eye+vein px from `_rot.png` / body px
+# where sprite alpha>200):
+#   E01 1.05%  E02 0.73%  E03 0.59%  E04 0.28%
+#   E07 0.22%  E08 0.66%  E09 0.85%  E10 0.69%
+# The nine full-resolution 1024px solo/boss plates all clear 1.5% (2.17%-
+# 7.29%: B1 2.71% B2 2.84% B3 2.17% B3P2 3.45% B4 2.59% B5 4.38% B6 7.29%
+# E05 3.32% E06 4.42%), so this is a resolution artifact of the sheet, not a
+# property of these creatures' designs. Replacement 1024x1024 solo plates are
+# requested per docs/design/2026-08-07-enemy-sprite-art.md 需要補圖清單. Each
+# key is removed from this dict the moment its replacement plate lands in
+# `tools/enemy_cutout.py`'s SOLO dict — do NOT lower the 1.5% floor and do
+# NOT add a key here without a measured number to back it.
+PENDING_ART = {
+    "E01": "sheet cell, measured 1.05% eye+vein",
+    "E02": "sheet cell, measured 0.73% eye+vein",
+    "E03": "sheet cell, measured 0.59% eye+vein",
+    "E04": "sheet cell, measured 0.28% eye+vein",
+    "E07": "sheet cell, measured 0.22% eye+vein",
+    "E08": "sheet cell, measured 0.66% eye+vein",
+    "E09": "sheet cell, measured 0.85% eye+vein",
+    "E10": "sheet cell, measured 0.69% eye+vein",
+}
+ROT_MIN_PCT = 1.5
+
 tests = 0
 fails = 0
 
@@ -79,6 +107,49 @@ def main():
         if k in meta:
             h, w = a.shape
             check(meta[k]["size"] == [w, h], "%s enemies.json size matches the PNG" % k)
+
+        # --- rot mask (eye/vein/ember bake) ---
+        rot_p = os.path.join(OUT, k + "_rot.png")
+        check(os.path.isfile(rot_p), "%s has a _rot.png mask" % k)
+        if not os.path.isfile(rot_p):
+            continue
+        rot = np.asarray(Image.open(rot_p).convert("RGB"))
+        check(rot.shape[:2] == a.shape, "%s _rot.png size matches its sprite" % k)
+        if rot.shape[:2] != a.shape:
+            continue
+
+        eye = rot[:, :, 0] > 128
+        vein = rot[:, :, 1] > 128
+        ember = rot[:, :, 2] > 128
+        # a pixel cannot be both a lit eye and a corruption crack, etc.
+        overlap = (eye & vein) | (eye & ember) | (vein & ember)
+        check(not overlap.any(),
+              "%s rot mask channels overlap on %d px" % (k, int(overlap.sum())))
+
+        body = int((a > 200).sum())
+        pct = 100.0 * (eye.sum() + vein.sum()) / max(body, 1)
+        if k in PENDING_ART:
+            # Not enforced yet — see PENDING_ART's comment. Still printed so
+            # the debt is visible in every run, not just the summary line.
+            print("  PENDING_ART: %s eye+vein=%.2f%% of body (< %.1f%%, exempt: %s)"
+                  % (k, pct, ROT_MIN_PCT, PENDING_ART[k]))
+        else:
+            check(pct >= ROT_MIN_PCT,
+                  "%s eye+vein is %.2f%% of body, need >= %.1f%% "
+                  "(tier-progression glow has nothing to light up below this)"
+                  % (k, pct, ROT_MIN_PCT))
+
+        if k in meta and "rot_px" in meta[k]:
+            rp = meta[k]["rot_px"]
+            check(rp["eye"] == int(eye.sum()) and rp["vein"] == int(vein.sum())
+                  and rp["ember"] == int(ember.sum()),
+                  "%s enemies.json rot_px matches the mask PNG" % k)
+
+    stale = [k for k in PENDING_ART if k not in KEYS]
+    check(not stale, "PENDING_ART only names real keys, stale=%s" % stale)
+    print("PENDING_ART: %d/%d keys still exempt from the eye+vein>=%.1f%% "
+          "check pending replacement art: %s"
+          % (len(PENDING_ART), len(KEYS), ROT_MIN_PCT, sorted(PENDING_ART)))
 
     return report()
 

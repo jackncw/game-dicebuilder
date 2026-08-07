@@ -219,6 +219,75 @@ def cap_height(rgba: Image.Image, h: int) -> Image.Image:
     return rgba.resize((max(1, round(rgba.width * h / rgba.height)), h), Image.LANCZOS)
 
 
+# --------------------------------------------------------------- rot mask
+
+# The corruption channels, baked here rather than recognised in the shader.
+#
+# The plates paint a lit eye and a corruption crack in the SAME value range —
+# measured across the nine full-resolution plates, the eye's 25th percentile
+# (0.49) and the crack's median (0.49) are the same number, and a split there
+# misreads 48.9% of crack pixels as eye. What separates them is shape: an eye
+# is a compact blob, a crack is a thin network. Two erosions delete the
+# network and leave the blobs, which a fragment shader cannot do — it has no
+# connected components. So the classification happens once, here, and the
+# shader only samples the result.
+#
+# VAL_MIN exists because the ink outline is a dark maroon, not black: it lands
+# inside the magenta hue band and, being dark, reports a high relative
+# saturation. Without a value floor it is 56% of every "magenta" pixel counted.
+MASK_HUE = (0.80, 0.91)
+MASK_SAT_MIN = 0.45
+MASK_VAL_MIN = 0.35
+EMBER_HUE = (0.00, 0.10)
+EMBER_SAT_MIN = 0.50
+# Brown leather (B2's boxing gloves) sits in the ember hue band and outnumbers
+# the lava toad's actual fissures. Lava is lit; leather is not.
+EMBER_VAL_MIN = 0.62
+EYE_ERODE = 2
+EYE_MIN_PX = 20
+
+
+def _hsv_planes(rgb: np.ndarray):
+    f = rgb.astype(np.float32) / 255.0
+    mx, mn = f.max(axis=2), f.min(axis=2)
+    d = mx - mn
+    h = np.zeros_like(mx)
+    r, g, b = f[:, :, 0], f[:, :, 1], f[:, :, 2]
+    nz = d > 1e-6
+    i = nz & (mx == r)
+    h[i] = ((g[i] - b[i]) / d[i]) % 6.0
+    i = nz & (mx == g)
+    h[i] = (b[i] - r[i]) / d[i] + 2.0
+    i = nz & (mx == b)
+    h[i] = (r[i] - g[i]) / d[i] + 4.0
+    return h / 6.0, np.where(mx > 0, d / np.maximum(mx, 1e-6), 0.0), mx
+
+
+def rot_mask(rgba: np.ndarray) -> Image.Image:
+    """R = lit eye, G = corruption crack, B = lava ember."""
+    h, s, v = _hsv_planes(rgba[:, :, :3])
+    body = rgba[:, :, 3] > 200
+    mag = (body & (h > MASK_HUE[0]) & (h < MASK_HUE[1])
+           & (s > MASK_SAT_MIN) & (v > MASK_VAL_MIN))
+    # blobs survive two erosions; thin crack networks do not
+    core = ndimage.binary_erosion(mag, np.ones((3, 3), bool), iterations=EYE_ERODE)
+    core = ndimage.binary_dilation(core, np.ones((3, 3), bool),
+                                   iterations=EYE_ERODE) & mag
+    lab, n = ndimage.label(core)
+    eye = np.zeros_like(mag)
+    if n:
+        sizes = ndimage.sum(core, lab, range(1, n + 1))
+        keep = [i + 1 for i, z in enumerate(sizes) if z >= EYE_MIN_PX]
+        if keep:
+            eye = np.isin(lab, keep)
+    ember = (body & (h < EMBER_HUE[1]) & (s > EMBER_SAT_MIN) & (v > EMBER_VAL_MIN))
+    out = np.zeros(rgba.shape[:2] + (3,), np.uint8)
+    out[:, :, 0] = np.where(eye, 255, 0)
+    out[:, :, 1] = np.where(mag & ~eye, 255, 0)
+    out[:, :, 2] = np.where(ember, 255, 0)
+    return Image.fromarray(out, "RGB")
+
+
 def edge_band_rgb(rgba: np.ndarray, px: int = 3) -> list:
     """Mean colour of the outermost `px` of the silhouette — the band the rim
     light lands on, and so the band `_t_enemy_legibility` measures."""
@@ -264,12 +333,21 @@ def main() -> int:
         im = cap_height(cuts[key], MAX_H)
         im.save(os.path.join(OUT, key + ".png"))
         arr = np.asarray(im)
+
+        mask_im = rot_mask(arr)
+        mask_im.save(os.path.join(OUT, key + "_rot.png"))
+        mask_arr = np.asarray(mask_im)
+        rot_px = {"eye": int((mask_arr[:, :, 0] > 128).sum()),
+                  "vein": int((mask_arr[:, :, 1] > 128).sum()),
+                  "ember": int((mask_arr[:, :, 2] > 128).sum())}
+
         meta[key] = {"size": [im.width, im.height],
                      "aspect": round(im.width / im.height, 4),
-                     "edge_rgb": edge_band_rgb(arr)}
+                     "edge_rgb": edge_band_rgb(arr),
+                     "rot_px": rot_px}
         extent.append('"%s": Vector2(1.00, %.2f)' % (key, im.width / im.height / 2.0))
-        print("%-5s %4dx%-4d aspect=%.3f edge=%s"
-              % (key, im.width, im.height, meta[key]["aspect"], meta[key]["edge_rgb"]))
+        print("%-5s %4dx%-4d aspect=%.3f edge=%s rot_px=%s"
+              % (key, im.width, im.height, meta[key]["aspect"], meta[key]["edge_rgb"], rot_px))
 
     with open(os.path.join(OUT, "enemies.json"), "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2, sort_keys=True)
