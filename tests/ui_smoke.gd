@@ -35,6 +35,7 @@ func _ready() -> void:
 	await _t_die_render()
 	_t_contrast()
 	_t_no_player_magenta()
+	_t_rot_rim()
 	_t_enemy_legibility()
 	if fails == 0:
 		print("UI SMOKE OK")
@@ -321,6 +322,26 @@ func _colors_in(v: Variant) -> Array:
 				out.append(v[k])
 		return out
 	return []
+
+
+## The rim light's strength is a single formula shared by GDScript and the
+## shader. It has to grow as the chapter card gets darker, or the darkest
+## chapter — the one that needs the rim most — gets the least of it.
+func _t_rot_rim() -> void:
+	var r1 := UITheme.rot_rim_for(1)
+	var r2 := UITheme.rot_rim_for(2)
+	var r3 := UITheme.rot_rim_for(3)
+	_check(r3 > r1, "chapter 3 rim (%.2f) must be stronger than chapter 1 (%.2f)" % [r3, r1])
+	_check(r1 <= r2 and r2 <= r3, "rim must not dip between chapters: %.2f/%.2f/%.2f" % [r1, r2, r3])
+	for ch in [1, 2, 3]:
+		var s := UITheme.rot_rim_for(ch)
+		_check(s >= 0.0 and s <= 1.0, "chapter %d rim %.2f out of 0..1" % [ch, s])
+	# the rim colour, at full strength, must clear the bar on its own card
+	var lit := UITheme.ROT_RIM
+	_check(UITheme.contrast(lit, UITheme.surface(3)) >= 2.4,
+			"ROT_RIM %s on chapter 3 is %.2f:1, needs 2.4:1"
+			% [lit.to_html(false), UITheme.contrast(lit, UITheme.surface(3))])
+	print("rot rim: ch1 %.2f  ch2 %.2f  ch3 %.2f" % [r1, r2, r3])
 
 
 ## Every enemy has to be visible against the card it fights on. The corrupted

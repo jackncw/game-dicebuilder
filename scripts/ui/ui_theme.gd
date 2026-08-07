@@ -127,6 +127,27 @@ const ROT_EYE_DIM := Color("d34aae")    # eye at tier 1: awake, not yet burning
 const ROT_MIST := Color("4a4055")
 const ROT_RIM := Color("cfa8dd")        # rim light that keeps a dark body legible
 
+
+## How hard the rim light has to work on a given chapter's enemy card.
+##
+## The enemy plates are painted nearly black — they were drawn on a cream
+## sheet, where that reads fine. Our cards are `surface(chapter)`, and all
+## three chapter surfaces are dark (this is a night-time grove), so the rim
+## is always doing some work, but not equally: measured with `luminance()`,
+## chapter 1's card (`#1b3019`) is 0.0242, chapter 2's (`#362414`) is 0.0210,
+## chapter 3's (`#1e1429`) is 0.0094. Strength is read straight off the
+## card's own luminance rather than tabulated per chapter, which keeps this
+## honest if a chapter surface is ever retuned.
+##
+## This is the SINGLE SOURCE for rim strength: `rot_pawn.gdshader` is handed
+## the result through its `rim_strength` uniform, and `_t_enemy_legibility`
+## predicts the lit edge with it. Two copies of this curve would let the test
+## and the picture drift apart silently.
+static func rot_rim_for(chapter: int) -> float:
+	var l := luminance(surface(chapter))
+	# 0.0242 luminance (chapter 1's card) -> 0.35; 0.0094 (chapter 3's) -> 1.0
+	return clampf(remap(l, 0.0094, 0.0242, 1.0, 0.35), 0.0, 1.0)
+
 ## The magenta wedge, in Godot's 0–1 hue. 285°–342°: everything from violet-
 ## magenta through to rose. Below it sits the game's existing purple family
 ## (the `resource` category and the chapter-3 palette all land at 260°–270°),
