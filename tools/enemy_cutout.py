@@ -98,35 +98,50 @@ def subject_mask(rgb: np.ndarray) -> np.ndarray:
 
 
 def _background_pockets(rgb: np.ndarray, holes: np.ndarray) -> np.ndarray:
-    """Which connected pieces of `holes` are flat plate cream rather than
-    painted body interior.
+    """Which connected pieces of `holes` are plate background (cream, or its
+    cast shadow) rather than painted body interior.
 
-    Same flatness test, same thresholds, as `art_cutout._bg_mask`'s pocket
-    check (the hare's bow encloses a cream pocket the border flood-fill can't
-    reach; this is the same shape of problem one level down, inside an
-    already-closed ink loop instead of the plate border). Its comment records
-    the measured gap this pipeline reuses rather than re-deriving: real
-    pockets sit under channel std 11 and mean-difference 3 from the plate's
-    border colour, while the palest surviving painted fur sits at
-    mean-difference 16+, so std < 14 and mean-difference < 6 lands in the gap
-    with room on both sides.
+    Two-part background test, both parts borrowed from `art_cutout._bg_mask`
+    with the provenance it records, because a single flatness test cannot
+    tell shadowed background from unshadowed background:
+
+    - desaturated-and-light (`sat < 0.20 & val > 0.63`) — `_bg_mask`'s own
+      candidate mask. Its comment there says the threshold "has to reach
+      down into the shadow (which bottoms out near 0.66 value ... without
+      being able to walk into the pale fur"; that is exactly the case here
+      too. This is what actually clears E06's three pale coil pockets, which
+      carry the bramble's own cast shadow and measure mean-difference 49-197
+      from the plate's border median — nowhere near the flat test below.
+    - flat and close to the plate's own border colour (`std < 14 &
+      mean-difference < 6`, `_bg_mask`'s pocket check for the hare's bow) —
+      covers clean, unshadowed cream, e.g. B4/B3P2's pose-gap pockets.
+
+    A hole is background if either test passes on its 1px-eroded core (the
+    ring where ink fades into background is neither ink nor flat plate, and
+    on B4's real pocket alone it drags std from 5-8 to 26 — enough to falsely
+    fail a genuinely flat cream pocket; erosion strips that ring, and the
+    whole component, ring included, is dropped once its core passes — same
+    as the outer silhouette's edge is cleaned up after the fact in
+    `cut_subject`). The desaturated-and-light test is judged on the fraction
+    of the core that qualifies, not the core's mean, so a real body part that
+    merely borders a pale fleck does not get pulled in.
     """
     border = np.concatenate([rgb[0], rgb[-1], rgb[:, 0], rgb[:, -1]])
     bg_col = np.median(border.reshape(-1, 3), axis=0)
+    f = rgb.astype(np.float32) / 255.0
+    mx, mn = f.max(axis=2), f.min(axis=2)
+    sat = np.where(mx > 0, (mx - mn) / np.maximum(mx, 1e-6), 0.0)
+    desat_light = (sat < 0.20) & (mx > 0.63)
     lab, n = ndimage.label(holes, structure=np.ones((3, 3), bool))
     pockets = np.zeros(rgb.shape[:2], bool)
     for i in range(1, n + 1):
         comp = lab == i
-        # Measure on a 1px-eroded core, not the raw component: the ring where
-        # ink fades into background is neither ink nor flat plate, and on
-        # B4's real pocket alone it drags std from 5-8 to 26 — enough to
-        # falsely fail a genuinely flat cream pocket. Erosion strips that
-        # ring; the whole component (ring included) still gets dropped once
-        # its core passes, same as the outer silhouette's edge is cleaned up
-        # after the fact in `cut_subject`.
         core = ndimage.binary_erosion(comp, np.ones((3, 3), bool))
-        px = rgb[core if core.any() else comp].astype(np.float32)
-        if px.std(axis=0).max() < 14.0 and np.abs(px.mean(axis=0) - bg_col).max() < 6.0:
+        core = core if core.any() else comp
+        px = rgb[core].astype(np.float32)
+        flat_bg = px.std(axis=0).max() < 14.0 and np.abs(px.mean(axis=0) - bg_col).max() < 6.0
+        shadow_bg = desat_light[core].mean() > 0.9
+        if flat_bg or shadow_bg:
             pockets |= comp
     return pockets
 
@@ -136,9 +151,32 @@ def cut_subject(img: Image.Image) -> Image.Image:
     rgb = np.asarray(img.convert("RGB"))
     mask = subject_mask(rgb)
     a = Image.fromarray(np.where(mask, 255, 0).astype(np.uint8), "L")
-    # 1px erode then a soft blur: kills the pale halo the flat cream leaves on
-    # the anti-aliased outline without visibly thinning the silhouette.
-    a = a.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(0.8))
+    # 1px erode: kills the pale halo the flat cream leaves on the
+    # anti-aliased outline without visibly thinning the silhouette.
+    a = a.filter(ImageFilter.MinFilter(3))
+    # Clutter (a smoke wisp, a spatter fleck) can be 8-connected to the main
+    # ink outline by a hairline anti-aliased touch, so it rides inside
+    # `subject_mask`'s single largest-ink-component union and no KEEP_FRAC
+    # ever sees it as separate. The erosion above severs that hairline and
+    # leaves it as its own island. Measured across all 17 plates (connected
+    # components of the resulting mask, 8-connected): 15 of 17 come out as
+    # exactly one component; the two that don't (B2's two smoke wisps beside
+    # the ear/glove, E05's antenna-adjacent flecks) are confirmed-by-eye
+    # clutter, all under 1.1% of the body. No real anatomy anywhere in the
+    # set separates this way — even E08's wraith hood, whose raw ink loop is
+    # only a third the size of the body's, survives as one piece — so this
+    # keeps the single largest component and drops everything else, with no
+    # size threshold to tune.
+    eroded = np.asarray(a) > 128
+    lab, n = ndimage.label(eroded, structure=np.ones((3, 3), bool))
+    if n > 1:
+        sizes = ndimage.sum(eroded, lab, range(1, n + 1))
+        main = int(np.argmax(sizes)) + 1
+        a = Image.fromarray(np.where(lab == main, 255, 0).astype(np.uint8), "L")
+    # Soft blur after the component filter, not before: blurring first would
+    # let a severed island's soft edge creep back above the >128 threshold
+    # used here.
+    a = a.filter(ImageFilter.GaussianBlur(0.8))
     out = np.asarray(img.convert("RGBA")).copy()
     out[:, :, 3] = np.asarray(a)
     # Decontaminate: partly-transparent pixels still carry JPEG cream, which

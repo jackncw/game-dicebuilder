@@ -62,13 +62,18 @@ def main():
             check(cream.mean() < 0.005,
                   "%s has %.2f%% cream pixels left inside it" % (k, 100 * cream.mean()))
 
-        # one subject, not a subject plus floating debris
-        lab, n = ndimage.label(a > 128)
+        # one subject, not a subject plus floating debris. 8-connected to
+        # match the pipeline's own component labelling; ANY extra component
+        # counts as debris regardless of size — a 0.01%-of-body smoke wisp
+        # is exactly the defect this check exists to catch, and a window
+        # that only looked at 2%-50% missed two of them (B2, E05) twice.
+        lab, n = ndimage.label(a > 128, structure=np.ones((3, 3), bool))
         if n:
             sizes = ndimage.sum(a > 128, lab, range(1, n + 1))
-            biggest = sizes.max()
-            debris = [s for s in sizes if 0.02 * biggest < s < 0.5 * biggest]
-            check(not debris, "%s has %d detached mid-size fragments" % (k, len(debris)))
+            debris = sorted(sizes)[:-1]
+            check(not debris,
+                  "%s has %d detached fragment(s) besides the main body: %s"
+                  % (k, len(debris), [int(s) for s in debris]))
 
         # metadata agrees with the file on disk
         if k in meta:
