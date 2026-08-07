@@ -18,8 +18,25 @@ uniform float eye_gain   : hint_range(0.0, 4.0) = 1.0;
 uniform float vein_gain  : hint_range(0.0, 4.0) = 0.0;
 uniform float ember_gain : hint_range(0.0, 2.0) = 0.6;
 uniform float rim_strength : hint_range(0.0, 2.0) = 0.0;
+// Placeholder only: a hand-rounded approximation of UITheme.ROT_RIM (#cfa8dd
+// = 0.8118, 0.6588, 0.8667). The real value is pushed in at runtime via
+// set_shader_parameter(), so this default is never what actually ships —
+// don't treat it as authoritative.
 uniform vec3  rim_color : source_color = vec3(0.81, 0.66, 0.87);
-uniform float rim_px = 3.0;
+uniform float rim_px : hint_range(0.0, 8.0) = 3.0;
+
+// canvas_item shaders have no MODULATE built-in in Godot 4.x (it existed in
+// 3.x and was removed; verified against 4.7.1's shader_types.cpp and the
+// current shader reference — neither lists it). The only way to read the
+// CanvasItem's modulate without the texture already multiplied in is to
+// capture vertex()'s entry COLOR value, which the docs define as
+// "vertex primitive color * modulate * self_modulate", into a varying
+// before the fragment stage bakes TEXTURE into COLOR.
+varying vec4 v_modulate;
+
+void vertex() {
+	v_modulate = COLOR;
+}
 
 void fragment() {
 	vec4 src = texture(TEXTURE, UV);
@@ -57,5 +74,16 @@ void fragment() {
 		lit = mix(lit, rim_color, clamp(edge * rim_strength, 0.0, 1.0));
 	}
 
-	COLOR = vec4(lit, src.a) * COLOR;
+	// NOT `* COLOR`: by the time fragment() runs, COLOR already equals
+	// texture(TEXTURE, UV) * modulate (see the built-in canvas_item shader
+	// reference), and `lit`/`src.a` above are already built from their own
+	// independent TEXTURE sample. Multiplying by COLOR here would bake the
+	// plate's own colour and alpha in a second time (final.rgb gets an extra
+	// factor of src.rgb, final.a becomes src.a^2 * modulate.a), darkening
+	// every pixel and corrupting the silhouette's edge alpha even with
+	// rot_mask unset and rim_strength at 0. `v_modulate` carries only the
+	// CanvasItem's modulate (see vertex() above), which is what the
+	// hit-flash effect drives via set_modulate/modulate — so this is the
+	// only correct multiplicand. Do not "simplify" this back to `* COLOR`.
+	COLOR = vec4(lit, src.a) * v_modulate;
 }
