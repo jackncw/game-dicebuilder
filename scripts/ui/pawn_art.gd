@@ -293,8 +293,24 @@ func rot_level() -> float:
 ## B1 arrives here carrying tier 1, and reading the row off the tier directly
 ## would leave the first two bosses with cold eyes and no smoke at all. `rot_of`
 ## is the conversion that already knows a boss is always all the way gone.
+##
+## Static, because `_t_enemy_legibility` has to know which dial row a key/tier
+## lands on to know how much mist is behind it, and a second copy of
+## `round(rot * 2)` in the test would be a second place for this to drift.
+static func dial_row(p_kind: String, p_tier: int) -> int:
+	return int(roundf(rot_of(p_kind, p_tier) * 2.0))
+
+
 func _dial_row() -> int:
-	return int(roundf(rot_level() * 2.0))
+	return dial_row(kind, tier)
+
+
+## How opaquely one wisp lays `UITheme.ROT_MIST` down. Same reason as
+## `dial_row`: the mist is part of the background an enemy's lit edge is read
+## against, so `_t_enemy_legibility` needs this number, and it may only exist
+## once. `_mist` is the only other reader.
+static func mist_alpha(p_kind: String, p_tier: int) -> float:
+	return 0.34 + 0.30 * rot_of(p_kind, p_tier)
 
 
 ## The corruption pass. Heroes never get one — magenta belongs to the enemy.
@@ -341,8 +357,7 @@ func _c(p: Vector2) -> Vector2:
 func _mist(spots: Array) -> void:
 	if spots.is_empty():
 		return
-	var t := rot_level()
-	var a := 0.34 + 0.30 * t
+	var a := mist_alpha(kind, tier)
 	var step := floorf(fmod(_t * 2.2 + _bob_seed, 2.0))
 	for i in spots.size():
 		var s: Array = spots[i]

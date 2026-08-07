@@ -348,6 +348,13 @@ func _colors_in(v: Variant) -> Array:
 ## `_t_enemy_legibility` instead, so lowering `ROT_RIM_TARGET` is caught there
 ## rather than nowhere. Measured: drop it to 2.0 and the worst real edge (E09 on
 ## chapter 1) falls to 2.35:1 and that test fires.
+##
+## The background here is the BARE card, deliberately: that is the quantity
+## `rot_rim_for` solves against, and this test's job is to check the curve
+## reaches its own declared target, not to re-litigate what that target should
+## be. What is actually behind a silhouette is `card_behind()`, which is mist
+## over the card on every misted row — so clearing this bar is necessary and
+## not sufficient, and `_t_enemy_legibility` is where that shows up.
 func _t_rot_rim() -> void:
 	var l1 := UITheme.luminance(UITheme.surface(1))
 	var l2 := UITheme.luminance(UITheme.surface(2))
@@ -372,8 +379,10 @@ func _t_rot_rim() -> void:
 				"chapter %d rim %.3f only carries a black edge to %.2f:1, needs %.2f:1"
 				% [ch, s, got, UITheme.ROT_RIM_TARGET])
 		# and not one step more than sufficient: back it off and it must fail,
-		# or the curve has been padded and the plates are being over-lit
-		var weaker := UITheme.contrast(Color.BLACK.lerp(UITheme.ROT_RIM, s - 0.02),
+		# or the curve has been padded and the plates are being over-lit.
+		# Through `lit_edge` and not a raw `lerp`, so that both halves of this
+		# assertion keep modelling the same thing when a term is added to it.
+		var weaker := UITheme.contrast(lit_edge(Color.BLACK, ch, s - 0.02),
 				UITheme.surface(ch))
 		_check(weaker < UITheme.ROT_RIM_TARGET,
 				"chapter %d rim %.3f is padded — %.3f already reaches %.2f:1"
@@ -396,6 +405,19 @@ func _t_rot_rim() -> void:
 ## strength from `UITheme.rot_rim_for`. This is a MODEL of the picture, not the
 ## picture — `tools/enemy_legibility.gd` renders the real thing, and the two
 ## are reconciled before this number is trusted. See DECISIONS.md.
+##
+## The background is `card_behind()`, NOT a bare `surface(chapter)`. `PawnArt`
+## draws `_auto_mist` before the plate, so on every row that carries mist the
+## thing behind the silhouette is mist over the card, and mist is brighter than
+## all three cards. Measured — see the header on `card_behind` — the mist is
+## behind 1.5%–20.3% of each plate's own edge band, so this is a case the
+## picture really produces and not a hypothetical.
+##
+## Which (chapter, tier) pairs a key is actually met at is not a free choice:
+## `battle_core.gd:123` gives a minion `tier = chapter`, and `:179` files a
+## boss under `int(def.chapter)` while `PawnArt.rot_of` puts every boss on the
+## top dial row regardless. So a minion is met once per chapter at that
+## chapter's tier, and a boss once, at row 2.
 func _t_enemy_legibility() -> void:
 	var f := FileAccess.open("res://assets/enemies/enemies.json", FileAccess.READ)
 	_check(f != null, "assets/enemies/enemies.json is missing")
@@ -432,23 +454,33 @@ func _t_enemy_legibility() -> void:
 	var edges_in := {1: {}, 2: {}, 3: {}}
 	var lits_out := {1: {}, 2: {}, 3: {}}
 	for key in meta:
-		if not (meta[key] is Dictionary and meta[key].has("edge_rgb")):
-			_check(false, "enemies.json entry %s has no edge_rgb" % key)
+		var edge_v: Variant = _edge_colour(meta, String(key))
+		if edge_v == null:
 			continue
-		var e: Array = meta[key]["edge_rgb"]
-		var edge := Color8(int(e[0]), int(e[1]), int(e[2]))
-		var chapters: Array = [int(PawnArt.BOSS_CHAPTER[key])] if PawnArt.BOSS_CHAPTER.has(key) \
-				else [1, 2, 3]
-		for ch in chapters:
-			var lit := lit_edge(edge, int(ch))
-			var r := UITheme.contrast(lit, UITheme.surface(int(ch)))
-			edges_in[int(ch)][edge.to_html(false)] = true
-			lits_out[int(ch)][lit.to_html(false)] = true
+		var edge: Color = edge_v
+		# a minion's tier IS the chapter it is met in; a boss is met once
+		var cases: Array = [[int(PawnArt.BOSS_CHAPTER[key]), int(PawnArt.BOSS_CHAPTER[key])]] \
+				if PawnArt.BOSS_CHAPTER.has(key) else [[1, 1], [2, 2], [3, 3]]
+		for c in cases:
+			var ch: int = c[0]
+			var tier: int = c[1]
+			var lit := lit_edge(edge, ch)
+			var bg := card_behind(ch, String(key), tier)
+			var r := UITheme.contrast(lit, bg)
+			# keyed on the raw channels, not `to_html`: at s ≈ 0.5 the lerp
+			# compresses differences by (1 - s), so two plates one 8-bit step
+			# apart can round to the same hex and fire this guard for a reason
+			# that has nothing to do with the rim. B3 (39,26,40) and B3P2
+			# (40,26,38) are already that close.
+			edges_in[ch][_colour_key(edge)] = true
+			lits_out[ch][_colour_key(lit)] = true
+			var wisps: int = PawnArt.MIST_COUNT[PawnArt.dial_row(String(key), tier)]
 			if r < worst:
 				worst = r
-				worst_what = "%s on chapter %d" % [key, ch]
-			_check(r >= 2.4, "%s lit edge %s on chapter %d card is %.2f:1, needs 2.4:1"
-					% [key, lit.to_html(false), ch, r])
+				worst_what = "%s ch%d tier%d (%d wisps)" % [key, ch, tier, wisps]
+			_check(r >= 2.4,
+					"%s ch%d tier%d (%d wisps): lit edge %s over %s is %.2f:1, needs 2.4:1"
+					% [key, ch, tier, wisps, lit.to_html(false), bg.to_html(false), r])
 	for ch in [1, 2, 3]:
 		_check(lits_out[ch].size() == edges_in[ch].size(),
 				"chapter %d: %d distinct edge colours went in, %d came out — the rim is washing the plates out, not lighting them"
@@ -457,12 +489,42 @@ func _t_enemy_legibility() -> void:
 			% [worst_what, worst, lits_out[1].size(), lits_out[2].size(), lits_out[3].size()])
 
 
+## `edge_rgb` for one key as a Colour, or null with a named failure already
+## reported. Every field is checked rather than assumed: `var e: Array = ...`
+## on a non-array, or `e[2]` on a two-element list, is a hard script error, and
+## a crashed suite is not the same signal as a failed check.
+func _edge_colour(meta: Dictionary, key: String) -> Variant:
+	if not (meta[key] is Dictionary):
+		_check(false, "enemies.json entry %s is not an object" % key)
+		return null
+	var entry: Dictionary = meta[key]
+	var raw: Variant = entry.get("edge_rgb")
+	if not (raw is Array and (raw as Array).size() >= 3):
+		_check(false, "enemies.json entry %s has no usable edge_rgb (got %s)" % [key, raw])
+		return null
+	var e: Array = raw
+	for i in 3:
+		if not (e[i] is float or e[i] is int):
+			_check(false, "enemies.json entry %s edge_rgb is not three numbers: %s" % [key, e])
+			return null
+	return Color8(int(e[0]), int(e[1]), int(e[2]))
+
+
+## A distinctness key that does not quantise. `to_html` rounds to 8 bits, and
+## `lit_edge` compresses the gaps between plates by `1 - rim_strength`, so two
+## sprites that genuinely differ can collapse onto one hex string well before
+## the rim is anywhere near washing them out.
+func _colour_key(c: Color) -> String:
+	return "%.9f/%.9f/%.9f" % [c.r, c.g, c.b]
+
+
 ## The rim light applied to an edge colour, mirroring the `mix()` at the bottom
 ## of `rot_pawn.gdshader` with that line's two other inputs pinned: the `edge`
 ## scalar at 1.0 and `v_modulate` at white.
 ##
-## Six known ways this is a model and not the picture, all six written out with
-## numbers in `task-5-report.md`. Five of them make the proxy read HIGH:
+## SEVEN known ways this pair of functions is a model and not the picture, all
+## seven written out with numbers in `task-5-report.md`. Six make the proxy read
+## HIGH (i.e. the real picture is less legible than this says):
 ##  1. `edge` (`src.a * (1 - amin)`) is 1.0 only right at the alpha boundary and
 ##     falls off inward, so part of the measured band is lit less than this.
 ##  2. `edge_rgb` was averaged over `alpha > 200` (`enemy_cutout.py`); the shader
@@ -477,13 +539,63 @@ func _t_enemy_legibility() -> void:
 ##     a non-white modulate on an enemy BATTLE-card pawn — the one place that
 ##     does, `screen_codex.gd`'s unseen-entry silhouette, is meant to be
 ##     unreadable, so this number does not speak for it.
+##  6. The mist is modelled as ONE flat layer at `PawnArt.mist_alpha`, covering
+##     the whole edge. Both halves of that are approximations, and they pull
+##     opposite ways — see `card_behind`, which owns this term.
 ## And one that makes it read LOW:
-##  6. The bloom pass adds `glow * 0.055` before the rim mix. Small at the
+##  7. The bloom pass adds `glow * 0.055` before the rim mix. Small at the
 ##     silhouette's boundary — the mask it gathers is eyes and cracks, which are
 ##     interior — but it is real and it is unmodelled.
 ## Task 6 renders the real thing and reconciles at 0.15:1 — the render wins.
-func lit_edge(edge: Color, chapter: int) -> Color:
-	return edge.lerp(UITheme.ROT_RIM, clampf(UITheme.rot_rim_for(chapter), 0.0, 1.0))
+##
+## `strength` defaults to `rot_rim_for(chapter)`; pass it only to ask what a
+## DIFFERENT rim would do to this edge, as `_t_rot_rim`'s tightness check does.
+## Both halves of that check go through here on purpose, so a term added to this
+## function lands on both.
+func lit_edge(edge: Color, chapter: int, strength := -1.0) -> Color:
+	var s := UITheme.rot_rim_for(chapter) if strength < 0.0 else strength
+	return edge.lerp(UITheme.ROT_RIM, clampf(s, 0.0, 1.0))
+
+
+## What is actually behind an enemy's silhouette on a battle card.
+##
+## Not the card. `PawnArt._draw` calls `_auto_mist` BEFORE `draw_texture_rect`,
+## so on any row whose dial gives it wisps the local background is
+## `ROT_MIST` over `surface(chapter)` — and `ROT_MIST` (luminance 0.0578) is
+## brighter than every card (0.0242 / 0.0210 / 0.0094), so it RAISES the
+## luminance the lit edge has to clear. This is the single largest gap between
+## the proxy and the picture and it was missing until fix round 2.
+##
+## Measured, not assumed. Rasterising `_auto_mist`'s five (tier 3 / boss) wisp
+## polygons into each plate's own texture grid and intersecting them with the
+## same `alpha > 200` minus three 3×3 erosions band `enemy_cutout.py` averages:
+##
+##   E05 1.5% · E09 3.2% · E01 3.9% · E02 4.9% · B3 6.4% · E10 7.3% · B5 7.3%
+##   B6 8.8% · E04 9.6% · B4 10.4% · E07 12.2% · B1 13.0% · E03 13.5%
+##   E08 16.1% · E06 16.6% · B3P2 17.6% · B2 20.3%      (10.6% of all band px)
+##
+## and the 3px ring of card immediately OUTSIDE the silhouette — the colour the
+## eye actually compares against — comes out the same, 10.1% overall. The
+## three-wisp tier-2 row runs 1.1%–14.4%. Every key, at every misted row, has a
+## real run of contour standing on mist. Wisps overlapping each other is NOT a
+## live case: across all seventeen bands exactly 32 pixels (B2, 0.3% of its own
+## band) see two layers, so one flat `mist_alpha` is the right model.
+##
+## Two approximations remain, pulling opposite ways. HIGH: the wisps have soft
+## polygon edges and cover only that 1.5%–20.3%, so most of the contour is on
+## bare card and this number is the worst case rather than the average — which
+## is what a legibility FLOOR wants. LOW: `draw_colored_polygon` blends in sRGB
+## under `gl_compatibility` exactly as this `lerp` does, but the wisp's own
+## anti-aliased boundary is not modelled.
+##
+## `MIST_COUNT`, `mist_alpha` and `rot_of` are read from `PawnArt` rather than
+## restated, so the mist has one source the way the rim has one.
+func card_behind(chapter: int, kind: String, tier: int) -> Color:
+	var row := PawnArt.dial_row(kind, tier)
+	if int(PawnArt.MIST_COUNT[row]) <= 0:
+		return UITheme.surface(chapter)
+	return UITheme.surface(chapter).lerp(UITheme.ROT_MIST,
+			clampf(PawnArt.mist_alpha(kind, tier), 0.0, 1.0))
 
 
 ## Every enemy is a plate now. This is the rule that keeps the hand-drawn
