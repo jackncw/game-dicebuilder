@@ -280,7 +280,8 @@ def rot_mask(rgba: np.ndarray) -> Image.Image:
         keep = [i + 1 for i, z in enumerate(sizes) if z >= EYE_MIN_PX]
         if keep:
             eye = np.isin(lab, keep)
-    ember = (body & (h < EMBER_HUE[1]) & (s > EMBER_SAT_MIN) & (v > EMBER_VAL_MIN))
+    ember = (body & (h >= EMBER_HUE[0]) & (h < EMBER_HUE[1])
+             & (s > EMBER_SAT_MIN) & (v > EMBER_VAL_MIN))
     out = np.zeros(rgba.shape[:2] + (3,), np.uint8)
     out[:, :, 0] = np.where(eye, 255, 0)
     out[:, :, 1] = np.where(mag & ~eye, 255, 0)

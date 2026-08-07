@@ -44,6 +44,30 @@ PENDING_ART = {
 }
 ROT_MIN_PCT = 1.5
 
+# Ceilings: the floor above catches too little eye/vein material; nothing
+# caught too much, which is exactly the direction the bug this task fixes
+# ran in (loosen MASK_VAL_MIN or drop an erosion and the ink outline reads
+# back in as rot material, so the percentage goes UP and the floor alone
+# still passes, or passes more easily). Two ceilings, not one, because the
+# two groups' legitimate ranges are different orders of magnitude and a
+# single ceiling loose enough for the nine full-resolution plates would be
+# useless against a regression on the eight low-res sheet cells.
+#
+# ROT_MAX_PCT (full-resolution plates): measured today (2026-08-07) the nine
+# non-PENDING_ART keys range 2.17% (B3) to 7.29% (B6, the most heavily-
+# corrupted boss) eye+vein of body. 9.0 leaves ~23% headroom above that
+# measured max. Demonstrated to bite (see task-2-report.md): setting
+# MASK_VAL_MIN = 0.0 and re-baking pushes all nine to 9.96%-22.19% -- every
+# one clears this ceiling, none come close.
+ROT_MAX_PCT = 9.0
+# ROT_MAX_PCT_PENDING (sheet cells): their legitimate range today is
+# 0.22%-1.05% (see PENDING_ART's comment) -- an order of magnitude below the
+# full-resolution plates, because sheet-cell JPEG compression mashes fine
+# eye/crack detail into flat grey. Demonstrated to bite the same way: the
+# MASK_VAL_MIN = 0.0 re-bake pushes all eight PENDING_ART keys to
+# 3.66%-26.05%, clearing 2.0 with room to spare.
+ROT_MAX_PCT_PENDING = 2.0
+
 tests = 0
 fails = 0
 
@@ -126,6 +150,22 @@ def main():
         check(not overlap.any(),
               "%s rot mask channels overlap on %d px" % (k, int(overlap.sum())))
 
+        # Shape control: B1 is the one sprite whose eye channel has been
+        # verified pixel-by-pixel against the source art (task-2-report.md)
+        # -- two small blobs sitting on the rabbit's two eye sockets, nothing
+        # else, measured today as 2 connected components (218 px + 95 px).
+        # The floor/ceiling above are a colour-volume signal; this is the
+        # shape signal the review asked for, because it is what would
+        # actually change if the ink outline (a long thin network, not a
+        # blob) were readmitted: setting MASK_VAL_MIN = 0.0 and re-baking
+        # turns B1's eye channel from 2 components into 39.
+        if k == "B1":
+            _, n_eye_comp = ndimage.label(eye, structure=np.ones((3, 3), bool))
+            check(n_eye_comp == 2,
+                  "B1 eye channel has %d connected component(s), expected "
+                  "exactly 2 (the rabbit's eye sockets -- a regression toward "
+                  "the ink-outline bug fragments this into dozens)" % n_eye_comp)
+
         body = int((a > 200).sum())
         pct = 100.0 * (eye.sum() + vein.sum()) / max(body, 1)
         if k in PENDING_ART:
@@ -133,11 +173,21 @@ def main():
             # the debt is visible in every run, not just the summary line.
             print("  PENDING_ART: %s eye+vein=%.2f%% of body (< %.1f%%, exempt: %s)"
                   % (k, pct, ROT_MIN_PCT, PENDING_ART[k]))
+            check(pct <= ROT_MAX_PCT_PENDING,
+                  "%s eye+vein is %.2f%% of body, need <= %.1f%% (regression "
+                  "ceiling for sheet cells -- a runaway classification blows "
+                  "well past this, see ROT_MAX_PCT_PENDING's comment)"
+                  % (k, pct, ROT_MAX_PCT_PENDING))
         else:
             check(pct >= ROT_MIN_PCT,
                   "%s eye+vein is %.2f%% of body, need >= %.1f%% "
                   "(tier-progression glow has nothing to light up below this)"
                   % (k, pct, ROT_MIN_PCT))
+            check(pct <= ROT_MAX_PCT,
+                  "%s eye+vein is %.2f%% of body, need <= %.1f%% (regression "
+                  "ceiling -- a runaway classification blows well past this, "
+                  "see ROT_MAX_PCT's comment)"
+                  % (k, pct, ROT_MAX_PCT))
 
         if k in meta and "rot_px" in meta[k]:
             rp = meta[k]["rot_px"]
