@@ -1,0 +1,250 @@
+# 敵人美術改用 AI 參考圖 sprite —— 設計
+
+2026-08-07
+
+## 鐵律
+
+**唔准手畫任何生物造型。** 10 隻小怪同 6 隻 boss(連 B3 第二階段)嘅造型,
+一律由 `Art reference/` 入面嘅 AI 生成圖裁出嚟做 sprite。
+
+准做:裁切、去背、縮放、色調、疊加特效(shader / modulate / 粒子)。
+唔准做:畫、改、補任何生物身體嘅形狀。缺圖入「需要補圖清單」交返出去,
+唔准自己畫住頂檔。
+
+本輪**只改視覺**,唔掂 gameplay。`battle_core` 同任何數值表一行都唔郁。
+
+## 現況
+
+上一輪 10 小怪 + 6 boss 全部係 `scripts/ui/pawn_art.gd` 入面嘅程序繪圖
+(`_draw_E01` … `_draw_B6`,約 700 行)。6 個主角已經係貼圖,由
+`tools/art_cutout.py` 由同一批 AI 參考圖切出,行 `HERO_TEX` 呢條路。
+
+即係話貼圖路徑已經存在並且驗證過,本輪係將敵人由程序路搬去貼圖路。
+
+## 探索結論(已驗證,唔係估)
+
+用現有 `tools/art_cutout.py` 嘅 `_bg_mask` 試切 `monster1.jfif`:
+
+- 10 隻小怪**各自成一舊獨立連通區域**。蛾(y357–502)同藤(y463–666)
+  y 軸雖然重疊,但根本冇黐埋,係兩件。
+- 第 11 大嘅碎片只得 220 px,即係主體同雜物之間有極闊嘅斷層。
+
+`Art reference/monster/` 已經有 `moth_solo.jfif`、`vine_solo.jfif`、
+`boss3_phase2.jfif` —— 原本擔心嘅三個缺口全部有現成獨立圖。
+
+**結論:冇阻塞性缺圖。**
+
+試切同時暴露三個要處理嘅嘢(見洋紅格仔驗證圖):
+
+1. 原圖畫咗嘅灰煙(甲蟲、骨狼、怨靈、蟾、蛇、菇)冇被 key 走,
+   變咗黐喺身上嘅灰舊 —— T1「無黑霧」會做唔到。
+2. 合集入面藤嘅內圈殘留兩笪奶白窟窿(封閉區域,border flood 入唔到)。
+3. 右下角 AI 嘅 ✦ 水印同零星白點。
+
+## 1. 資產 pipeline —— `tools/enemy_cutout.py`
+
+可重跑。**原圖唯讀,一個 byte 都唔改。**
+
+### 核心判斷:主體 = 「墨線輪廓 + 填內部」
+
+唔用「非奶白 = 主體」。
+
+呢批圖有一個穩定嘅生成特性:**主體必定被一條封閉深墨線包住,雜物必定冇。**
+所以取墨線遮罩(value 極低)嘅最大連通區域、再填晒內部空洞,得出嚟就係主體。
+
+一招同時解決上面三個問題:黐身灰煙冇墨線所以走清、藤嘅內圈奶白窟窿被
+「填內部」自動封、✦ 水印同飛濺點冇墨線所以掉。
+
+呢個判斷要記入 `DECISIONS.md` 當經驗:以後所有同源 AI 圖都用呢把刀。
+
+### 來源對應
+
+| 輸出 key | 來源 |
+|---|---|
+| E01 史萊姆 / E02 鼠 / E03 毒菇 | `monster1.jfif` 第 1 行 |
+| E04 甲蟲 / E07 骨狼 | `monster1.jfif` 第 2 行左、右 |
+| E05 蛾 | `monster/moth_solo.jfif` |
+| E06 藤 | `monster/vine_solo.jfif` |
+| E08 怨靈 / E09 蟾 / E10 蛇 | `monster1.jfif` 第 3 行 |
+| B1–B6 | `boss/boss1.jfif` … `boss6.jfif` |
+| B3P2 | `monster/boss3_phase2.jfif` |
+
+E05/E06 用 solo plate 而唔用合集中間格:solo 係 1024px(合集格得 145/203px),
+而且避開合集藤嘅奶白窟窿。合集中間格上蛾下藤嘅切法已驗證可行,只係質素較差。
+
+共 17 張 → `assets/enemies/<KEY>.png`。
+
+### 每張嘅步驟
+
+1. cream key(沿用 `_bg_mask` 嘅 border flood fill)
+2. 主體判定(墨線最大連通區域 + 填空洞)
+3. 邊緣去色污:半透明像素嘅顏色向內取樣,殺 JPEG 嘅奶白滲邊
+4. 1px 侵蝕 + 柔化(沿用 `art_cutout` 嘅做法)
+5. trim 到 alpha bounds
+6. **唔放大。** 原生高度輸出,cap 512
+
+不放大嘅理由:戰鬥入面敵人美術上限係 `570 - 96 - 274 = 200px` 高
+(`_enemy_art_budget()`)。pipeline 放大只係將軟化提早焗死落 PNG,
+不如留返畀 Godot 按實際尺寸縮。
+
+### 輸出
+
+- `assets/enemies/<KEY>.png` × 17
+- `assets/enemies/enemies.json` —— 每隻嘅 aspect、**邊緣帶平均色**
+  (trim 後最外 3px 環),第 5 節要用
+- `qa/enemy_cutout_*.png` —— 洋紅格仔驗證圖,睇白邊同雜點
+- stdout 印出 `EXTENT` dict,貼返入 `PawnArt`
+
+## 2. `PawnArt` 由程序繪圖轉貼圖
+
+加 `ENEMY_TEX`(對應 `HERO_TEX`)。`_draw()` 嘅貼圖分支收編所有敵人,
+額外做三件事:
+
+- 體型乘 `bulk(kind, tier)` —— 0.90 / 1.00 / 1.12,常數已存在,唔使改
+- 掛 shader material(第 3 節)
+- 加黑霧
+
+Boss 嘅 `bulk` 維持 1.0(佢哋冇 tier,永遠係最盡嗰個狀態)。
+
+### 刪碼
+
+**刪走** E01–E10 / B1–B6 嘅 `_draw_*` 造型 routine,同只服務佢哋嘅幾何
+primitive:`_limb`、`_smooth`、`_dome_points`、`_leaf`、`_veins`、`_rot_eye`。
+
+理由:留住唔係「保險」,係一個瞓喺度嘅後門 —— 貼圖 load 失敗就自動畫返
+手畫造型,直接違反鐵律。要考古有 git history。
+
+**保留** `_mist` / `_wisp` / `_rim`。佢哋畫嘅係煙同光,唔係生物造型,
+而且黑霧本來就要求沿用現有特效系統。
+
+黑霧位置改由 sprite alpha 闊度自動撒(T2 三束、T3 五束),唔再逐隻手寫座標
+—— 手寫座標係綁死喺舊造型上面嘅,換圖就錯。
+
+### 動畫
+
+idle 浮動、攻擊 lunge、受擊閃光全部沿用。呢啲都係 sprite transform 級,
+本來就同畫法無關。
+
+## 3. Shader —— `assets/shaders/rot_pawn.gdshader`
+
+專案第一個 shader。`canvas_item` 型。
+
+```
+hot = sat > 0.45 && hue ∈ 洋紅帶
+  value >  0.72 → 眼     additive bloom × eye_gain
+  value <= 0.72 → 腐化紋  additive       × vein_gain
+sat > 0.50 && hue ∈ 橙帶 → 岩漿:固定微亮,唔跟 tier
+rim: 取樣 8 鄰 alpha,喺 alpha 邊界疊 ROT_RIM × rim_strength
+```
+
+認色而唔係查表,所以零手工資料:17 隻全部自動有效,換圖唔使重新量,
+雙頭蛇 4 隻眼同蛾嘅細眼自動處理。
+
+洋紅帶、橙帶同 0.45 / 0.72 呢啲界線係**量出嚟,唔係估**:pipeline 會統計
+17 張圖嘅眼、裂紋、岩漿、身體四類像素嘅 HSV 分佈,揀喺斷層中間落刀,
+數字入返 shader 同 `DECISIONS.md`。如果某兩類根本冇斷層,即係認色行唔通,
+要即刻講,唔准硬揀一個數就當過關。
+
+橙帶單獨開一條路,係因為蟾蜍嘅岩漿紋係「熱,唔係腐」——
+上一輪已經定咗佢唔入洋紅色域,呢個身份要保住。
+
+### Tier 遞進
+
+| | 眼 | 腐化紋 glow | 黑霧 |
+|---|---|---|---|
+| T1 | 弱 bloom | 0(唔著) | 無 |
+| T2 | 中 bloom | 0(唔著) | 少量 |
+| T3 | 強 bloom | 整條著 | 常駐 |
+
+加埋體型 0.90/1.00/1.12,三個 tier 並排要一眼分得開。
+
+### 成本
+
+bloom 喺 shader 內用 5×5 tap,只對 hot 像素做。sprite 係 200px 級,
+同屏最多 4 隻敵人。可接受。
+
+## 4. 章節傳遞
+
+`PawnArt` 加 `chapter` 欄位。小怪預設 = tier(同一隻小怪三章都打得到,
+章節就係佢嘅 tier);boss 查 `BOSS_CHAPTER` 表;battle screen 明確傳
+`args.opts.chapter`。
+
+`UITheme.rot_rim_for(chapter)` 做 rim 強度嘅**單一真源**,由 `surface(ch)`
+嘅亮度反推 —— 第 3 章卡面(`#1e1429`)近黑,自動最強。
+
+GDScript 同 shader 必須共用呢一條公式,唔准兩邊各寫一份 —— 第 5 節嘅代理
+量法就係靠呢個單一真源先至有意義。
+
+## 5. 可讀性:代理 + 實測,而且要對數
+
+門檻維持 **2.4:1**,量度對象由「body 顏色」改為「sprite + rim 嘅輪廓可辨性」。
+
+`BODY` 常數會隨程序繪圖一齊消失,所以要換一把尺。
+
+### 代理(headless,全量)
+
+`_t_enemy_legibility()` 讀 `enemies.json` 嘅邊緣帶平均色,同
+`rot_rim_for(ch)` 按 shader 同一條公式混合,再對 `surface(ch)` 計對比。
+17 隻 × 3 章全量。呢個要 headless 跑得,先至可以留喺 `ui_smoke` 入面。
+
+### 實測(要視窗)
+
+`tools/enemy_legibility.gd`:真 render sprite + shader 落三章卡面,
+抽邊緣帶像素實測對比,印表。
+
+### 對數(收貨條件)
+
+代理係一個模型,唔係實測。所以要對一次數:
+
+1. 揀最差嗰 3–5 個 case(第 3 章 + 邊緣帶最深嗰幾隻)
+2. 兩把尺各量一次
+3. 差距超過 **0.15:1** 呢個量級 → **以真 render 為準**,返轉頭校代理公式
+4. 校完再全量跑
+
+**淨係代理綠唔算數。** 對完數、headless 全綠,先收貨。
+
+## 6. 解析度:先行後補
+
+戰鬥顯示上限 200px。合集切出嚟嘅小怪高度:
+
+| | 高度 | vs 200px |
+|---|---|---|
+| E02 鼠 | 143 px | 放大 1.40× |
+| E05 蛾(合集) | 145 px | 用 solo 代替 |
+| E06 藤(合集) | 203 px | 用 solo 代替 |
+| E01 史萊姆 | 214 px | 1.00× |
+| E09 蟾 | 220 px | 1.00× |
+| E07 骨狼 | 222 px | 1.00× |
+| E04 甲蟲 | 246 px | 縮 |
+| E03 毒菇 | 251 px | 縮 |
+| E10 蛇 | 251 px | 縮 |
+| E08 怨靈 | 270 px | 縮 |
+
+Boss 同 solo plate 全部 1024px,冇問題。
+
+平面粗描邊插畫係最捱得放大嗰類美術,1.4× 對老鼠嚟講多數係「軟咗少少」
+而唔係「爛」。所以照做落去,**gallery 出咗之後逐隻真眼睇**:邊隻喺實戰
+同圖鑑放大位(長按詳情、boss strip)明顯起毛,先補嗰隻嘅 solo。
+
+補圖模板用返蛾/藤嗰段換主體就得,唔使八隻盲補晒。
+E02 鼠預咗係第一個要補嘅,但等截圖定案。
+
+## 7. 收尾同交付
+
+- `tools/pawn_extents.gd` 改為由 sprite alpha bounds 覆核,印 `EXTENT`
+- fitted 正常(extent 變成 x=1.00、y=aspect/2,同主角一致)
+- 圖鑑 / 意圖區 / 長按詳情自動用新圖,逐個覆核
+- 精英 badge 不變
+- 37 張 gallery(10 小怪 × 3 tier + 6 boss + B3 二階段)
+- 三章實戰截圖
+- 540 抽驗
+- 12 個測試套件全綠(`bash tools/test_all.sh`)
+- `DECISIONS.md` 記低判斷,包括「墨線輪廓 + 填內部」呢把刀
+- **需要補圖清單**:逐項講明缺乜(主體、姿勢),等 AI 生成補返
+
+## 唔喺範圍入面
+
+- 任何 gameplay、數值、`battle_core`
+- 主角美術(上一輪已完成)
+- 敵人以外嘅 UI
+- 原圖檔案本身
