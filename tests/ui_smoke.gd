@@ -326,23 +326,63 @@ func _colors_in(v: Variant) -> Array:
 
 
 ## The rim light's strength is a single formula shared by GDScript and the
-## shader. It has to grow as the chapter card gets darker, or the darkest
-## chapter — the one that needs the rim most — gets the least of it.
+## shader, and it has to run the way the arithmetic runs, not the way "darker
+## card needs more help" sounds.
+##
+## A contrast ratio is `(Lfg + 0.05) / (Lbg + 0.05)`. A BRIGHTER card raises the
+## luminance the lit edge has to reach, so the brightest of the three cards —
+## chapter 1's `#1b3019`, luminance 0.0242 against chapter 3's 0.0094 — is the
+## one that takes the most rim, and chapter 3 the least. This test used to
+## assert the opposite (`r1 <= r2 <= r3`); it was passing because the curve had
+## the same mistake in it, and chapter 3 was being driven to 1.00, where the
+## shader's `mix()` stops lighting the plate's ink outline and simply replaces
+## it with flat `ROT_RIM`.
+##
+## So: the ordering, and that each chapter's strength is the MINIMUM that does
+## the job. Both halves matter — an inflated rim passes any floor check while
+## quietly flattening the artwork.
+##
+## The checks below read `UITheme.ROT_RIM_TARGET` because what they test is that
+## the curve reaches its own declared target — they would follow that constant
+## wherever it went. The 2.4:1 floor is therefore spelled out as a literal in
+## `_t_enemy_legibility` instead, so lowering `ROT_RIM_TARGET` is caught there
+## rather than nowhere. Measured: drop it to 2.0 and the worst real edge (E09 on
+## chapter 1) falls to 2.35:1 and that test fires.
 func _t_rot_rim() -> void:
+	var l1 := UITheme.luminance(UITheme.surface(1))
+	var l2 := UITheme.luminance(UITheme.surface(2))
+	var l3 := UITheme.luminance(UITheme.surface(3))
+	_check(l1 > l2 and l2 > l3,
+			"this test's premise is that card luminance falls ch1>ch2>ch3; it is now %.4f/%.4f/%.4f"
+			% [l1, l2, l3])
 	var r1 := UITheme.rot_rim_for(1)
 	var r2 := UITheme.rot_rim_for(2)
 	var r3 := UITheme.rot_rim_for(3)
-	_check(r3 > r1, "chapter 3 rim (%.2f) must be stronger than chapter 1 (%.2f)" % [r3, r1])
-	_check(r1 <= r2 and r2 <= r3, "rim must not dip between chapters: %.2f/%.2f/%.2f" % [r1, r2, r3])
+	_check(r1 > r2 and r2 > r3,
+			"rim must fall as the card darkens (ch1 is the brightest card): %.3f/%.3f/%.3f"
+			% [r1, r2, r3])
 	for ch in [1, 2, 3]:
 		var s := UITheme.rot_rim_for(ch)
-		_check(s >= 0.0 and s <= 1.0, "chapter %d rim %.2f out of 0..1" % [ch, s])
-	# the rim colour, at full strength, must clear the bar on its own card
-	var lit := UITheme.ROT_RIM
-	_check(UITheme.contrast(lit, UITheme.surface(3)) >= 2.4,
-			"ROT_RIM %s on chapter 3 is %.2f:1, needs 2.4:1"
-			% [lit.to_html(false), UITheme.contrast(lit, UITheme.surface(3))])
-	print("rot rim: ch1 %.2f  ch2 %.2f  ch3 %.2f" % [r1, r2, r3])
+		_check(s > 0.0 and s <= 1.0, "chapter %d rim %.3f out of (0..1]" % [ch, s])
+		# sufficient: even a pure-black edge — darker than any plate's — clears
+		# the target once this rim is on it
+		var black := lit_edge(Color.BLACK, ch)
+		var got := UITheme.contrast(black, UITheme.surface(ch))
+		_check(got >= UITheme.ROT_RIM_TARGET,
+				"chapter %d rim %.3f only carries a black edge to %.2f:1, needs %.2f:1"
+				% [ch, s, got, UITheme.ROT_RIM_TARGET])
+		# and not one step more than sufficient: back it off and it must fail,
+		# or the curve has been padded and the plates are being over-lit
+		var weaker := UITheme.contrast(Color.BLACK.lerp(UITheme.ROT_RIM, s - 0.02),
+				UITheme.surface(ch))
+		_check(weaker < UITheme.ROT_RIM_TARGET,
+				"chapter %d rim %.3f is padded — %.3f already reaches %.2f:1"
+				% [ch, s, s - 0.02, weaker])
+	print("rot rim: ch1 %.3f  ch2 %.3f  ch3 %.3f — black edge lands at %.2f/%.2f/%.2f:1"
+			% [r1, r2, r3,
+			UITheme.contrast(lit_edge(Color.BLACK, 1), UITheme.surface(1)),
+			UITheme.contrast(lit_edge(Color.BLACK, 2), UITheme.surface(2)),
+			UITheme.contrast(lit_edge(Color.BLACK, 3), UITheme.surface(3))])
 
 
 ## Can you still tell where the creature ends and the card begins?
@@ -361,13 +401,40 @@ func _t_enemy_legibility() -> void:
 	_check(f != null, "assets/enemies/enemies.json is missing")
 	if f == null:
 		return
-	var meta: Dictionary = JSON.parse_string(f.get_as_text())
+	# not `var meta: Dictionary = JSON.parse_string(...)`: on malformed JSON that
+	# returns null and the typed assignment is a hard script error, which reads as
+	# a crashed suite instead of a failed check
+	var parsed: Variant = JSON.parse_string(f.get_as_text())
 	f.close()
-	_check(meta.size() == 17, "enemies.json describes %d sprites, expected 17" % meta.size())
+	_check(parsed is Dictionary, "assets/enemies/enemies.json did not parse as an object")
+	if not (parsed is Dictionary):
+		return
+	var meta: Dictionary = parsed
+	# Identity, not cardinality. A key renamed on one side only would keep the
+	# count at 17 and quietly measure a different set of sprites; `ENEMY_TEX` is
+	# the list that actually gets drawn, so it is the one this has to match.
+	var want: Array = PawnArt.ENEMY_TEX.keys()
+	want.sort()
+	var got: Array = meta.keys()
+	got.sort()
+	_check(got == want, "enemies.json describes %s; the drawn plates are %s" % [got, want])
+	_check(want.size() == 17, "expected 17 enemy plates, PawnArt.ENEMY_TEX lists %d" % want.size())
 
 	var worst := 99.0
 	var worst_what := ""
+	# per chapter: how many distinct edge colours went in, how many came out. A
+	# lerp with strength < 1 is injective, so those two counts have to agree. They
+	# stop agreeing exactly when the rim is strong enough to stop lighting the
+	# plates and start replacing them — at strength 1.00 every row collapses onto
+	# `ROT_RIM` itself and the rows below measure nothing about the sprite. That
+	# is what chapter 3 was doing before `rot_rim_for` was solved instead of
+	# ramped; this is the guard that keeps it from coming back.
+	var edges_in := {1: {}, 2: {}, 3: {}}
+	var lits_out := {1: {}, 2: {}, 3: {}}
 	for key in meta:
+		if not (meta[key] is Dictionary and meta[key].has("edge_rgb")):
+			_check(false, "enemies.json entry %s has no edge_rgb" % key)
+			continue
 		var e: Array = meta[key]["edge_rgb"]
 		var edge := Color8(int(e[0]), int(e[1]), int(e[2]))
 		var chapters: Array = [int(PawnArt.BOSS_CHAPTER[key])] if PawnArt.BOSS_CHAPTER.has(key) \
@@ -375,17 +442,46 @@ func _t_enemy_legibility() -> void:
 		for ch in chapters:
 			var lit := lit_edge(edge, int(ch))
 			var r := UITheme.contrast(lit, UITheme.surface(int(ch)))
+			edges_in[int(ch)][edge.to_html(false)] = true
+			lits_out[int(ch)][lit.to_html(false)] = true
 			if r < worst:
 				worst = r
 				worst_what = "%s on chapter %d" % [key, ch]
 			_check(r >= 2.4, "%s lit edge %s on chapter %d card is %.2f:1, needs 2.4:1"
 					% [key, lit.to_html(false), ch, r])
-	print("enemy legibility (proxy): worst is %s at %.2f:1" % [worst_what, worst])
+	for ch in [1, 2, 3]:
+		_check(lits_out[ch].size() == edges_in[ch].size(),
+				"chapter %d: %d distinct edge colours went in, %d came out — the rim is washing the plates out, not lighting them"
+				% [ch, edges_in[ch].size(), lits_out[ch].size()])
+	print("enemy legibility (proxy): worst is %s at %.2f:1 (distinct lit edges %d/%d/%d)"
+			% [worst_what, worst, lits_out[1].size(), lits_out[2].size(), lits_out[3].size()])
 
 
 ## The rim light applied to an edge colour, mirroring the `mix()` at the bottom
-## of `rot_pawn.gdshader`. `edge` is 1.0 there because `edge_rgb` is sampled
-## from exactly the band the shader lights.
+## of `rot_pawn.gdshader` with that line's two other inputs pinned: the `edge`
+## scalar at 1.0 and `v_modulate` at white.
+##
+## Six known ways this is a model and not the picture, all six written out with
+## numbers in `task-5-report.md`. Five of them make the proxy read HIGH:
+##  1. `edge` (`src.a * (1 - amin)`) is 1.0 only right at the alpha boundary and
+##     falls off inward, so part of the measured band is lit less than this.
+##  2. `edge_rgb` was averaged over `alpha > 200` (`enemy_cutout.py`); the shader
+##     lights everything with `alpha > 0.2`. Two different bands, and the extra
+##     skirt the shader lights is the soft, semi-transparent part.
+##  3. Minification. The band is 3 TEXTURE px; on an enemy battle card the
+##     plates draw at 0.12–1.04 of source size, so that band is 0.37–3.11 SCREEN
+##     px — per key, and with mipmaps off on every plate.
+##  4. Alpha compositing at the cut boundary: the proxy compares an opaque colour
+##     to the card, the renderer blends the boundary's own alpha into it.
+##  5. `v_modulate` is white here, and the shader multiplies by it. Nothing puts
+##     a non-white modulate on an enemy BATTLE-card pawn — the one place that
+##     does, `screen_codex.gd`'s unseen-entry silhouette, is meant to be
+##     unreadable, so this number does not speak for it.
+## And one that makes it read LOW:
+##  6. The bloom pass adds `glow * 0.055` before the rim mix. Small at the
+##     silhouette's boundary — the mask it gathers is eyes and cracks, which are
+##     interior — but it is real and it is unmodelled.
+## Task 6 renders the real thing and reconciles at 0.15:1 — the render wins.
 func lit_edge(edge: Color, chapter: int) -> Color:
 	return edge.lerp(UITheme.ROT_RIM, clampf(UITheme.rot_rim_for(chapter), 0.0, 1.0))
 
