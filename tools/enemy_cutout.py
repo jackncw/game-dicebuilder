@@ -59,14 +59,12 @@ SOLO = {
 # of the bone wolf cell (E07, the darkest-shadowed minion) shows the outline's
 # density peak below 0.24 and its painted-shadow density peak above 0.34, with
 # a trough at 0.28-0.32 between them — 0.30 sits in that trough.
-# Swept 0.10-0.70 against every plate while chasing a cream-pocket test failure
-# on B4 and B3P2: the value made no difference at any point in that range, so
-# there was no evidence to move off this measurement. Root cause turned out to
-# be a real gap in the pose (shoulder/horn on B4, underarm on B3P2) fully
-# enclosed by ink on both sides — not a broken outline — so no INK_V can close
-# it without also destroying the outline elsewhere. Both are on the
-# needs-new-art list; see tools/enemy_cutout_test.py's cream check, which
-# correctly still fails on them.
+# B4 and B3P2 initially failed the cream check with this value unchanged
+# across a 0.10-0.70 sweep: their pockets (shoulder/horn on B4, both armpits
+# on B3P2) are real background fully enclosed by ink on both sides, not a
+# broken outline, so no INK_V closes them. That is a colour question, not an
+# ink-threshold one — see `_background_pockets` below, which is what actually
+# resolves them.
 INK_V = 0.30
 # A real body part is large; smoke, spatter and the corner sparkle are not.
 # Anything under this fraction of the biggest ink component is clutter.
@@ -91,7 +89,46 @@ def subject_mask(rgb: np.ndarray) -> np.ndarray:
     for i, s in enumerate(sizes):
         if s >= sizes.max() * KEEP_FRAC:
             keep |= lab == i + 1
-    return ndimage.binary_fill_holes(keep)
+    filled = ndimage.binary_fill_holes(keep)
+    # The subject is still found by ink alone; colour only adjudicates which
+    # of fill_holes's *additions* (never the ink-kept pixels themselves) are
+    # real background peeking through a pose gap — an armpit, a horn/shoulder
+    # notch — versus a real enclosed body part (an eye socket, a shield boss).
+    return filled & ~_background_pockets(rgb, filled & ~keep)
+
+
+def _background_pockets(rgb: np.ndarray, holes: np.ndarray) -> np.ndarray:
+    """Which connected pieces of `holes` are flat plate cream rather than
+    painted body interior.
+
+    Same flatness test, same thresholds, as `art_cutout._bg_mask`'s pocket
+    check (the hare's bow encloses a cream pocket the border flood-fill can't
+    reach; this is the same shape of problem one level down, inside an
+    already-closed ink loop instead of the plate border). Its comment records
+    the measured gap this pipeline reuses rather than re-deriving: real
+    pockets sit under channel std 11 and mean-difference 3 from the plate's
+    border colour, while the palest surviving painted fur sits at
+    mean-difference 16+, so std < 14 and mean-difference < 6 lands in the gap
+    with room on both sides.
+    """
+    border = np.concatenate([rgb[0], rgb[-1], rgb[:, 0], rgb[:, -1]])
+    bg_col = np.median(border.reshape(-1, 3), axis=0)
+    lab, n = ndimage.label(holes, structure=np.ones((3, 3), bool))
+    pockets = np.zeros(rgb.shape[:2], bool)
+    for i in range(1, n + 1):
+        comp = lab == i
+        # Measure on a 1px-eroded core, not the raw component: the ring where
+        # ink fades into background is neither ink nor flat plate, and on
+        # B4's real pocket alone it drags std from 5-8 to 26 — enough to
+        # falsely fail a genuinely flat cream pocket. Erosion strips that
+        # ring; the whole component (ring included) still gets dropped once
+        # its core passes, same as the outer silhouette's edge is cleaned up
+        # after the fact in `cut_subject`.
+        core = ndimage.binary_erosion(comp, np.ones((3, 3), bool))
+        px = rgb[core if core.any() else comp].astype(np.float32)
+        if px.std(axis=0).max() < 14.0 and np.abs(px.mean(axis=0) - bg_col).max() < 6.0:
+            pockets |= comp
+    return pockets
 
 
 def cut_subject(img: Image.Image) -> Image.Image:
