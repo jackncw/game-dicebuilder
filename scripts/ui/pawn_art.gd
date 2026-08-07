@@ -85,29 +85,6 @@ const EYE_GAIN := [0.45, 0.85, 1.5]
 const VEIN_GAIN := [0.0, 0.0, 1.1]     # T1/T2 dark, T3 alight
 const MIST_COUNT := [0, 3, 5]
 
-## The main colour of each enemy — the one that covers most of its silhouette,
-## before the rot is applied.
-##
-## Dead as far as drawing goes: the plates carry their own colour and this table
-## no longer decides any pixel. It survives only because `_t_enemy_legibility`
-## in `ui_smoke` still measures legibility through it, and Task 5 replaces that
-## test with one that reads the plates. Delete both together.
-const BODY := {
-	"E01": Color("6a8d53"),   # slime, still recognisably green
-	"E02": Color("8a7f96"),   # fang rat
-	"E03": Color("99779e"),   # sporecap — the cap is most of its outline
-	"E04": Color("85808f"),   # stone beetle
-	"E05": Color("8d7ba2"),   # gloom moth — the wings
-	"E06": Color("9d7c68"),   # bramble vine
-	"E07": Color("8d8079"),   # bone wolf — what hide is left on it
-	"E08": Color("8d7ba5"),   # wraith
-	"E09": Color("ab775d"),   # lava toad
-	"E10": Color("6a8c65"),   # twin viper
-	"B1": Color("8c7d96"), "B2": Color("8c7d96"),
-	"B3": Color("8d7c9e"), "B3P2": Color("8a7d9c"),
-	"B4": Color("8a7d9c"), "B5": Color("8a7e95"), "B6": Color("8b7d9a"),
-}
-
 ## How much of its own art a design draws at each tier. `fit_height` sizes every
 ## card against tier 3 — the biggest — so a tier-1 minion simply sits smaller
 ## inside the same card, which is the point.
@@ -304,21 +281,6 @@ static func rot_of(p_kind: String, p_tier: int) -> float:
 	if is_boss(p_kind):
 		return 1.0
 	return clampf((float(clampi(p_tier, 1, 3)) - 1.0) * 0.5, 0.0, 1.0)
-
-
-## A body colour taken to a depth of rot: at 0 the animal keeps its own colour
-## and is only lifted, at 1 it has sunk into the dead violet everything hostile
-## ends up as. Nothing draws through this any more — see `BODY`.
-static func rot_shade(base: Color, t: float) -> Color:
-	if t <= 0.5:
-		return base.lightened(0.28 * (0.5 - t))
-	return base.lerp(UITheme.ROT_UNDER, 0.56 * (t - 0.5))
-
-
-## What a design's main colour would be painted as at `p_tier`. Kept for
-## `_t_enemy_legibility` in `ui_smoke` until Task 5 replaces it — see `BODY`.
-static func rot_body(p_kind: String, p_tier: int) -> Color:
-	return rot_shade(BODY.get(p_kind, Color("8a7d9a")), rot_of(p_kind, p_tier))
 
 
 func rot_level() -> float:

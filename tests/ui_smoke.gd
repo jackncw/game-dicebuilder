@@ -345,26 +345,49 @@ func _t_rot_rim() -> void:
 	print("rot rim: ch1 %.2f  ch2 %.2f  ch3 %.2f" % [r1, r2, r3])
 
 
-## Every enemy has to be visible against the card it fights on. The corrupted
-## palette is deliberately dark and chapter 3's card is `#1e1429`, so this is
-## the line that stops "darker = more corrupted" from walking a creature into
-## the background. 2.4:1 is a silhouette threshold, not the 4.5:1 text one:
-## the body only has to separate from the panel, not carry type.
+## Can you still tell where the creature ends and the card begins?
 ##
-## Tier 3 is the one measured because it is the darkest a design ever gets.
+## The old version measured a flat body colour this file used to own. The
+## bodies are painted plates now, so the thing that has to survive the card is
+## the LIT EDGE: the outermost band of the silhouette with the rim light on it.
+##
+## `edge_rgb` is measured off each cut PNG by `tools/enemy_cutout.py`; the
+## blend below mirrors `rot_pawn.gdshader`'s rim line, and both take their
+## strength from `UITheme.rot_rim_for`. This is a MODEL of the picture, not the
+## picture — `tools/enemy_legibility.gd` renders the real thing, and the two
+## are reconciled before this number is trusted. See DECISIONS.md.
 func _t_enemy_legibility() -> void:
+	var f := FileAccess.open("res://assets/enemies/enemies.json", FileAccess.READ)
+	_check(f != null, "assets/enemies/enemies.json is missing")
+	if f == null:
+		return
+	var meta: Dictionary = JSON.parse_string(f.get_as_text())
+	f.close()
+	_check(meta.size() == 17, "enemies.json describes %d sprites, expected 17" % meta.size())
+
 	var worst := 99.0
 	var worst_what := ""
-	for kind in PawnArt.BODY:
-		var body := PawnArt.rot_body(String(kind), 3)
-		for ch in [1, 2, 3]:
-			var r := UITheme.contrast(body, UITheme.surface(ch))
+	for key in meta:
+		var e: Array = meta[key]["edge_rgb"]
+		var edge := Color8(int(e[0]), int(e[1]), int(e[2]))
+		var chapters: Array = [int(PawnArt.BOSS_CHAPTER[key])] if PawnArt.BOSS_CHAPTER.has(key) \
+				else [1, 2, 3]
+		for ch in chapters:
+			var lit := lit_edge(edge, int(ch))
+			var r := UITheme.contrast(lit, UITheme.surface(int(ch)))
 			if r < worst:
 				worst = r
-				worst_what = "%s on chapter %d" % [kind, ch]
-			_check(r >= 2.4, "%s body %s on chapter %d card is %.2f:1, needs 2.4:1"
-					% [kind, body.to_html(false), ch, r])
-	print("enemy legibility: worst is %s at %.2f:1" % [worst_what, worst])
+				worst_what = "%s on chapter %d" % [key, ch]
+			_check(r >= 2.4, "%s lit edge %s on chapter %d card is %.2f:1, needs 2.4:1"
+					% [key, lit.to_html(false), ch, r])
+	print("enemy legibility (proxy): worst is %s at %.2f:1" % [worst_what, worst])
+
+
+## The rim light applied to an edge colour, mirroring the `mix()` at the bottom
+## of `rot_pawn.gdshader`. `edge` is 1.0 there because `edge_rgb` is sampled
+## from exactly the band the shader lights.
+func lit_edge(edge: Color, chapter: int) -> Color:
+	return edge.lerp(UITheme.ROT_RIM, clampf(UITheme.rot_rim_for(chapter), 0.0, 1.0))
 
 
 ## Every enemy is a plate now. This is the rule that keeps the hand-drawn
@@ -408,7 +431,7 @@ func _t_enemy_sprites() -> void:
 				"tier 3 pawn got no vein glow")
 
 	# a chapter-1 pawn, so rim_strength has something to differ from — the old
-	# `> 0.0` check passed at any chapter because rot_rim_for(1) is 0.35
+	# `> 0.0` check passed at any chapter because rot_rim_for(1) is well above 0
 	var t1 := PawnArt.make("E01", 140.0, false, 1, 1)
 	add_child(t1)
 	await get_tree().process_frame

@@ -143,10 +143,17 @@ const ROT_RIM := Color("cfa8dd")        # rim light that keeps a dark body legib
 ## the result through its `rim_strength` uniform, and `_t_enemy_legibility`
 ## predicts the lit edge with it. Two copies of this curve would let the test
 ## and the picture drift apart silently.
+##
+## The floor (chapter 1's weakest end) was originally 0.35. `_t_enemy_legibility`
+## measured every chapter-1 lit edge against `surface(1)` (`#1b3019`, luminance
+## 0.0242 — the brightest of the three cards, so it takes the most rim to clear
+## a fixed contrast ratio, not the least) and every one of the twelve chapter-1
+## keys landed under 2.4:1, worst at E09 1.68:1. Raised to 0.55 — the minimum
+## that clears the floor is ~0.4953 — measured worst case E09 2.74:1.
 static func rot_rim_for(chapter: int) -> float:
 	var l := luminance(surface(chapter))
-	# 0.0242 luminance (chapter 1's card) -> 0.35; 0.0094 (chapter 3's) -> 1.0
-	return clampf(remap(l, 0.0094, 0.0242, 1.0, 0.35), 0.0, 1.0)
+	# 0.0242 luminance (chapter 1's card) -> 0.55; 0.0094 (chapter 3's) -> 1.0
+	return clampf(remap(l, 0.0094, 0.0242, 1.0, 0.55), 0.0, 1.0)
 
 ## The magenta wedge, in Godot's 0–1 hue. 285°–342°: everything from violet-
 ## magenta through to rose. Below it sits the game's existing purple family
