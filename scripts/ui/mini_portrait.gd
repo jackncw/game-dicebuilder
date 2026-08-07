@@ -11,7 +11,8 @@ extends Control
 ##
 ## The crop is the pawn's own `_draw`, not a second drawing of the character —
 ## scaled so the head fills the disc and offset so the head's centre lands on
-## the centre. `PawnArt.HEAD` is where each design's head is.
+## the centre. `PawnArt.head()` says where to expect a head. Every hero now
+## ships a `*_head.png` framed on the face, so that path is the fallback only.
 
 const DEFAULT_D := 54.0
 

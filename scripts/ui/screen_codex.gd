@@ -239,7 +239,9 @@ func _tier_strip(key: String) -> Control:
 		cell.add_theme_constant_override("separation", 0)
 		var holder := Control.new()
 		holder.custom_minimum_size = Vector2(96, 100)
-		var art := PawnArt.fitted(key, Vector2(96, 92.0), false, tier)
+		# a minion's tier IS the chapter it is met in, so the rim the codex
+		# shows is the rim the fight will show
+		var art := PawnArt.fitted(key, Vector2(96, 92.0), false, tier, tier)
 		art.position = Vector2(48, 96)
 		if not Game.enemy_tier_seen(key, tier):
 			art.modulate = Color(0.05, 0.04, 0.06, 1.0)

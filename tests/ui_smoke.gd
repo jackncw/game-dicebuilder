@@ -37,6 +37,7 @@ func _ready() -> void:
 	_t_no_player_magenta()
 	_t_rot_rim()
 	_t_enemy_legibility()
+	await _t_enemy_sprites()
 	if fails == 0:
 		print("UI SMOKE OK")
 	else:
@@ -364,6 +365,45 @@ func _t_enemy_legibility() -> void:
 			_check(r >= 2.4, "%s body %s on chapter %d card is %.2f:1, needs 2.4:1"
 					% [kind, body.to_html(false), ch, r])
 	print("enemy legibility: worst is %s at %.2f:1" % [worst_what, worst])
+
+
+## Every enemy is a plate now. This is the rule that keeps the hand-drawn
+## routines from creeping back: if a key has no texture there is no fallback
+## that could quietly draw a creature instead.
+func _t_enemy_sprites() -> void:
+	var keys := ["E01", "E02", "E03", "E04", "E05", "E06", "E07", "E08", "E09", "E10",
+			"B1", "B2", "B3", "B3P2", "B4", "B5", "B6"]
+	for k in keys:
+		var tex := PawnArt.enemy_texture(k)
+		_check(tex != null, "%s has no sprite in assets/enemies/" % k)
+		if tex != null:
+			_check(tex.get_width() > 40 and tex.get_height() > 40,
+					"%s sprite is %dx%d, too small to be a real cut"
+					% [k, tex.get_width(), tex.get_height()])
+	# the pawn actually carries the corruption shader
+	var pa := PawnArt.make("E01", 140.0, false, 3, 3)
+	add_child(pa)
+	await get_tree().process_frame
+	_check(pa.material is ShaderMaterial, "E01 pawn has no ShaderMaterial")
+	if pa.material is ShaderMaterial:
+		var m: ShaderMaterial = pa.material
+		_check(float(m.get_shader_parameter("rim_strength")) > 0.0,
+				"chapter 3 pawn got no rim strength")
+		_check(float(m.get_shader_parameter("vein_gain")) > 0.0,
+				"tier 3 pawn got no vein glow")
+	var t1 := PawnArt.make("E01", 140.0, false, 1, 1)
+	add_child(t1)
+	await get_tree().process_frame
+	if t1.material is ShaderMaterial:
+		_check(float((t1.material as ShaderMaterial).get_shader_parameter("vein_gain")) == 0.0,
+				"tier 1 must have no vein glow — it is one of the five tier dials")
+	pa.queue_free()
+	t1.queue_free()
+	# extents come off the sprites now: trimmed art always fills its height
+	for k2 in keys:
+		_check(is_equal_approx(PawnArt.extent(k2).x, 1.0),
+				"%s extent.x is %.2f — trimmed sprites always reach 1.00"
+				% [k2, PawnArt.extent(k2).x])
 
 
 ## The floating-number regression: a damage number has to land inside the rect
