@@ -837,10 +837,10 @@ void fragment() {
 	// plate in twice (alpha becomes src.a², every pixel darkens), even with
 	// rot_mask unset and rim_strength at 0.
 	//
-	// Godot 4.x has no MODULATE built-in in canvas_item fragment (it was 3.x
-	// only, verified against 4.7.1's shader_types.cpp), and the modulate is
-	// needed — the hit flash drives it. So vertex() captures COLOR before the
-	// texture is applied and passes it down:
+	// Godot 4.x has no MODULATE built-in in canvas_item fragment (verified
+	// against 4.7.1's shader_types.cpp), and the modulate is needed — the hit
+	// flash drives it. So vertex() captures COLOR before the texture is
+	// applied and passes it down:
 	//
 	//     varying vec4 v_modulate;
 	//     void vertex() { v_modulate = COLOR; }
