@@ -19,32 +19,43 @@ const CARD_EDGE_FLOOR := 2.4      # lit edge vs the bare chapter card
 ## own measured error against the render, added on so that "the model clears the
 ## floor" implies "the render clears the floor" instead of merely suggesting it.
 ##
-## Derived, not chosen. `tools/enemy_legibility.gd` renders all 37 rows and
-## `_screen_band` models the same 37; the largest amount by which the model reads
-## ABOVE the render — the optimistic direction, the one that can hide a failure —
-## is **+0.0447** (E05 ch1: modelled 2.513:1, rendered 2.469:1; next E10 ch1
-## +0.043, then E03 ch2 +0.032). So a row that clears 2.4448 here has cleared
-## 2.400 there. The other direction runs to −0.028 and needs nothing.
+## Derived, not chosen, and then deliberately rounded UP. Two numbers bracket it,
+## both off `tools/enemy_legibility.gd`, which renders all 37 rows while
+## `_screen_band` models the same 37:
+##   • the FLOOR it must clear — the largest amount by which the model reads
+##     ABOVE the render, the optimistic direction and the only one that can hide
+##     a failure — is **+0.0447** (E05 ch1: modelled 2.513:1, rendered 2.469:1;
+##     next E10 ch1 +0.043, then E03 ch2 +0.032, so it is a shoulder and not a
+##     lone outlier). The other direction runs to −0.028 and needs nothing.
+##   • the CEILING it must not reach — the thinnest MODELLED row is E09 ch1 at
+##     2.490, so anything past 0.090 would red a row the render passes at 2.494.
 ##
-## The only padding is the last digit: 0.0448, not 0.0447, because the tool
-## prints that bias to four places and a constant quoted at the same precision as
-## the thing it must exceed can land underneath it. Nothing beyond that is added,
-## because a bigger number would be one nobody measured — and there is not much
-## room for one either: the thinnest MODELLED row is E09 ch1 at 2.490, so
-## anything past 0.090 would red a row the render passes. Spent 0.0448,
-## left 0.045.
+## **0.06**, which is 0.0447 plus half of what is left. It is not set to the
+## measured worst plus a rounding digit, and the reason is what that measurement
+## is: a MAX over 37 deterministic samples. A max over a sample is by
+## construction a lower bound on the true worst, and the 37 are one card layout,
+## one set of plates and one idle frame — the next plate cut or the next retuned
+## box is not in them. Sitting a ten-thousandth above the largest number anyone
+## happened to draw would be treating a lower bound as a bound.
 ##
-## It goes stale like any measurement. The render is what refreshes it, and the
-## run prints `LEGIBILITY BOUND1 worst OPTIMISTIC bias ... COVERED` or
-## `MARGIN TOO SMALL` against this very constant, so the staleness is not silent.
+## The other half of the reason is that the alarm is manual. The render prints
+## `LEGIBILITY BOUND1 worst OPTIMISTIC bias ... COVERED` or `MARGIN TOO SMALL`
+## against this very constant every run — but that run needs a real window and is
+## NOT in `tools/test_all.sh`, so a stale margin is caught only when somebody
+## remembers to look. A margin that carries slack degrades to a smaller true
+## margin; a margin fitted to the last measured digit degrades to a false claim.
+##
+## Spent 0.06 of the 0.090 available, leaving E09 ch1 passing at 2.490 against
+## 2.460, i.e. **+0.030**. That spare is the check's own headroom, not padding on
+## the guarantee: the guarantee is that 0.06 > 0.0447.
 ##
 ## This covers BOUND 1 ONLY. Bound 2 is a cap that the model already overstates
 ## on all 37 rows (worst modelled 20.2% at B2 against 9.2% rendered), so it is
 ## conservative without help. Bound 3 gets no margin on purpose — its residual is
-## two-sided at ±0.443 and a one-sided margin there would be a false guarantee,
+## two-sided at ±0.46 and a one-sided margin there would be a false guarantee,
 ## while one big enough to cover it would red rows the picture passes; see
 ## `MIST_EDGE_FLOOR` and `lit_edge`'s residual note for what stands in instead.
-const CARD_EDGE_MARGIN := 0.0448
+const CARD_EDGE_MARGIN := 0.06
 ## RE-PRICED IN TASK 6 FROM 1.9, AND THE REASON IS THE RULER, NOT THE BAR.
 ## Task 5 set 1.9 as "just below today's worst modelled row, 1.990". That 1.990
 ## came out of a `lit_edge()` that pinned the shader's `edge` scalar at 1.0 —
@@ -58,6 +69,13 @@ const CARD_EDGE_MARGIN := 0.0448
 ## 69 rendered band pixels). Same construction Task 5 used, just below the worst,
 ## and deliberately not padded further.
 ##
+## That 1.600 was measured against `card_behind()`'s MODEL of the mist background,
+## which was the last modelled term inside the instrument of record. The tool now
+## reads that background off the render too, and the same row comes back at
+## **1.604** — so the floor's margin is **+0.054**, and the derivation above stands
+## with the number it was derived from confirmed rather than replaced. See
+## `card_behind` for the measurement.
+##
 ## What this bound now permits, concretely: E05 has the LOWEST mist coverage in
 ## the cast — 1.5% of its band at five wisps, against B2's 20.2% — so this floor
 ## lets roughly one and a half percent of the moth's outline sit at 1.6:1 while
@@ -65,7 +83,7 @@ const CARD_EDGE_MARGIN := 0.0448
 ## `MIST_COVER_CAP` is what keeps that "roughly one and a half percent" true.
 ##
 ## `rim_px` cannot buy this row back: rendered at 3/6/7/8/9/12 it reads
-## 1.023 / 1.600 / 1.613 / 1.616 / 1.631 / 1.557 — flat past 6, falling past 9.
+## 1.025 / 1.604 / 1.617 / 1.620 / 1.635 / 1.561 — flat past 6, falling past 9.
 const MIST_EDGE_FLOOR := 1.55     # lit edge vs mist-over-card, where mist sits behind it
 const MIST_COVER_CAP := 0.25      # how much of an edge band the mist may ever stand on
 
@@ -499,7 +517,7 @@ func _t_rot_rim() -> void:
 ##      `CARD_EDGE_MARGIN`, the model's own measured error against the render,
 ##      so that clearing the bar here means clearing it there. Rendered worst is
 ##      E05 ch1 at 2.469:1 (+0.069 on the floor); modelled worst is E09 ch1 at
-##      2.490:1 (+0.045 on floor-plus-margin).
+##      2.490:1 (+0.030 on floor-plus-margin).
 ##   2. `MIST_COVER_CAP` — the mist may never stand on more than 25% of an edge
 ##      band. Today's worst is B2 at 20.2%. THIS is what makes bound 1
 ##      meaningful: without it, the veil could grow until "most of the contour
@@ -510,14 +528,27 @@ func _t_rot_rim() -> void:
 ##   3. `MIST_EDGE_FLOOR` — where the veil does sit, the edge still reaches
 ##      1.55:1. Re-priced in Task 6 from 1.9, off the RENDER rather than off a
 ##      model that had been measured wrong; the constant carries the derivation.
-##      Rendered worst is E05 ch3 at 1.600:1 (69 px, margin +0.050); modelled
-##      worst is E09 ch3 tier3 at 1.816:1 (+0.266). The model cannot resolve
-##      this bound better than ±0.443 and errs in BOTH directions, so no margin
-##      is added — a one-sided one would be a false guarantee and a two-sided
-##      one would red rows the picture passes. THIS BOUND IS NOT GATED HERE.
-##      `tools/enemy_legibility.gd` is its instrument of record and has to be
-##      re-run when a plate, a dial, a card layout or a chapter colour moves.
-##      See `lit_edge`'s residual note for the two causes.
+##      Rendered worst is E05 ch3 at 1.604:1 (margin +0.054, against a mist
+##      background read off the render — see `card_behind`); modelled worst is
+##      E09 ch3 tier3 at 1.816:1 (+0.266). The model cannot resolve this bound
+##      better than ±0.46 and errs in BOTH directions, so no margin is added —
+##      a one-sided one would be a false guarantee and a two-sided one would red
+##      rows the picture passes.
+##
+##      WHAT THAT MAKES THE CHECK BELOW. It is a live, unmargined `_check`: it
+##      can and does fail the suite. What it is NOT is a statement about the
+##      picture. Read it as a LOOSE REGRESSION GUARD — it catches a change that
+##      moves the modelled mist-backed edge by more than the model's own ±0.44,
+##      and nothing finer. Its green does not imply the render passes and its
+##      red does not imply the render fails; both have happened. In round 2 of
+##      Task 6, at the then-floor of 1.9, this check redded E09 ch3 at 1.893
+##      while the render passed the same row at 1.930, and passed E05 ch3 at
+##      2.002 while the render failed it at 1.600. Both rows clear the current
+##      floor on both rulers, but that is a fact about the render, not something
+##      this check established.
+##      `tools/enemy_legibility.gd` is this bound's instrument of record and has
+##      to be re-run when a plate, a dial, a card layout or a chapter colour
+##      moves. See `lit_edge`'s residual note for the two causes.
 ##
 ## Do not simplify these back into one. Bound 1 alone measures a background that
 ## a tenth of the contour does not have; bound 3 alone applies a veiled-case bar
@@ -649,10 +680,7 @@ func _t_enemy_legibility() -> void:
 			(MIST_COVER_CAP - worst_cover) * 100.0])
 	print("enemy legibility: distinct lit edges %d/%d/%d"
 			% [lits_out[1].size(), lits_out[2].size(), lits_out[3].size()])
-	if _metrics != null:
-		# a bare `.new()` Control that never entered the tree — nothing frees it
-		_metrics.free()
-		_metrics = null
+	free_render_model()
 
 
 ## `edge_rgb` for one key as a Colour, or null with a named failure already
@@ -734,9 +762,10 @@ func _colour_key(c: Color) -> String:
 ##
 ## One of the four left makes the proxy read LOW and three read HIGH, and the
 ## worst measured optimistic bias — the only direction that can hide a failure —
-## is +0.0447:1 on bound 1. `CARD_EDGE_MARGIN` is that number, added to the bound
-## so the suite's green means something. `tools/enemy_legibility.gd` reprints the
-## bias every run and says whether the margin still covers it.
+## is +0.0447:1 on bound 1. `CARD_EDGE_MARGIN` covers that number with room to
+## spare (0.06) and is added to the bound so the suite's green means something.
+## `tools/enemy_legibility.gd` reprints the bias every run and says whether the
+## margin still covers it.
 ##  1. `edge_rgb` was averaged over `alpha > 200` (`enemy_cutout.py`); the shader
 ##     lights everything with `alpha > 0.2`. Two different bands, and the extra
 ##     skirt the shader lights is the soft, semi-transparent part. HIGH.
@@ -749,10 +778,18 @@ func _colour_key(c: Color) -> String:
 ##     piece of contour, the mean colour of the whole band is the wrong colour
 ##     for it. Mixed direction, and closing it means a per-region `edge_rgb`,
 ##     i.e. a change to what `tools/enemy_cutout.py` measures.
-##  3. `v_modulate` is white here, and the shader multiplies by it. Nothing puts
-##     a non-white modulate on an enemy BATTLE-card pawn — the one place that
-##     does, `screen_codex.gd`'s unseen-entry silhouette, is meant to be
-##     unreadable, so this number does not speak for it. HIGH where it applies.
+##  3. `v_modulate` is white here, and the shader multiplies by it
+##     (`COLOR = vec4(lit, src.a) * v_modulate`). It is NOT always white on a
+##     battle card. `screen_battle._refresh_enemies` sets
+##     `card.modulate = Color(0.55, 0.55, 0.6, 0.85)` on every NON-TARGET enemy
+##     card whenever `_targeting()` is true, and `modulate` propagates down the
+##     CanvasItem tree to the pawn inside — so it is on precisely while a player
+##     is scanning the row of silhouettes to pick one. Nothing here or in
+##     `tools/enemy_legibility.gd` models it and no bound covers it; what it
+##     costs was rendered instead, and the answer is in `task-6-report.md` and in
+##     the tool's own `LEGIBILITY DIM` lines. (`screen_codex.gd`'s unseen-entry
+##     silhouette also carries one, and that one is meant to be unreadable.)
+##     HIGH where it applies.
 ##  4. The bloom pass adds `glow * 0.055` before the rim mix. Small at the
 ##     silhouette's boundary — the mask it gathers is eyes and cracks, which are
 ##     interior — but it is real and it is unmodelled. LOW.
@@ -766,31 +803,38 @@ func _colour_key(c: Color) -> String:
 ##     DELTA_MAX of 0.15, and the residual is now two-sided: −0.028 (E01 ch3,
 ##     E02 ch2) to +0.045. It is no longer a bias with a direction, it is noise
 ##     around the picture. The one-sided part that remains, +0.0447, is what
-##     `CARD_EDGE_MARGIN` is set to.
+##     `CARD_EDGE_MARGIN` (0.06) has to cover, and does.
 ##   bound 2 — CONSERVATIVE WITHOUT HELP. It is a CAP, and the model is at or
 ##     above the render on all 37 rows (worst modelled 20.2% at B2 against 9.2%
 ##     rendered; worst rendered anywhere 14.8%). Reading high is the safe
 ##     direction for a cap, so no margin is needed or added.
-##   bound 3 — NOT RECONCILED, AND NOT RECONCILABLE FROM HERE. 0.000 to 0.443,
+##   bound 3 — NOT RECONCILED, AND NOT RECONCILABLE FROM HERE. 0.000 to 0.459,
 ##     in BOTH directions, against a floor of 1.55. Two causes, both named and
 ##     neither correctable in a headless test: rows where the veil stands on
 ##     almost none of the contour, so the render's own mean is over a handful of
 ##     pixels sitting on a wisp's rasterised boundary (E09 ch2: 0.4% of the band,
 ##     14 rendered pixels, and the worst delta in the table); and #2 above, the
-##     one-colour-per-band covariance — E05 ch3 renders at 1.600:1 where this
-##     says 1.973:1, and it is the row the bound stands on.
+##     one-colour-per-band covariance — E05 ch3 renders at 1.604:1 where this
+##     says 1.973:1, and it is the row the bound stands on. NOT one of the causes,
+##     any more: the mist background itself, which the render now measures and
+##     which agrees with `card_behind` to 0.72 of an 8-bit step.
 ##
 ## So: a green `_t_enemy_legibility` implies the render clears BOUND 1, because
-## the model is reconciled to 0.045 and the check carries a 0.045 margin on top
-## of the floor; and it implies the render clears BOUND 2, because the model
-## overstates a cap. It does NOT imply anything about bound 3 in either
-## direction. A one-sided margin there would be a false guarantee — the model is
-## wrong both ways — and one large enough to cover 0.443 would red rows the
-## picture passes. BOUND 3'S INSTRUMENT OF RECORD IS
-## `tools/enemy_legibility.gd`, and it has to be re-run whenever a plate, a mist
-## dial, a card layout or a chapter colour moves. That is also true of
-## `CARD_EDGE_MARGIN`, which is a measurement and goes stale like one; the tool
-## prints `MARGIN TOO SMALL` the moment it does. See `task-6-report.md`.
+## the model is reconciled to 0.045 and the check carries a larger margin than
+## that on top of the floor; and it implies the render clears BOUND 2, because
+## the model overstates a cap. It does NOT imply anything about bound 3 in
+## either direction. Bound 3 IS still asserted — an unmargined `_check` that can
+## fail the suite — but only as a loose regression guard on the model's own
+## number; at ±0.46 against a 1.55 floor it has redded a row the render passes
+## (E09 ch3, 1.893 modelled vs 1.930 rendered, at the old 1.9 floor) and passed
+## the row the render failed (E05 ch3, 2.002 vs 1.600). A one-sided margin there
+## would be a false guarantee — the model is wrong both ways — and one large
+## enough to cover 0.459 would red rows the picture passes. BOUND 3'S INSTRUMENT
+## OF RECORD IS `tools/enemy_legibility.gd`, and it has to be re-run whenever a
+## plate, a mist dial, a card layout or a chapter colour moves. That is also
+## true of `CARD_EDGE_MARGIN`, which is a measurement and goes stale like one;
+## the tool prints `MARGIN TOO SMALL` the moment it does. See
+## `task-6-report.md`.
 ##
 ## `strength` defaults to `rot_rim_for(chapter)`; pass it only to ask what a
 ## DIFFERENT rim would do to this edge, as `_t_rot_rim`'s tightness check does.
@@ -946,6 +990,18 @@ func _art_box(p_kind: String) -> Vector2:
 		_metrics = load("res://scripts/ui/screen_battle.gd").new()
 	var m: Dictionary = _metrics._enemy_metrics(4, PawnArt.is_boss(p_kind))
 	return Vector2(float(m["w"]) - 2.0 * UIKit.S3, float(m["art"]))
+
+
+## Drop the bare `screen_battle` `_art_box` keeps for its geometry. It never
+## entered the tree, so nothing else will free it and Godot reports it as a leak
+## at exit — which matters beyond tidiness, because `tools/test_all.sh` greps the
+## logs. `_t_enemy_legibility` calls this when it is done; anything else that
+## drives the rendering model (`tools/enemy_legibility.gd`) has to as well, which
+## is why this is a named method and not four lines at the end of the test.
+func free_render_model() -> void:
+	if _metrics != null:
+		_metrics.free()
+		_metrics = null
 
 
 ## The edge band AS THE SCREEN SAMPLES IT — one entry per screen pixel that
@@ -1105,10 +1161,34 @@ func seen_edge(edge: Color, chapter: int, p_kind: String, p_tier: int, bg: Color
 ## px, 0.3% of its own band — and zero everywhere else. So alphas are not
 ## compounded. (Round 2's independent rasteriser found the same 32.)
 ##
-## One approximation remains, and it reads LOW: `draw_colored_polygon` blends in
-## sRGB under `gl_compatibility` exactly as this `lerp` does, but the wisp's own
-## anti-aliased boundary is not modelled, so the true edge of a wisp is slightly
-## more transparent than this says.
+## THIS COLOUR IS NOW CHECKED AGAINST THE RENDER, and it survives. It used to
+## carry a residual on the wisp's "anti-aliased boundary", argued to be small and
+## conservative. That residual does not exist: `PawnArt._wisp` draws with
+## `draw_colored_polygon`, which performs no anti-aliasing, and this project sets
+## no `msaa_2d` — a covered pixel is fully covered and an uncovered one is
+## untouched. So there was nothing to be conservative about, and the claim was
+## replaced by a measurement rather than by a smaller argument.
+##
+## `tools/enemy_legibility.gd:_sample_mist` reads the real thing out of the frame
+## buffer — every pixel a wisp covers where the plate's own alpha tap is zero, so
+## what is on screen there is exactly `ROT_MIST` at `mist_alpha` over
+## `surface(chapter)` as the engine blended it, with pixels under a second wisp
+## excluded because this models ONE flat layer. Against that, over all 27
+## wisp-bearing rows, the worst disagreement on any channel is **0.0028, i.e. 0.72
+## of one 8-bit step** (chapter 2; chapter 1 is 0.40/255 and chapter 3 is
+## 0.16/255). Bound 3's binding row moves 1.600 -> 1.604 when measured against the
+## rendered background instead of this one, so the floor's margin goes to +0.054.
+## The `lerp` is right because `gl_compatibility` blends canvas items in sRGB,
+## exactly as it does.
+##
+## 25 of the 27 are measured on their own render (123 to 8534 qualifying pixels).
+## The other two are E09's, and the reason is worth knowing: E09's wisps stand
+## entirely BEHIND its silhouette — every pixel inside one of them has plate alpha
+## 0.79 (tier 2) / 0.13 (tier 3) or more over it, so there is nowhere in E09's
+## picture that mist-over-card is visible unoccluded. The colour is a function of
+## `chapter` and `mist_alpha` only, and `mist_alpha` is `0.34 + 0.30 * rot_of`
+## where `rot_of` is tier, never the key, so the tool takes E09's from another row
+## with the same pair rather than falling back here.
 ##
 ## `MIST_COUNT`, `mist_alpha` and `rot_of` are read from `PawnArt` rather than
 ## restated, so the mist has one source the way the rim has one.

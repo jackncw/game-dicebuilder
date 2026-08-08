@@ -30,27 +30,48 @@ extends Node
 ## the `proxy=` column are the numbers the headless suite actually asserts on,
 ## and there is no second copy to drift.
 ##
+## What the RENDERED columns borrow from the proxy is only the ruler — the band
+## `edge_rgb` was measured over, and the card sizes. Every colour in them comes
+## off the frame buffer, including both backgrounds: bound 1's card and bound 3's
+## mist-over-card. The mist background used to be taken from `card_behind()`,
+## which left the one quantity separating bound 3 from bound 1 as the one quantity
+## never read off the picture, inside the tool whose premise is that the picture
+## wins. `_sample_mist` reads it now, and `LEGIBILITY MISTBG` prints what the
+## model was worth (0.72 of one 8-bit step, worst channel, over 27 rows).
+##
 ## ── What the deltas are FOR ──────────────────────────────────────
 ## `ui_smoke` cannot render. What it can do is be conservative about the fact,
-## and `CARD_EDGE_MARGIN` is how: bound 1's headless check is `2.4 + 0.044`, the
-## 0.044 being the largest amount by which the model has been measured to read
-## ABOVE this render. That is a claim about a number only this tool can produce,
+## and `CARD_EDGE_MARGIN` is how: bound 1's headless check is `2.4 + 0.06`, that
+## 0.06 covering the +0.0447 by which the model has been measured to read ABOVE
+## this render. That is a claim about a number only this tool can produce,
 ## so this tool prints it — `LEGIBILITY BOUND1 worst OPTIMISTIC bias` — and says
 ## whether the margin still covers it. If that line ever reads MARGIN TOO SMALL,
 ## the headless suite has stopped implying anything about the picture and the
 ## constant has to move (or the term behind it has to be modelled).
 ##
-## Bound 3 has no such margin and is not reconcilable from here; the run says so
-## in as many words. See `LEGIBILITY BOUND3` at the bottom of the output.
+## Bound 3 gets no such margin and is not reconcilable from here. It is still
+## ASSERTED by `ui_smoke` — an unmargined `_check` that can fail the suite — but
+## only as a loose regression guard: the model resolves that bound to about
+## ±0.44 against a 1.55 floor, so its green neither implies nor refutes what this
+## render says. The proof is on the record: at the old 1.9 floor the proxy redded
+## E09 ch3 at 1.893 while this tool passed the same row at 1.930. See
+## `LEGIBILITY BOUND3` at the bottom of the output.
 ##
-## ── Which size is "the picture" ──────────────────────────────────
+## ── Which size is "the picture", and which renders happen ────────
 ## `rim_px` is in TEXTURE pixels (`rot_pawn.gdshader` multiplies it by
-## `TEXTURE_PIXEL_SIZE`), so the rim's on-screen thickness is `3 × draw scale`,
-## and the plates are stored at wildly different resolutions (143px tall to
-## 512px). Each key is therefore rendered TWICE: at the smallest and the largest
-## box `screen_battle._enemy_metrics()` can hand it. The three bounds are FLOORS,
-## so the smallest box is the reconciliation target and the largest box is
-## printed alongside as evidence of how far the number moves with scale.
+## `TEXTURE_PIXEL_SIZE`), so the rim's on-screen thickness is `rim_px × draw
+## scale`, and the plates are stored at wildly different resolutions (143px tall
+## to 512px). Each key is therefore rendered THREE times per (chapter, tier) row:
+##   • at the SMALLEST box `screen_battle._enemy_metrics()` can hand it — four
+##     minions up, or a boss. The bounds are FLOORS, so the smallest and most
+##     minified box is the reconciliation target, and bounds 1 and 2 are read
+##     off it;
+##   • at draw scale 1.0, which is the ruler bound 3 is read off — on the
+##     four-up card a row can land as few as 14 veiled pixels, and a mean over
+##     14 pixels is not a measurement (see `_measure`'s note);
+##   • at the smallest box again, DIMMED by the modulate `screen_battle` puts on
+##     a non-target enemy card while the player is choosing a target. That state
+##     is not modelled anywhere and is not bounded; this prints what it costs.
 ##
 ## Sizes come from `screen_battle` itself rather than being restated, so a
 ## retuned card layout moves this measurement with it.
@@ -81,6 +102,25 @@ const BOSSES := ["B1", "B2", "B3", "B3P2", "B4", "B5", "B6"]
 const DELTA_MAX := 0.15
 const PAD := 10
 
+## The modulate `screen_battle._refresh_enemies` puts on every NON-TARGET enemy
+## card while `_targeting()` is true — i.e. exactly while a player is scanning
+## the row of silhouettes to pick one. `modulate` propagates down the CanvasItem
+## tree, so it reaches the card's own panel AND the pawn drawn inside it, and
+## `rot_pawn.gdshader`'s last line is `COLOR = vec4(lit, src.a) * v_modulate`.
+##
+## COPIED from `scripts/ui/screen_battle.gd:585`, which is the only place it is
+## written, because it is a literal inside `_refresh_enemies` and there is no
+## way to ask a bare `.new()` screen for it. If that literal moves, this must.
+const DIM_MODULATE := Color(0.55, 0.55, 0.6, 0.85)
+
+## The same modulate with its ALPHA removed, rendered alongside as a bracket.
+## The alpha lets 15% of whatever the card stands on through, and what it stands
+## on is `Forest.scenery` — a painted scene whose local colour varies, so the
+## real number sits between "over the arena's ground tone" (the bright end, the
+## pessimistic one) and "over nothing at all". Measuring both says how much of
+## the damage is the multiply, which no backdrop can argue away.
+const DIM_MODULATE_OPAQUE := Color(0.55, 0.55, 0.6, 1.0)
+
 var meta := {}
 var sub: SubViewport
 var proxy: Node          ## a live `tests/ui_smoke.gd`, used as the model
@@ -88,6 +128,24 @@ var battle: Control      ## a live `screen_battle.gd`, used for the card metrics
 var _alpha_cache := {}
 var _edge_cache := {}
 var _ring_cache := {}
+
+## Rendered mist backgrounds, keyed on `chapter` and `PawnArt.mist_alpha`.
+##
+## Those two are the WHOLE of what the colour is — `_wisp` fills one polygon with
+## `ROT_MIST` at `mist_alpha(key, tier)` over `surface(chapter)`, and nothing about
+## which creature it is enters — so two rows sharing the key share the pixel, and
+## the engine's blend is deterministic. `mist_alpha` is `0.34 + 0.30 * rot_of`,
+## and `rot_of` is tier (or boss), never the key.
+##
+## Why the sharing is needed rather than merely convenient: E09's wisps stand
+## entirely BEHIND its silhouette. Measured off its own render, every one of the
+## 2436 (tier 2) / 3898 (tier 3) pixels inside a wisp has plate alpha 0.79 / 0.13
+## or more over it, so there is no pixel anywhere in E09's picture where
+## mist-over-card is visible unoccluded. The colour is still a fact about the
+## render; it is just a fact E01's render carries and E09's does not.
+##
+## Dimmed renders never touch this — see `_measure`.
+var _mist_bg_cache := {}
 
 
 func _ready() -> void:
@@ -134,6 +192,25 @@ func _ready() -> void:
 	var worst_mist_row := []
 	var worst_cover := -1.0
 	var worst_cover_what := ""
+	# what the targeting dim costs, on the same card-backed ruler as bound 1
+	var worst_dim := 99.0
+	var worst_dim_what := ""
+	var worst_dim_op := 99.0
+	var worst_dim_op_what := ""
+	var best_dim := -99.0
+	var best_dim_what := ""
+	var worst_dim_drop := 0.0
+	var worst_dim_drop_what := ""
+	# how far the MEASURED mist background sits from `card_behind`'s model of it
+	var worst_mbg := 0.0
+	var worst_mbg_what := ""
+	# and the same check on the BARE card, where the answer is already known:
+	# an undimmed render's card pixels have to come back as `UITheme.surface()`,
+	# or the screen->texel projection is not reading the image it thinks it is
+	var worst_cbg := 0.0
+	var worst_cbg_what := ""
+	var mbg_rows := []
+	var dim_rows := []
 
 	for key in MINIONS + BOSSES:
 		var chapters: Array = [int(PawnArt.BOSS_CHAPTER[key])] \
@@ -144,8 +221,8 @@ func _ready() -> void:
 			# and `:179` files a boss under `int(def.chapter)` — so on both sides
 			# the tier a pawn arrives here carrying is its chapter
 			var tier := ch
-			var boxes := _boxes(key)
-			var small: Dictionary = await _measure(key, tier, ch, boxes[0])
+			var box := _box(key)
+			var small: Dictionary = await _measure(key, tier, ch, box)
 			# ── why bound 3 is read off a SECOND, native-scale render ──
 			# The mist-backed sample is a fraction of a fraction: on the smallest
 			# card E05 ch3 lands 413 band pixels and a wisp stands behind 0.5% of
@@ -161,7 +238,16 @@ func _ready() -> void:
 			# samples. Both are printed — `mist real` is the native one, `mist@sm`
 			# the small card's — and where the small card has enough pixels to be
 			# worth anything the two agree.
-			var nat: Dictionary = await _measure(key, tier, ch, boxes[0], -1.0, true)
+			var nat: Dictionary = await _measure(key, tier, ch, box, -1.0, true)
+			# ── the state nothing models: a non-target card while targeting ──
+			# `screen_battle` dims every non-target enemy card the moment a die is
+			# picked up, which is exactly when a player is scanning silhouettes to
+			# choose one. Same smallest box as bound 1, so the two numbers are on
+			# the same ruler and the drop between them is the cost.
+			var dim: Dictionary = await _measure(key, tier, ch, box, -1.0, false,
+					DIM_MODULATE)
+			var dim_op: Dictionary = await _measure(key, tier, ch, box, -1.0, false,
+					DIM_MODULATE_OPAQUE)
 
 			var edge_v: Variant = proxy._edge_colour(meta, key)
 			var edge: Color = edge_v if edge_v != null else Color.BLACK
@@ -216,12 +302,69 @@ func _ready() -> void:
 				if mist_real < worst_mist:
 					worst_mist = mist_real
 					worst_mist_what = "%s ch%d tier%d" % [key, ch, tier]
-					worst_mist_row = [key, ch, tier, boxes[0]]
+					worst_mist_row = [key, ch, tier, box]
+
+			# ── the background bound 3 is measured against, READ, not modelled ──
+			# `card_behind()` is the proxy's model of mist-over-card, and until now
+			# this tool borrowed it: the one quantity that separates bound 3 from
+			# bound 1 was the one quantity never taken off the picture, inside the
+			# tool whose whole premise is that the picture wins. It is measured now
+			# — see `_sample_mist` — and this line is what says whether the model
+			# was right. The rendered bound-3 contrasts above are against the
+			# MEASURED background; the proxy column stays against `card_behind`,
+			# because that is what the headless suite asserts on.
+			if int(PawnArt.MIST_COUNT[PawnArt.dial_row(key, tier)]) > 0:
+				var mb: Color = nat["mist_bg_c"]
+				var dmb := maxf(maxf(absf(mb.r - mist_bg.r), absf(mb.g - mist_bg.g)),
+						absf(mb.b - mist_bg.b))
+				if dmb > worst_mbg:
+					worst_mbg = dmb
+					worst_mbg_what = "%s ch%d tier%d" % [key, ch, tier]
+				mbg_rows.append(("LEGIBILITY MISTBG %-4s ch%d t%d rendered=%s modelled=%s "
+						+ "worst channel delta=%.4f (%.2f/255) n=%d (%s)")
+						% [key, ch, tier, mb.to_html(false), mist_bg.to_html(false),
+						dmb, dmb * 255.0, int(nat["mist_bg_n"]),
+						String(nat["mist_bg_src"])])
+
+			var cbg: Color = small["card_seen"]
+			var dcbg := maxf(maxf(absf(cbg.r - card_bg.r), absf(cbg.g - card_bg.g)),
+					absf(cbg.b - card_bg.b))
+			if dcbg > worst_cbg:
+				worst_cbg = dcbg
+				worst_cbg_what = "%s ch%d tier%d" % [key, ch, tier]
 
 			if small["card"] < worst_card:
 				worst_card = small["card"]
 				worst_card_what = "%s ch%d tier%d" % [key, ch, tier]
-				worst_card_row = [key, ch, tier, boxes[0]]
+				worst_card_row = [key, ch, tier, box]
+
+			# the dim state, against the card AS THE DIM LEAVES IT — both the
+			# silhouette and the panel behind it go through the same modulate, and
+			# 15% of the arena behind the card comes through with it, so the
+			# background this contrast is taken against has to be read off the
+			# render too. `_sample_card` does that.
+			var r_dim: float = dim["card"]
+			var drop: float = small["card"] - r_dim
+			if r_dim < worst_dim:
+				worst_dim = r_dim
+				worst_dim_what = "%s ch%d tier%d" % [key, ch, tier]
+			if r_dim > best_dim:
+				best_dim = r_dim
+				best_dim_what = "%s ch%d tier%d" % [key, ch, tier]
+			if float(dim_op["card"]) < worst_dim_op:
+				worst_dim_op = float(dim_op["card"])
+				worst_dim_op_what = "%s ch%d tier%d" % [key, ch, tier]
+			if drop > worst_dim_drop:
+				worst_dim_drop = drop
+				worst_dim_drop_what = "%s ch%d tier%d" % [key, ch, tier]
+			dim_rows.append(("LEGIBILITY DIM %-4s ch%d t%d card %5.3f:1 -> dimmed %5.3f:1 "
+					+ "(%+.3f) | multiply only %5.3f:1 | card %s -> %s over arena %s "
+					+ "| floor %.2f %s")
+					% [key, ch, tier, small["card"], r_dim, -drop,
+					float(dim_op["card"]),
+					card_bg.to_html(false), (dim["card_seen"] as Color).to_html(false),
+					UITheme.bg(ch).to_html(false), float(proxy.CARD_EDGE_FLOOR),
+					"OK" if r_dim >= float(proxy.CARD_EDGE_FLOOR) else "UNDER"])
 			# from the native render: the same fraction, resolved on 7x–65x the
 			# pixels, so the cap is judged on a number that has samples behind it
 			if nat["cover"] > worst_cover:
@@ -252,6 +395,24 @@ func _ready() -> void:
 
 	for r in rows:
 		print(r)
+	for r in mbg_rows:
+		print(r)
+	print("LEGIBILITY MISTBG worst channel delta vs card_behind() %.4f (%.2f/255) at %s"
+			% [worst_mbg, worst_mbg * 255.0, worst_mbg_what])
+	print("LEGIBILITY CARDBG rendered bare card vs UITheme.surface() worst channel delta "
+			+ "%.4f (%.2f/255) at %s — the projection reading the image it thinks it is"
+			% [worst_cbg, worst_cbg * 255.0, worst_cbg_what])
+	for r in dim_rows:
+		print(r)
+	print("LEGIBILITY DIM worst card-backed edge while targeting %.3f:1 at %s (bound-1 floor %.2f) %s"
+			% [worst_dim, worst_dim_what, float(proxy.CARD_EDGE_FLOOR),
+			"OK" if worst_dim >= float(proxy.CARD_EDGE_FLOOR) else "UNDER"])
+	print("LEGIBILITY DIM best card-backed edge while targeting %.3f:1 at %s"
+			% [best_dim, best_dim_what])
+	print("LEGIBILITY DIM worst with the modulate's ALPHA removed (multiply only) %.3f:1 at %s"
+			% [worst_dim_op, worst_dim_op_what])
+	print("LEGIBILITY DIM worst drop from the undimmed card %+.3f at %s"
+			% [-worst_dim_drop, worst_dim_drop_what])
 	print("LEGIBILITY WORST-DELTA bound1 %.3f at %s (max allowed %.2f) %s"
 			% [worst_d1, worst_d1_what, DELTA_MAX,
 			"OK" if worst_d1 <= DELTA_MAX else "OVER"])
@@ -344,6 +505,11 @@ func _ready() -> void:
 				float(a3["mean"]), float(a6["mean"]),
 				100.0 * float(PawnArt.ROT_RIM_PX) / float(mini(int(a3["w"]), int(a3["h"])))])
 
+	# `proxy.seen_edge` -> `_screen_band` -> `_art_box` builds a SECOND bare
+	# `screen_battle` inside `ui_smoke` for its card metrics. Only
+	# `_t_enemy_legibility` used to free it, so running this tool leaked one
+	# Control and printed a leak warning into the very log that gets grepped.
+	proxy.free_render_model()
 	proxy.free()
 	battle.free()
 	get_tree().quit()
@@ -390,32 +556,45 @@ func _rim_area(key: String, r: float) -> Dictionary:
 			acc += e
 			if e >= 0.5:
 				lit += 1
-	return {"w": w, "h": h, "solid": solid, "lit": lit,
+	return {"w": w, "h": h, "solid": solid,
 			"frac": float(lit) / maxf(float(solid), 1.0),
 			"mean": acc / maxf(float(solid), 1.0)}
 
 
-## The smallest and the largest art box the battle screen can hand this key —
-## `[smallest, largest]`. Read off `screen_battle` rather than restated: one
-## enemy on screen is the biggest card, four the smallest, and a boss is
-## height-bound by the band budget in every layout so both of its boxes agree.
-func _boxes(key: String) -> Array:
-	var boss := PawnArt.is_boss(key)
-	var s: Dictionary = battle._enemy_metrics(4, boss)
-	var l: Dictionary = battle._enemy_metrics(1, boss)
-	return [Vector2(float(s["w"]) - 2.0 * UIKit.S3, float(s["art"])),
-			Vector2(float(l["w"]) - 2.0 * UIKit.S3, float(l["art"]))]
-
-
-## Renders one pawn on its chapter card at one box size and reads the outermost
-## `BAND_PX` screen pixels of its silhouette back.
+## The SMALLEST art box the battle screen can hand this key — four minions up,
+## or a boss (height-bound by the enemy band budget in every layout, so all of
+## its boxes agree). Read off `screen_battle` rather than restated, so a retuned
+## card layout moves this measurement with it.
 ##
-## Returns `card` (the band's mean colour against the bare card, bound 1's real
+## Only the smallest, because every bound here is a FLOOR and the smallest box
+## is also the most minified. The largest box used to be measured alongside as
+## scale evidence; that question was answered in round 1 (over a 2–2.2x scale
+## change the ratio moved by at most 0.05) and the second render was dropped
+## rather than left running unread. `_measure`'s `p_native` covers what is still
+## needed from a bigger draw — sample count for bound 3.
+func _box(key: String) -> Vector2:
+	var m: Dictionary = battle._enemy_metrics(4, PawnArt.is_boss(key))
+	return Vector2(float(m["w"]) - 2.0 * UIKit.S3, float(m["art"]))
+
+
+## Renders one pawn on its chapter card at one box size and reads the band back.
+##
+## Returns `card` (the band's mean colour against the card, bound 1's real
 ## counterpart), `mist` (the mean over the band pixels a wisp is behind, against
-## `card_behind`, bound 3's), `cover` (what fraction of the band those are,
-## bound 2's), plus the draw `scale` and the band's pixel count.
+## the MEASURED mist background, bound 3's), `cover` (what fraction of the band
+## those are, bound 2's), the two backgrounds as they were actually rendered
+## (`card_seen`, `mist_bg_c`) with their sample counts, plus the draw `scale`,
+## the band's pixel count and the three-ring split.
+##
+## `p_dim` renders the same thing as a NON-TARGET card during targeting: the card
+## and the pawn go under one Control carrying `DIM_MODULATE`, over the chapter's
+## arena colour, because that modulate has an alpha and 15% of whatever is behind
+## the card comes through with it. Both the silhouette and its background move,
+## so both are read off the picture.
 func _measure(key: String, tier: int, chapter: int, box: Vector2,
-		p_rim_px := -1.0, p_native := false) -> Dictionary:
+		p_rim_px := -1.0, p_native := false,
+		p_dim := Color(0, 0, 0, 0)) -> Dictionary:
+	var dimmed := p_dim.a > 0.0
 	var tex := PawnArt.enemy_texture(key)
 	var body_h := PawnArt.fit_height(key, box)
 	if p_native:
@@ -431,13 +610,28 @@ func _measure(key: String, tier: int, chapter: int, box: Vector2,
 		sub.remove_child(c)
 		c.queue_free()
 	sub.size = Vector2i(vw, vh)
+	var host: Node = sub
+	if dimmed:
+		# the arena the card stands on, so the modulate's 0.85 alpha has something
+		# real to let through. `Forest.scenery` paints a whole scene over this and
+		# its local colour varies; `UITheme.bg(chapter)` is that scene's ground
+		# tone, and it is the BRIGHT end of what can be behind a card, which is the
+		# pessimistic direction for a contrast taken against it.
+		var arena := ColorRect.new()
+		arena.color = UITheme.bg(chapter)
+		arena.size = Vector2(vw, vh)
+		sub.add_child(arena)
+		var holder := Control.new()
+		holder.modulate = p_dim
+		sub.add_child(holder)
+		host = holder
 	var card := ColorRect.new()
 	card.color = UITheme.surface(chapter)
 	card.size = Vector2(vw, vh)
-	sub.add_child(card)
+	host.add_child(card)
 	var pa := PawnArt.make(key, body_h, false, tier, chapter)
 	pa.position = origin
-	sub.add_child(pa)
+	host.add_child(pa)
 	# Pin the stepped idle frame. `_t` and `_bob_seed` are the only state the
 	# bob and the wisp phases read, so zeroing both and stopping `_process` puts
 	# the render on frame 0 (`bob = 0`, `wisp_phase(i, 0)`) every time — the
@@ -467,8 +661,34 @@ func _measure(key: String, tier: int, chapter: int, box: Vector2,
 	var mask: PackedByteArray = band_info["px"]
 	var ring: PackedByteArray = _rings(key)["px"]
 	var polys := _wisp_polys(key, tier, w, h)
+	var plate_a: PackedFloat32Array = _plate_alpha(key)["a"]
+
+	# ── the two backgrounds, off the picture ──
+	# The card first, because on an undimmed run its answer is already known and
+	# that makes it a check on everything else: these pixels have to come back as
+	# `UITheme.surface(chapter)`. On a dimmed run it is the only way to know what
+	# the card became, since the modulate moves the background and the silhouette
+	# together.
+	var seen_card: Dictionary = _sample_card(img, vw, vh, origin, w, h, polys)
+	var card_bg: Color = seen_card["c"] if dimmed else UITheme.surface(chapter)
+	# Then the mist. This used to be `proxy.card_behind()` — the model — which
+	# left the one quantity that distinguishes bound 3 from bound 1 as the one
+	# quantity never read off the render.
+	var seen_mist: Dictionary = _sample_mist(img, polys, origin, w, h, tw, th, plate_a)
+	var mist_n_bg := int(seen_mist["n"])
 	var mist_bg: Color = proxy.card_behind(chapter, key, tier)
-	var card_bg: Color = UITheme.surface(chapter)
+	var mist_bg_src := "modelled"
+	if not dimmed:
+		# a dimmed render's mist is a different colour and must never land in the
+		# shared cache, which is why this whole branch is skipped there
+		var mbk := "%d/%.6f" % [chapter, PawnArt.mist_alpha(key, tier)]
+		if mist_n_bg > 0:
+			mist_bg = seen_mist["c"]
+			mist_bg_src = "measured"
+			_mist_bg_cache[mbk] = mist_bg
+		elif _mist_bg_cache.has(mbk):
+			mist_bg = _mist_bg_cache[mbk]
+			mist_bg_src = "measured on another row of the same chapter and mist_alpha"
 
 	var n_card := 0
 	var n_mist := 0
@@ -515,7 +735,11 @@ func _measure(key: String, tier: int, chapter: int, box: Vector2,
 		"card": 0.0,
 		"mist": 0.0,
 		"card_c": card_bg,
-		"mist_c": mist_bg,
+		"card_seen": seen_card["c"],
+		"card_seen_n": int(seen_card["n"]),
+		"mist_bg_c": mist_bg,
+		"mist_bg_n": mist_n_bg,
+		"mist_bg_src": mist_bg_src,
 	}
 	var rings := []
 	for i in 3:
@@ -526,19 +750,123 @@ func _measure(key: String, tier: int, chapter: int, box: Vector2,
 		out["card_c"] = _mean(acc_card, n_card)
 		out["card"] = UITheme.contrast(out["card_c"], card_bg)
 	if n_mist > 0:
-		out["mist_c"] = _mean(acc_mist, n_mist)
-		out["mist"] = UITheme.contrast(out["mist_c"], mist_bg)
+		out["mist"] = UITheme.contrast(_mean(acc_mist, n_mist), mist_bg)
 	return out
+
+
+## The card AS RENDERED, averaged over the `PAD` ring outside the plate's own
+## draw rect — the only pixels in the viewport with nothing but card behind them.
+## Anything a wisp's bounding box touches is skipped: `_auto_mist` puts the
+## wisps' centres at 0.368w and they sway 0.092h, so on a native-scale render
+## smoke does reach into the pad.
+##
+## On an undimmed run this is a CHECK, not an input — the answer has to be
+## `UITheme.surface(chapter)` and the run prints how far off it is. On a dimmed
+## run it is the background the contrast is taken against, because the modulate
+## moved it.
+func _sample_card(img: Image, vw: int, vh: int, origin: Vector2,
+		w: float, h: float, polys: Array) -> Dictionary:
+	var bbs := []
+	for poly in polys:
+		bbs.append(_poly_bounds(poly).grow(1.0))
+	var acc := Color(0, 0, 0)
+	var n := 0
+	for py in vh:
+		var ly := float(py) + 0.5 - origin.y
+		var border_y := py < PAD or py >= vh - PAD
+		for px in vw:
+			if not border_y and px >= PAD and px < vw - PAD:
+				continue
+			var pt := Vector2(float(px) + 0.5 - origin.x, ly)
+			var hit := false
+			for b in bbs:
+				if (b as Rect2).has_point(pt):
+					hit = true
+					break
+			if hit:
+				continue
+			acc += img.get_pixel(px, py)
+			n += 1
+	return {"c": _mean(acc, maxi(n, 1)), "n": n}
+
+
+## The mist background AS RENDERED — `ROT_MIST` composited over the card by the
+## engine, which is what bound 3 is measured against.
+##
+## The render contains the pixels that settle it: anywhere a wisp polygon covers
+## a spot the plate contributes NOTHING to, the frame buffer holds exactly
+## `draw_colored_polygon(ROT_MIST at mist_alpha)` over `surface(chapter)`, blended
+## the way the engine blends it. Three conditions, all of them there to make the
+## sample the same thing `card_behind()` claims to model:
+##   • the plate's bilinear tap at that fragment is zero, so no silhouette and no
+##     anti-aliased skirt is mixed in;
+##   • the pixel is wholly inside ONE wisp — all four of its corners are in the
+##     polygon. `draw_colored_polygon` performs no anti-aliasing and this project
+##     sets no `msaa_2d`, so a covered pixel is fully covered and an uncovered one
+##     is untouched; the corner test is only there because the rasteriser's fill
+##     rule and `is_point_in_polygon` can still disagree about a pixel the
+##     boundary crosses;
+##   • no second wisp is over it, because `card_behind()` models ONE flat layer
+##     and a doubled alpha is a different colour.
+## Scanned per wisp over that wisp's own bounding box, not over the viewport.
+func _sample_mist(img: Image, polys: Array, origin: Vector2, w: float, h: float,
+		tw: int, th: int, a: PackedFloat32Array) -> Dictionary:
+	var acc := Color(0, 0, 0)
+	var n := 0
+	var vw := img.get_width()
+	var vh := img.get_height()
+	for i in polys.size():
+		var poly: PackedVector2Array = polys[i]
+		var bb := _poly_bounds(poly)
+		var x0 := maxi(int(floor(bb.position.x + origin.x)) - 1, 0)
+		var x1 := mini(int(ceil(bb.end.x + origin.x)) + 1, vw)
+		var y0 := maxi(int(floor(bb.position.y + origin.y)) - 1, 0)
+		var y1 := mini(int(ceil(bb.end.y + origin.y)) + 1, vh)
+		for py in range(y0, y1):
+			var ly := float(py) + 0.5 - origin.y
+			for px in range(x0, x1):
+				var lx := float(px) + 0.5 - origin.x
+				if not Geometry2D.is_point_in_polygon(Vector2(lx, ly), poly):
+					continue
+				if not (Geometry2D.is_point_in_polygon(Vector2(lx - 0.5, ly - 0.5), poly)
+						and Geometry2D.is_point_in_polygon(Vector2(lx + 0.5, ly - 0.5), poly)
+						and Geometry2D.is_point_in_polygon(Vector2(lx - 0.5, ly + 0.5), poly)
+						and Geometry2D.is_point_in_polygon(Vector2(lx + 0.5, ly + 0.5), poly)):
+					continue
+				var doubled := false
+				for j in polys.size():
+					if j != i and Geometry2D.is_point_in_polygon(Vector2(lx, ly), polys[j]):
+						doubled = true
+						break
+				if doubled:
+					continue
+				var u := (lx + w * 0.5) / w
+				var v := (ly + h) / h
+				if u >= 0.0 and u < 1.0 and v >= 0.0 and v < 1.0:
+					if proxy._bilinear_a(a, tw, th, u * float(tw) - 0.5,
+							v * float(th) - 0.5) > 0.0005:
+						continue
+				acc += img.get_pixel(px, py)
+				n += 1
+	return {"c": _mean(acc, maxi(n, 1)), "n": n}
+
+
+## Axis-aligned bounds of a polygon, in the pawn's own drawing space.
+func _poly_bounds(poly: PackedVector2Array) -> Rect2:
+	var r := Rect2(poly[0], Vector2.ZERO)
+	for p in poly:
+		r = r.expand(p)
+	return r
 
 
 func _mean(acc: Color, n: int) -> Color:
 	return Color(acc.r / float(n), acc.g / float(n), acc.b / float(n))
 
 
-## The rim's own `edge` scalar averaged over the band — `src.a * (1 - amin)` —
-## at the radius the game ships (`PawnArt.ROT_RIM_PX`) and at the two sweep
-## points, plus the band's mean alpha, which is what the final `vec4(lit, src.a)`
-## composites the lit colour over the card with.
+## The rim's own `edge` scalar averaged over the band — `src.a * (1 - amin)` — at
+## the radius the game ships (`PawnArt.ROT_RIM_PX`), plus the band's mean alpha,
+## which is what the final `vec4(lit, src.a)` composites the lit colour over the
+## card with.
 ##
 ## The scalar itself is NOT computed here: `proxy.rim_coverage()` is, and this
 ## asks it. That function is the one `lit_edge` now multiplies by, so asking it
@@ -548,9 +876,9 @@ func _mean(acc: Color, n: int) -> Color:
 ## independent `s_eff`/`cov` fit, which comes out of the rendered pixels and
 ## touches none of this.
 ##
-## The `rim_px` 3 / 6 / 9 sweep is the lever, priced. `LEGIBILITY LEVER`
-## re-renders the worst row at each so the prediction is checked against the
-## picture rather than trusted.
+## Only the shipping radius. What the OTHER radii are worth is a rendered
+## question, not a modelled one, and `LEGIBILITY LEVER` answers it by re-rendering
+## the worst row of each bound at 3 / 6 / 7 / 8 / 9 / 12.
 func _shader_edge(key: String) -> Dictionary:
 	if _edge_cache.has(key):
 		return _edge_cache[key]
@@ -570,9 +898,6 @@ func _shader_edge(key: String) -> Dictionary:
 			n += 1
 	var out := {
 		"edge": float(proxy.rim_coverage(key)),
-		"edge3": float(proxy.rim_coverage(key, 3.0)),
-		"edge6": float(proxy.rim_coverage(key, 6.0)),
-		"edge9": float(proxy.rim_coverage(key, 9.0)),
 		"alpha": acc_a / maxf(float(n), 1.0),
 	}
 	_edge_cache[key] = out
