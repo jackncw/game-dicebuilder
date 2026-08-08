@@ -620,12 +620,28 @@ func _colour_key(c: Color) -> String:
 ## legible than this says):
 ##  1. `edge` (`src.a * (1 - amin)`) is 1.0 only right at the alpha boundary and
 ##     falls off inward, so part of the measured band is lit less than this.
+##     MEASURED in Task 6, and it is not a minor term — it is the whole
+##     divergence. Averaged over this very band, `edge` is 0.562 (E09) to 0.677
+##     (B6), never 1.0, because `rim_px` is 3 texels and the band is 3 texels:
+##     a ray cast from the band's innermost texel only just reaches the alpha
+##     boundary, so `1 - amin` collapses there. See `_t_enemy_legibility`'s
+##     header for what that does to the numbers below.
 ##  2. `edge_rgb` was averaged over `alpha > 200` (`enemy_cutout.py`); the shader
 ##     lights everything with `alpha > 0.2`. Two different bands, and the extra
 ##     skirt the shader lights is the soft, semi-transparent part.
 ##  3. Minification. The band is 3 TEXTURE px; on an enemy battle card the
 ##     plates draw at 0.12–1.04 of source size, so that band is 0.37–3.11 SCREEN
-##     px — per key, and with mipmaps off on every plate.
+##     px — per key, and with mipmaps off on every plate. Task 5 expected this to
+##     be the term that broke Task 6's reconciliation. MEASURED: it does not
+##     affect the ratio at all. Rendering every key at both its smallest and its
+##     largest battle-card box — a 2–2.2x change in scale — moves the card-backed
+##     edge by at most 0.05:1 (E03 ch1 1.810 vs 1.760; E05 ch1 1.566 vs 1.560).
+##     With mipmaps off, a fragment's bilinear fetch spans 2x2 texels whatever
+##     the scale, and `amin` is cast at a fixed 3-TEXEL radius, so the shader's
+##     output at a given UV does not know how big the plate is being drawn. What
+##     scale does change is how MANY screen pixels land in the band — the rim is
+##     3 x scale px thick, i.e. sub-pixel on the big plates — which is a real
+##     defect in how thin the light reads, but not one this ratio can see.
 ##  4. Alpha compositing at the cut boundary: the proxy compares an opaque colour
 ##     to the card, the renderer blends the boundary's own alpha into it.
 ##  5. `v_modulate` is white here, and the shader multiplies by it. Nothing puts
@@ -637,6 +653,31 @@ func _colour_key(c: Color) -> String:
 ##     silhouette's boundary — the mask it gathers is eyes and cracks, which are
 ##     interior — but it is real and it is unmodelled.
 ## Task 6 renders the real thing and reconciles at 0.15:1 — the render wins.
+##
+## ── AND IT DID NOT RECONCILE. READ THIS BEFORE TRUSTING A GREEN RUN ──
+## `tools/enemy_legibility.gd` measured all 37 rows on a real render. Every row
+## disagrees, in the same direction and by roughly the same amount: this function
+## reads 0.99 to 1.33 HIGH on bound 1 and 0.53 to 1.33 high on bound 3. The
+## card-backed edge is 1.516:1 (E09 ch1) to 2.202:1 (E08 ch3) in the picture, not
+## the 2.752–3.376 printed below, so bound 1's 2.4:1 floor is met by NO enemy at
+## any chapter, and bound 3's 1.9:1 by few. Bound 2 is the one that holds — the
+## rendered mist cover is at or under the modelled figure on every key.
+##
+## Approximation #1 is the whole of it, confirmed two independent ways: the rim
+## strength fitted back out of the rendered pixels (0.530–0.659 of
+## `rot_rim_for`) matches the `edge` scalar computed straight off each plate's
+## alpha channel with the shader's own 8-ray formula (0.562–0.677), worst
+## agreement 0.041.
+##
+## The correction is one factor on the blend below — `rot_rim_for(chapter)` times
+## that per-key coverage — and it is DELIBERATELY NOT APPLIED. Applying it turns
+## 37 rows red, and the bounds do not move; which lever to pull instead is the
+## controller's call, and the one the mechanism points at is `rim_px`, which is
+## 3 texels precisely because the band is 3 texels. Re-rendered at `rim_px = 6`,
+## E09 ch1 goes 1.516 -> 2.494:1 and `edge` goes 0.562 -> 0.957. So until that is
+## decided, the numbers this function prints are an upper bound on the picture
+## and not a description of it, and a passing `_t_enemy_legibility` says only
+## that the MODEL clears the floor.
 ##
 ## `strength` defaults to `rot_rim_for(chapter)`; pass it only to ask what a
 ## DIFFERENT rim would do to this edge, as `_t_rot_rim`'s tightness check does.
