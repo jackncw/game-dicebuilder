@@ -13,8 +13,8 @@ spend the faces, and build the deck of faces you roll with as the run goes on.
 
 ### ▶︎ [立即試玩 / Play in your browser](https://jackncw.github.io/game-dicebuilder/)
 
-冇嘢要裝,手機同電腦瀏覽器都玩得。首次載入約 46 MB。
-No install; runs in a desktop or mobile browser. First load is about 46 MB.
+冇嘢要裝,手機同電腦瀏覽器都玩得。首次載入約 17 MB(gzip 後),之後由瀏覽器快取。
+No install; runs in a desktop or mobile browser. First load is about 17 MB over the wire.
 
 ---
 
@@ -103,7 +103,8 @@ godot --headless --path . -- --sim 200   # 平衡模擬器
 
 ## Web 版已知限制 / Known limits of the web build
 
-- **首次載入約 46 MB**(39 MB wasm + 7 MB pack)。之後由瀏覽器快取。
+- **首次載入約 17 MB**。磁碟上係 46 MB(39 MB wasm + 7 MB pack),但 Pages 出 gzip,
+  實際落線量到 10.2 MB wasm + pack。之後由瀏覽器快取。
 - **存檔喺瀏覽器入面。** `user://` 喺 web 係 IndexedDB —— 換瀏覽器、無痕模式、
   清網站資料,存檔就冇咗。已驗證 refresh 之後 meta 同 run 存檔都仲喺度。
 - **音效係即時合成嘅**,部分瀏覽器要你先撳一下畫面先會出聲(autoplay 政策)。
