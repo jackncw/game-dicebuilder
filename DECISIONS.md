@@ -915,3 +915,13 @@ refresh 成頁,標題畫面照樣出「繼續 Continue」—— meta 同 run 存
 交代落嚟話「如未有 remote 就開個 public repo,名建議 dice-grove」。
 Remote 已經存在(`jackncw/game-dicebuilder`,public,Pages 已開),
 所以用返佢:改名會斷咗現有 URL,亦要多一重權限。
+
+## Pages 一定要落 `docs/.nojekyll`
+Pages legacy builder 預設會行 Jekyll。第一次上線之後實測:根目錄出咗一個
+**Jekyll 用 repo README 生成嘅主題頁**,蓋過咗遊戲自己嗰個 `index.html`,
+而 `index.wasm` / `index.pck` / `index.js` **全部 404** —— Jekyll 唔會 copy
+佢唔認識嘅檔。加 `.nojekyll` 之後即刻正常(`/` 6,070 bytes = 我哋隻 shell、
+wasm 200 `application/wasm`)。`tools/web_build.sh` 每次 build 都會補返呢個檔。
+
+順帶量到:Pages 出 wasm 有 gzip,39.5 MB 傳輸得 **10.2 MB**。所以「首次載入
+46 MB」係磁碟數;實際落線約 17 MB。

@@ -1,5 +1,23 @@
 # 敵人 sprite 美術 Implementation Plan
 
+> **狀態:2026-08-08 全部 8 個 Task 做完,`enemy-sprite-art` 已經 merge 返 main。**
+>
+> 下面啲 `- [ ]` 冇逐格剔 —— 本輪由頭到尾用 commit 同
+> `docs/design/2026-08-07-enemy-sprite-art.md` 追進度,唔係用呢啲格仔,
+> 依家補剔會令人以為當時剔過。收貨憑證係實物:
+>
+> - Task 1–6:見 git log(`feat(art): 用墨線輪廓分割…` 到 `test(art): 真 render 量輪廓可辨性…`)
+> - Task 7:`EXTENTS: 23 kinds, 0 mismatches`;`PAWNS: DONE 41 shots`
+>   (`art_iterations/sprite_2/`);三章實戰 + 540 全掃 52 張
+>   (`art_iterations/iter_sprite2/`、`iter_sprite540/`)
+> - Task 8:`DECISIONS.md` 尾嗰九節;補圖清單已結案(7 張入、剩 E09 一條量度口徑賬)
+> - 收尾實測:`LEGIBILITY BOUND1 CALIBRATED`,worst delta 0.046(上限 0.15);
+>   `bash tools/test_all.sh` → `ALL SUITES PASSED`(13 個套件)
+>
+> 計劃入面有兩處被執行過程推翻,兩處都喺原地寫低咗理由:Task 2 嘅
+> 「shader 自己用 value 分眼同紋」(量到冇谷,分類搬入 pipeline),
+> 同 Task 5 嘅單一 2.4:1 門檻(後來拆成卡背 / 霧覆蓋 / 霧背三條)。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 將 10 隻小怪 + 6 隻 boss(連 B3 第二階段)由 `pawn_art.gd` 嘅程序繪圖,換成由 `Art reference/` 嘅 AI 生成圖裁出嚟嘅 sprite,tier 差異同暗底可讀性全部靠 shader 同粒子疊加。
