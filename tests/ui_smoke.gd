@@ -1223,10 +1223,13 @@ var _cover_cache := {}
 ## Scale-free, so one number covers every card layout: `_auto_mist` places
 ## everything in units of the pawn's own `w` and `h`, and `w/h` is the texture's
 ## own aspect at every size, so the fraction depends on the silhouette and the
-## aspect and on nothing else. Flip is irrelevant for the same reason —
-## `_draw` mirrors the wisps (`_c`) and the plate (`draw_texture_rect`'s
-## `flip_h`) about the same x = 0, so a flipped pawn is the mirror image of this
-## one and covers the same count.
+## aspect and on nothing else. Flip is irrelevant for the same reason — `_draw`
+## mirrors the wisps (`_c`) and the plate (its own `draw_set_transform`, x scaled
+## by -1) about the same x = 0, so a flipped pawn is the mirror image of this one
+## and covers the same count. That was not true before the Task 7 fix: the plate
+## used to be handed to `draw_texture_rect`'s `transpose` parameter, so a flipped
+## pawn was rotated rather than mirrored and this paragraph described a picture
+## the game was not drawing.
 ##
 ## Where it stops being exact: a wisp boundary cuts through pixels, and
 ## `SUB_ROWS` decides those in the conservative direction — touched counts as

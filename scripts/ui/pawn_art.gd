@@ -360,8 +360,9 @@ func _apply_rot_material() -> void:
 # ============================================================ mist
 
 ## Authoring-space point → drawing-space point: mirrors a flipped pawn and
-## carries the attack lunge. Only the mist goes through it now; the plate itself
-## is placed by `draw_set_transform` and flipped by `draw_texture_rect`.
+## carries the attack lunge. Only the mist goes through it now; the plate is
+## mirrored by its own `draw_set_transform` instead, about this same x = 0 —
+## see `_draw`, which also records why it cannot be `draw_texture_rect`'s job.
 func _c(p: Vector2) -> Vector2:
 	var q := p
 	if flip:
@@ -461,5 +462,28 @@ func _draw() -> void:
 	draw_set_transform(Vector2(0, bob), 0, Vector2.ONE)
 	if ENEMY_TEX.has(kind):
 		_auto_mist(w, h)
-	draw_set_transform(Vector2(0, bob) + _attack_offset, 0, Vector2.ONE)
-	draw_texture_rect(tex, Rect2(-w * 0.5, -h, w, h), false, Color.WHITE, flip)
+	#
+	# A mirrored pawn is mirrored by THIS transform, not by `draw_texture_rect`:
+	# that call's fifth parameter is `transpose`, not any kind of flip
+	# (`CanvasItem` has no `flip_h` argument at all), so passing `flip` there
+	# drew every mirrored pawn rotated 90 degrees with its rect's width and
+	# height swapped — which is what put E05's wing through the HP bar.
+	#
+	# Scaling x by -1 mirrors about x = 0, the axis the plate is already centred
+	# on and the same one `_c` mirrors the mist about, and it leaves the rect's
+	# own extent alone, so a flipped pawn occupies the same box as an unflipped
+	# one. It also leaves UV untouched — the rim's ray cast, the 5x5 mask gather
+	# and `rot_mask` alignment all live in texture space and cannot see a
+	# canvas-space mirror, so `edge_rgb` and the legibility calibration keyed to
+	# it are unaffected. Measured on a real render over E05/E02/E07/B5/BADGER:
+	# flipped and unflipped bounding boxes now agree exactly (BADGER 172x200
+	# either way, where the transpose gave 200x172), and mirroring the flipped
+	# frame about the pawn's own axis leaves 0 alpha mismatches and a worst
+	# channel difference of 1 of 255 — bilinear rounding at the axis — over
+	# 19235 to 23498 opaque pixels per key.
+	#
+	# `_attack_offset` rides in the translation, which the scale does not reach,
+	# so the lunge keeps the direction `play_attack` already picked for it.
+	draw_set_transform(Vector2(0, bob) + _attack_offset, 0,
+			Vector2(-1.0 if flip else 1.0, 1.0))
+	draw_texture_rect(tex, Rect2(-w * 0.5, -h, w, h), false, Color.WHITE)
