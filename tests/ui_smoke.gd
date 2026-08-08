@@ -12,7 +12,28 @@ var fails := 0
 ## constant would move with the thing it is checking. See the header on
 ## `_t_enemy_legibility` for why there are three of them and not one.
 const CARD_EDGE_FLOOR := 2.4      # lit edge vs the bare chapter card
-const MIST_EDGE_FLOOR := 1.9      # lit edge vs mist-over-card, where mist sits behind it
+## RE-PRICED IN TASK 6 FROM 1.9, AND THE REASON IS THE RULER, NOT THE BAR.
+## Task 5 set 1.9 as "just below today's worst modelled row, 1.990". That 1.990
+## came out of a `lit_edge()` that pinned the shader's `edge` scalar at 1.0 —
+## a model Task 6's render then measured to be reading 0.99 to 1.326 HIGH on all
+## 37 rows. So 1.9 was calibrated against numbers we now know were bad; it was
+## never a measurement of the picture, it was a measurement of a broken proxy.
+## Re-deriving it from the real render is not loosening a standard to pass. It is
+## setting the standard against a ruler that works. Both numbers stay written
+## down so the history is legible: OLD 1.9 (from modelled worst 1.990),
+## NEW 1.55 (from RENDERED worst 1.600, E05 ch3 — `tools/enemy_legibility.gd`,
+## 69 rendered band pixels). Same construction Task 5 used, just below the worst,
+## and deliberately not padded further.
+##
+## What this bound now permits, concretely: E05 has the LOWEST mist coverage in
+## the cast — 1.5% of its band at five wisps, against B2's 20.2% — so this floor
+## lets roughly one and a half percent of the moth's outline sit at 1.6:1 while
+## the rest of its contour clears the untouched 2.4:1 of `CARD_EDGE_FLOOR`.
+## `MIST_COVER_CAP` is what keeps that "roughly one and a half percent" true.
+##
+## `rim_px` cannot buy this row back: rendered at 3/6/7/8/9/12 it reads
+## 1.023 / 1.600 / 1.613 / 1.616 / 1.631 / 1.557 — flat past 6, falling past 9.
+const MIST_EDGE_FLOOR := 1.55     # lit edge vs mist-over-card, where mist sits behind it
 const MIST_COVER_CAP := 0.25      # how much of an edge band the mist may ever stand on
 
 ## Sub-rows per texture row when `_stamp_wisp` scan-converts a wisp. Four, and
@@ -448,11 +469,14 @@ func _t_rot_rim() -> void:
 ##      is on bare card" quietly stopped being true and bound 1 stopped
 ##      describing what anyone sees.
 ##   3. `MIST_EDGE_FLOOR` — where the veil does sit, the edge still reaches
-##      1.9:1. Today's worst MODELLED row is E09 ch3 tier3 at 1.893:1, i.e. this
-##      bound is currently RED by 0.007. It is red on the wrong row: the render
-##      puts E09 ch3 at 1.930:1 (100 px) and E05 ch3 — which passes here at
-##      2.002:1 — at 1.600:1 (69 px). `lit_edge`'s residual note says why the
-##      model cannot resolve this bound to the precision 1.9 asks for.
+##      1.55:1. Re-priced in Task 6 from 1.9, off the RENDER rather than off a
+##      model that had been measured wrong; the constant carries the derivation.
+##      Rendered worst is E05 ch3 at 1.600:1 (69 px, margin +0.050); modelled
+##      worst is E09 ch3 tier3 at 1.893:1 (+0.343). The model still cannot
+##      resolve this bound better than about ±0.4 — see `lit_edge`'s residual
+##      note — which is exactly why the floor is derived from the instrument
+##      that can, and why `tools/enemy_legibility.gd` is the thing that has to
+##      be re-run when a plate or a dial moves.
 ##
 ## Do not simplify these back into one. Bound 1 alone measures a background that
 ## a tenth of the contour does not have; bound 3 alone applies a veiled-case bar
@@ -612,31 +636,34 @@ func _colour_key(c: Color) -> String:
 ## at white. The `edge` scalar used to be pinned at 1.0 here too; it is now the
 ## `coverage` argument and `rim_coverage()` measures it.
 ##
-## SIX known ways this pair of functions is a model and not the picture, all six
-## written out with numbers in `task-5-report.md`. There were seven: the mist
-## used to be on this list as "one flat layer covering the whole edge", which was
-## an approximation because a single number was being asked to stand for two
-## different backgrounds. It is not on the list any more because it is no longer
-## approximated — it is MODELLED, by `mist_coverage()` measuring how much contour
-## the veil actually stands on and by the card-backed and mist-backed edges being
-## bounded separately. What residual it still has lives on `card_behind` and
-## `mist_coverage`, where the measurement is.
+## FIVE known ways this pair of functions is a model and not the picture, all
+## five written out with numbers in `task-5-report.md` and `task-6-report.md`.
+## There were seven. TWO have come off the list, and both for the same reason —
+## they stopped being approximated and started being measured:
+##   • the mist, which used to read "one flat layer covering the whole edge": a
+##     single number standing for two different backgrounds. Now MODELLED, by
+##     `mist_coverage()` measuring how much contour the veil actually stands on
+##     and by the card-backed and mist-backed edges being bounded separately.
+##     What residual it still has lives on `card_behind` and `mist_coverage`.
+##   • the shader's `edge` scalar (`src.a * (1 - amin)`), which used to be PINNED
+##     at 1.0 here and was the whole of the divergence: it reaches 1.0 only right
+##     at the alpha boundary and falls off inward, so pinning it made this
+##     function read 0.99–1.326 HIGH on every one of the 37 rows Task 6 rendered.
+##     At the `rim_px = 3` that shipped then, the band mean was 0.562 (E09) to
+##     0.677 (B6) — the ray from the band's innermost texel only just reached the
+##     boundary. Now MODELLED, by `rim_coverage()`, which evaluates that same
+##     expression over the same band off the plate's own alpha channel; and
+##     `PawnArt.ROT_RIM_PX` went to 6 so the scalar is 0.957–0.982. Correcting it
+##     took the worst bound-1 disagreement from 1.326 to 0.093 at the unchanged
+##     `rim_px = 3`, which is the validation. What residual is left of it is not
+##     this term but #2 below — the scale-dependence a headless model cannot see.
 ##
-## Five of the six make the proxy read HIGH (i.e. the real picture is less
+## Four of the five make the proxy read HIGH (i.e. the real picture is less
 ## legible than this says):
-##  1. WAS the whole divergence; it is now MODELLED, by `rim_coverage()`. `edge`
-##     (`src.a * (1 - amin)`) reaches 1.0 only right at the alpha boundary and
-##     falls off inward, and pinning it at 1.0 here made this function read
-##     0.99–1.33 HIGH on every one of the 37 rows Task 6 rendered. At the
-##     `rim_px = 3` this shipped with, the band mean was 0.562 (E09) to 0.677
-##     (B6) — the ray from the band's innermost texel only just reached the
-##     boundary. Both halves were fixed together: `rim_coverage()` computes the
-##     scalar, and `PawnArt.ROT_RIM_PX` went to 6 so the scalar is 0.957–0.982.
-##     What is left of this term is the residual under `— WHAT IS LEFT —` below.
-##  2. `edge_rgb` was averaged over `alpha > 200` (`enemy_cutout.py`); the shader
+##  1. `edge_rgb` was averaged over `alpha > 200` (`enemy_cutout.py`); the shader
 ##     lights everything with `alpha > 0.2`. Two different bands, and the extra
 ##     skirt the shader lights is the soft, semi-transparent part.
-##  3. Minification. The band is 3 TEXTURE px, drawn at 0.12–1.04 of source size.
+##  2. Minification. The band is 3 TEXTURE px, drawn at 0.12–1.04 of source size.
 ##     Task 5 predicted this would dominate. MEASURED TWICE, and the answer
 ##     depends on `rim_px`:
 ##       at `rim_px = 3` it did not move the ratio at all — smallest versus
@@ -650,15 +677,15 @@ func _colour_key(c: Color) -> String:
 ##     texels outside it. At `rim_px = 3` there was no gradient worth averaging.
 ##     This is now the largest single term in the residual, it is scale-dependent,
 ##     and nothing headless can see it: this function has no card size.
-##  4. Alpha compositing at the cut boundary: the proxy compares an opaque colour
+##  3. Alpha compositing at the cut boundary: the proxy compares an opaque colour
 ##     to the card, the renderer blends the boundary's own alpha into it. Band
 ##     mean alpha 0.974–0.987, so worth ~2%.
-##  5. `v_modulate` is white here, and the shader multiplies by it. Nothing puts
+##  4. `v_modulate` is white here, and the shader multiplies by it. Nothing puts
 ##     a non-white modulate on an enemy BATTLE-card pawn — the one place that
 ##     does, `screen_codex.gd`'s unseen-entry silhouette, is meant to be
 ##     unreadable, so this number does not speak for it.
 ## And one that makes it read LOW:
-##  6. The bloom pass adds `glow * 0.055` before the rim mix. Small at the
+##  5. The bloom pass adds `glow * 0.055` before the rim mix. Small at the
 ##     silhouette's boundary — the mask it gathers is eyes and cracks, which are
 ##     interior — but it is real and it is unmodelled.
 ##
@@ -668,7 +695,8 @@ func _colour_key(c: Color) -> String:
 ## `rim_px = 3` the render was taken at — that is the validation, and it was done
 ## before the lever moved, so it is a check on the model and not on the change.
 ##
-## At the shipped `rim_px = 6` the residual is larger again, and #3 is why:
+## At the shipped `rim_px = 6` the residual is larger again, and #2 (minification)
+## is why:
 ##   bound 1 — this function still reads 0.09 to 0.26 HIGH, on all 37 rows, the
 ##     gap tracking draw scale (worst E05 ch1 at scale 0.124, best E06 ch2 at the
 ##     native-scale end). Every row is conservative in the same direction.
@@ -680,11 +708,15 @@ func _colour_key(c: Color) -> String:
 ##
 ## So a green `_t_enemy_legibility` means the model clears the floor, and on
 ## bound 1 that is now a conservative statement about the picture — every render
-## came in below this and every render still cleared 2.4:1. On bound 3 it is not:
-## the model resolves that bound to about ±0.4, the floor is 1.9, and the render
-## disagrees with it in both directions. E05 ch3 fails bound 3 in the picture
-## (1.600:1, 69 rendered pixels) while passing here, and `rim_px` cannot fix it —
-## swept 3/6/7/8/9/12, that row tops out at 1.631:1. See `task-6-report.md`.
+## came in below this and every render still cleared 2.4:1. On bound 3 it is a
+## WEAKER statement, and the weakness is the reason `MIST_EDGE_FLOOR` is derived
+## from the render rather than from here: the model resolves that bound to about
+## ±0.4 and disagrees with the render in both directions (E05 ch3 renders 1.600
+## where this says 2.002; E09 ch2 renders 2.575 where this says 2.166). Both rows
+## clear the re-priced 1.55 on both rulers, so the bound holds in the picture as
+## well as in the model — but the model alone could not have told you that, and
+## `tools/enemy_legibility.gd` is what has to be re-run when a plate, a dial or a
+## card layout moves. See `task-6-report.md`.
 ##
 ## `strength` defaults to `rot_rim_for(chapter)`; pass it only to ask what a
 ## DIFFERENT rim would do to this edge, as `_t_rot_rim`'s tightness check does.
@@ -834,7 +866,7 @@ func _bilinear_a(a: PackedFloat32Array, w: int, h: int, fx: float, fy: float) ->
 ##
 ## HOW MUCH of the contour this speaks for is not assumed here — it is measured,
 ## per key, by `mist_coverage()`, and bounded by `MIST_COVER_CAP`. That is what
-## makes it legitimate to hold this background to a different (1.9:1) bar than
+## makes it legitimate to hold this background to a different (1.55:1) bar than
 ## the bare card's 2.4:1 instead of applying one bar to a blend of the two.
 ##
 ## One flat layer is a measured claim, not a convenience: instrumenting

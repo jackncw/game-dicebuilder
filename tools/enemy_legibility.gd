@@ -15,8 +15,10 @@ extends Node
 ##   1. the card-backed edge reaches `CARD_EDGE_FLOOR` (2.4:1) against the bare
 ##      chapter card;
 ##   2. the mist stands on at most `MIST_COVER_CAP` (25%) of the edge band;
-##   3. where it does stand, the edge still reaches `MIST_EDGE_FLOOR` (1.9:1)
-##      against mist-over-card.
+##   3. where it does stand, the edge still reaches `MIST_EDGE_FLOOR` (1.55:1)
+##      against mist-over-card — a floor this tool's own render priced, after the
+##      Task-5 1.9 turned out to have been derived from the pinned-`edge` model.
+## The floors are read off the proxy at print time, never restated here.
 ## All three are computed from ONE modelled quantity — `lit_edge()`, the plate's
 ## `edge_rgb` lerped towards `UITheme.ROT_RIM` by `UITheme.rot_rim_for(chapter)`
 ## — plus `card_behind()` and `mist_coverage()`. So this tool measures the real
