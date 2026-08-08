@@ -833,3 +833,85 @@ tier 遞進喺佢哋身上完全著唔起 —— 即係由「外觀」升級做�
 ## E05/E06 用 solo plate 唔用合集中間格
 合集中間格上蛾下藤,實測兩件根本冇黐埋(切得開),但只得 145/203px,
 而且合集嘅藤內圈有奶白窟窿。solo 係 1024px,兩個問題一次過冇。
+
+---
+
+# Web 試玩版同上線(2026-08-08)
+
+## 遊戲要自己帶字體(呢個係 web 版最大嘅發現)
+本來成個專案冇 font asset:Godot 內置嘅 Noto Sans 出 Latin,中文由作業系統
+fallback(Windows 係 Microsoft JhengHei)。瀏覽器**冇系統字體可以 fallback**,
+所以第一個 web export 出嚟成版中文係豆腐格,連標題都係。
+
+判斷:砌一隻**只含遊戲用到嘅字**嘅字體,入 `gui/theme/custom_font`。
+`tools/font_build.py` 掃全 repo 嘅 `.gd/.json/.tscn` 收集字元(959 個 CJK,
+共 1095 個),由三隻 SIL OFL 字體裁出再合併:
+
+| 來源 | 供乜 |
+|---|---|
+| Noto Sans TC | 全部中文 + Latin |
+| Noto Sans Symbols 2 | ✦ ✕ ✗ 💰 ⭮ |
+| Noto Emoji | 🧪 |
+
+5.7 MB 變 392 KB。Godot 本身支援 fallback font 鏈,可以唔使合併,但 fallback
+清單要喺 `.import` 檔手改、錯咗會靜靜哋唔生效;砌成一隻檔可以**驗 cmap**,
+所以 `font_build.py` 覆核唔齊就唔寫檔。
+
+**`↻` U+21BB 換成 `⭮` U+2B6E。** U+21BB 喺任何一隻 Noto 都冇 —— 佢一直行到
+淨係因為 Windows 有 Segoe UI Symbol。同一個箭嘴,換去帶得走嗰隻。
+
+副作用:`ENEMY_CHROME_H` 由 274 加到 281。換字體換咗 line height,B6 張卡撐到
+577 過咗 570 條界,`layout_test` 即刻紅。呢個係測試做緊嘢 —— 重新量,唔係放鬆條界。
+
+**一個踩過嘅坑:`project.godot` 嘅註解係 `;` 唔係 `#`。** 用 `#` 寫註解會令
+Godot 掉埋成個 section,`gui/theme/custom_font` 靜靜哋讀唔到,行為同冇設過一樣。
+
+## 非多線程 web export,唔行 coi-serviceworker
+Godot 多線程 web export 要 `SharedArrayBuffer`,而佢要 document 係
+cross-origin isolated,即係要 COOP/COEP response headers —— GitHub Pages
+**根本唔俾設 header**。業界 workaround 係 coi-serviceworker(用 service worker
+假扮 isolation),但佢首次到訪要多行一次完整 page load、喺 service worker
+註冊唔到嘅情況下會直接冧,而且係多一件要養嘅嘢。
+`variant/thread_support=false` 由根本上免咗呢個要求 —— 兩條路之中喺 Pages 上
+真係穩嗰條。實測:載入 1.3–1.8 秒(本機),零 console error。
+
+## Pages 用 `docs/` 資料夾,唔用 GitHub Actions
+Actions 要每次 build 都載 Godot + export template(約 1 GB),多咗一個會壞、
+而且壞咗唔容易 debug 嘅環節。`docs/` 就係「build 完 commit 落去,push 即上」,
+本機驗到乜,線上就係乜。代價係 binary 入 git history(約 46 MB/次)。
+`bash tools/web_build.sh` 係唯一寫 `docs/` 嘅嘢,`docs/.gdignore` 阻止 Godot
+將 exporter 自己嗰啲 icon PNG 當資源 import 返入專案(舊嗰個 root-level export
+就係咁留低咗 `index.png.import` 喺 repo 度)。
+
+順手清咗 repo root 嗰個舊 web export(`index.html`/`index.js`/`index.wasm` …)。
+佢係壞嘅:`.gitignore` 有 `*.pck`,所以 `index.pck` **由頭到尾冇入過 git** ——
+Pages 服務緊一個永遠載入唔到嘅頁。
+
+## export 排除參考圖同截圖
+`export_filter="all_resources"` 會將 `Art reference/`(22 MB)、`qa/`(8 MB)、
+`final/` + `final_round1/`(27 MB)全部打包 —— 全部係工具輸入同截圖產物,
+遊戲 runtime 一個都唔會 load。加 `exclude_filter` 之後 pack 由 **32 MB 跌到 6.7 MB**。
+
+## 3D 骰喺 web 唔降級
+規格話「明顯掉幀就將 3D 骰喺 web 降級做『擲骰期間先 render』」。實測唔使:
+真 GPU(RTX 3070 Laptop,ANGLE/D3D11,540×960)之下 ——
+
+| 場景 | fps | 最差幀 | 超過 33 ms 嘅幀 |
+|---|---|---|---|
+| 入戰鬥、8 粒骰一齊擲落枱 | 60.0 | 17.3 ms | **0 / 240** |
+| 戰鬥待機 | 60.0 | 17.5 ms | **0 / 180** |
+| 結束回合 → 敵人行動 → 勝利 → 轉場 | 56.2 | 133 ms | 4 / 337 |
+
+即係話 8 骰齊擲鎖死 60fps,一格都冇跌;唯一嘅頓喺**場景轉換**(6 秒入面 4 格),
+係載入成本唔係 render 成本,降級 3D 骰醫唔到佢。
+**未測到嘅:低階手機 GPU。** 呢度冇裝置可以量,所以呢個結論嘅範圍就係桌面級 GPU。
+
+## 存檔喺 web:`user://` → IndexedDB,已驗證
+Godot 喺 web 將 `user://` 掛喺 IndexedDB(`/userfs`)。實測開一場 run、
+refresh 成頁,標題畫面照樣出「繼續 Continue」—— meta 同 run 存檔都仲喺度。
+代價寫咗入 README:換瀏覽器 / 無痕 / 清網站資料 = 存檔冇咗。
+
+## Repo 名沿用 `game-dicebuilder`
+交代落嚟話「如未有 remote 就開個 public repo,名建議 dice-grove」。
+Remote 已經存在(`jackncw/game-dicebuilder`,public,Pages 已開),
+所以用返佢:改名會斷咗現有 URL,亦要多一重權限。

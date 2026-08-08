@@ -35,6 +35,16 @@ window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/handheld/orientation=1
 
+[gui]
+
+; The game ships its own font. Without this the Chinese renders from whatever
+; the OS happens to have — Microsoft JhengHei on Windows, NOTHING in a browser,
+; where the first web export came out as tofu boxes end to end. Built by
+; `python tools/font_build.py`; see that file for what is in it and why.
+; (Comments in this file are `;` — a `#` line makes Godot drop the rest of the
+; section, which is exactly how the first attempt at this setting did nothing.)
+theme/custom_font="res://assets/fonts/DiceGroveSans-Regular.ttf"
+
 [input_devices]
 
 pointing/emulate_touch_from_mouse=true

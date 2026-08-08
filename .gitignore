@@ -8,3 +8,9 @@ export/
 .godot-prompter-cache/
 art_iterations/
 __pycache__/
+
+# The web build is a COMMITTED artifact, not a byproduct: GitHub Pages serves
+# `docs/` straight off `main`, so the .pck and the .wasm have to be in history.
+# Everything under docs/ is written by `bash tools/web_build.sh` and should
+# never be hand-edited.
+!docs/*.pck

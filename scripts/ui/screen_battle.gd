@@ -101,7 +101,14 @@ const HERO_FLOAT_DROP := 96.0
 ## Measured, not guessed: `tests/layout_test.gd` builds the tallest case there
 ## is (a boss carrying five statuses AND a damage-preview chip) and fails if a
 ## card reaches past the band, so this number cannot drift out of date quietly.
-const ENEMY_CHROME_H := 274.0
+##
+## 281, up from 274 on 2026-08-08, and the 7px is the font: the game used to
+## render from whatever the OS supplied and now ships its own face (see
+## `gui/theme/custom_font`), whose line height is not the same. This is the
+## check working — the constant is downstream of text metrics, the metrics
+## moved, and B6's card reached 577 against the band's 570 until it was
+## re-measured. Not a tolerance to widen.
+const ENEMY_CHROME_H := 281.0
 
 
 func setup(p_args: Dictionary) -> void:
@@ -354,7 +361,11 @@ func _refresh_top() -> void:
 	top_turn.text = "%s %d" % [Data.t("ui_turn"), bc.s.turn]
 	if essence_bar != null and essence_bar.visible:
 		essence_bar.set_value(int(bc.s.mana), BattleCore.MANA_CAP)
-	top_reroll.text = "↻ ∞" if bc.rerolls_unlimited() else "↻ %d" % bc.s.rerolls
+	# U+2B6E, not the U+21BB this used to be: U+21BB is in no Noto face, so it
+	# was only ever drawing because Windows had Segoe UI Symbol behind it, and
+	# it came out a tofu box the moment the game ran in a browser. Same arrow,
+	# in the face the game now ships. See tools/font_build.py.
+	top_reroll.text = "⭮ ∞" if bc.rerolls_unlimited() else "⭮ %d" % bc.s.rerolls
 
 
 ## Does anybody in this party actually touch Essence? A party with no Gather /
