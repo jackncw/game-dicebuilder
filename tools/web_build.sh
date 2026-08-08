@@ -28,3 +28,10 @@ mkdir -p art_export docs
 
 sed -e 's/\r$//' "$LOG" | grep -iE "error|failed|missing" | head -20 || true
 ls -l docs/index.html docs/index.pck docs/index.wasm docs/index.js 2>&1
+
+# .nojekyll is not optional: GitHub Pages' legacy builder runs Jekyll over the
+# published folder by default, which rendered the repo README into a themed
+# index.html over the top of the game's, and dropped index.wasm / index.pck as
+# unrecognised files (verified: / served a Jekyll page, every asset 404'd).
+# This file turns that off and publishes the directory verbatim.
+[ -f docs/.nojekyll ] || : > docs/.nojekyll
