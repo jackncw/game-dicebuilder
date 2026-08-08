@@ -65,6 +65,41 @@ SOLO = {
 # broken outline, so no INK_V closes them. That is a colour question, not an
 # ink-threshold one — see `_background_pockets` below, which is what actually
 # resolves them.
+#
+# KNOWN DEFECT, DIAGNOSED AND PRICED BUT NOT FIXED HERE — E05's upper-right
+# wing. `binary_fill_holes` is all-or-nothing about a broken outline, and the
+# moth's outline breaks: at (x 885, y 383) of its 1024^2 plate the wing
+# dissolves into airbrushed dust with no ink line at all across a band 20+ px
+# wide, so the cream walks in. It then spreads, because the moth is the one
+# plate whose body paint is as dark as an outline — its wings peak at 0.28-0.31
+# (194 and 139 per thousand paint pixels per 0.02 bin) and fall to 11 at 0.32,
+# so at 0.30 the wing comes out as speckle rather than solid ink and the flood
+# has somewhere to go. Measured against a background key of the same plate,
+# that costs 12,440 px of wing interior — 6.4% of the moth's 195,560 px
+# silhouette — in three bites, the largest 8,736 px. (task-7-report §5.1 is
+# right that it is real and a pipeline defect; its 18,000 px / 9.6% counted
+# bounding-box background as well.)
+#
+# INK_V = 0.32 fixes it: holes 12,440 -> 3,178, the wing renders whole, all 17
+# outputs keep their exact size and aspect so `PawnArt.EXTENT` does not move,
+# and `edge_rgb` moves by at most 1 of 255 on fourteen keys. It is NOT applied
+# because of what it does to the two keys it does move. E05's own `edge_rgb`
+# goes [33,23,38] -> [26,17,31]: the true wing edge is darker than the bitten
+# one was, which drops `ui_smoke`'s proxy for E05 ch1 tier1 to 2.407:1 against
+# `CARD_EDGE_FLOOR + CARD_EDGE_MARGIN` = 2.460 and reds the suite. And B2's two
+# named smoke wisps (see `cut_subject`) re-attach through the thicker ink,
+# +2,371 px and `edge_rgb` +4, which pushes the rendered optimistic bias to
+# +0.0794 and makes `enemy_legibility` print `MARGIN TOO SMALL` against
+# `CARD_EDGE_MARGIN` 0.06. Landing this therefore needs the Task 6 proxy/render
+# reconciliation re-run, not just a constant — and note that re-running
+# `enemy_legibility` after re-cutting requires forcing a Godot reimport, or it
+# renders the stale imported textures and reports the OLD picture unchanged.
+#
+# Rejected alternatives, all measured: guarding the background flood by colour
+# repairs E05 but re-admits B2's whole painted smoke plume (+7,268 px) and the
+# bosses' (B6 +5,924), which is exactly the clutter this file exists to drop;
+# morphologically closing the ink mask is a knob with no principled stop and
+# recovers only 8,334 px at 2 iterations while moving B2 and B3 as much.
 INK_V = 0.30
 # A real body part is large; smoke, spatter and the corner sparkle are not.
 # Anything under this fraction of the biggest ink component is clutter.
