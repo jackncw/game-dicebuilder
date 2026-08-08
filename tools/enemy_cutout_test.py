@@ -32,15 +32,16 @@ KEYS = ["E%02d" % i for i in range(1, 11)] + ["B1", "B2", "B3", "B4", "B5", "B6"
 # key is removed from this dict the moment its replacement plate lands in
 # `tools/enemy_cutout.py`'s SOLO dict — do NOT lower the 1.5% floor and do
 # NOT add a key here without a measured number to back it.
+# 2026-08-08: seven of the original eight cleared this list when their solo
+# plates landed. E09 is the last sheet cell and is exempt on DIFFERENT grounds
+# from the other seven, so it does not clear when a plate arrives — it clears
+# when the ruler changes. The lava toad's corruption is painted as ORANGE
+# EMBER, not magenta rot ("熱,唔係腐" — see the design doc), so it banks its
+# tier material in the mask's blue channel: 1,217 ember px against 323 eye+vein.
+# A magenta-only floor is the wrong measurement for it, and lowering that floor
+# to fit it would stop the floor from biting on the nine keys it is for.
 PENDING_ART = {
-    "E01": "sheet cell, measured 1.05% eye+vein",
-    "E02": "sheet cell, measured 0.73% eye+vein",
-    "E03": "sheet cell, measured 0.59% eye+vein",
-    "E04": "sheet cell, measured 0.28% eye+vein",
-    "E07": "sheet cell, measured 0.22% eye+vein",
-    "E08": "sheet cell, measured 0.66% eye+vein",
-    "E09": "sheet cell, measured 0.85% eye+vein",
-    "E10": "sheet cell, measured 0.69% eye+vein",
+    "E09": "sheet cell, ember-channel creature: 0.85% eye+vein but 1217 ember px",
 }
 ROT_MIN_PCT = 1.5
 

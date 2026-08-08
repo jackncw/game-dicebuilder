@@ -590,13 +590,20 @@ func _t_enemy_legibility() -> void:
 	var worst_mist_what := ""
 	var worst_cover := -1.0
 	var worst_cover_what := ""
-	# per chapter: how many distinct edge colours went in, how many came out. A
-	# lerp with strength < 1 is injective, so those two counts have to agree. They
-	# stop agreeing exactly when the rim is strong enough to stop lighting the
-	# plates and start replacing them — at strength 1.00 every row collapses onto
-	# `ROT_RIM` itself and the rows below measure nothing about the sprite. That
-	# is what chapter 3 was doing before `rot_rim_for` was solved instead of
-	# ramped; this is the guard that keeps it from coming back.
+	# per chapter: how many distinct inputs went in, how many distinct lit edges
+	# came out. A lerp with strength < 1 is injective, so those two counts have
+	# to agree. They stop agreeing exactly when the rim is strong enough to stop
+	# lighting the plates and start replacing them — at strength 1.00 every row
+	# collapses onto `ROT_RIM` itself and the rows below measure nothing about
+	# the sprite. That is what chapter 3 was doing before `rot_rim_for` was
+	# solved instead of ramped; this is the guard that keeps it from coming back.
+	#
+	# The INPUT is the pair (edge colour, rim coverage), not the edge colour
+	# alone: `lit_edge` takes the plate's own measured coverage, so it is a
+	# function of both and two plates can share an edge colour and still light
+	# differently. They do — E01 and E10 both measure edge_rgb (24,15,29) —
+	# and keying this on the colour alone reported 11 in against 12 out, a
+	# collapse guard firing on the absence of a collapse.
 	var edges_in := {1: {}, 2: {}, 3: {}}
 	var lits_out := {1: {}, 2: {}, 3: {}}
 	for key in meta:
@@ -612,13 +619,14 @@ func _t_enemy_legibility() -> void:
 			var tier: int = c[1]
 			# with the MEASURED rim coverage, not the pinned 1.0 — the number this
 			# row is about is what the band actually receives
-			var lit := lit_edge(edge, ch, -1.0, rim_coverage(String(key)))
+			var cov := rim_coverage(String(key))
+			var lit := lit_edge(edge, ch, -1.0, cov)
 			# keyed on the raw channels, not `to_html`: at s ≈ 0.5 the lerp
 			# compresses differences by (1 - s), so two plates one 8-bit step
 			# apart can round to the same hex and fire this guard for a reason
 			# that has nothing to do with the rim. B3 (39,26,40) and B3P2
 			# (40,26,38) are already that close.
-			edges_in[ch][_colour_key(edge)] = true
+			edges_in[ch]["%s@%.9f" % [_colour_key(edge), cov]] = true
 			lits_out[ch][_colour_key(lit)] = true
 			var wisps: int = PawnArt.MIST_COUNT[PawnArt.dial_row(String(key), tier)]
 			var where := "%s ch%d tier%d (%d wisps)" % [key, ch, tier, wisps]

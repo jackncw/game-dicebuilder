@@ -33,19 +33,34 @@ OUT = os.path.join(ROOT, "assets", "enemies")
 QA = os.path.join(ROOT, "qa")
 
 # The 3x3 collection sheet. Row 1 slime/rat/sporecap, row 2 beetle/(moth over
-# bramble)/bone wolf, row 3 wraith/toad/viper. The middle cell holds two
-# creatures, so the sheet yields eight — the moth and the bramble come from
-# their own full-resolution plates instead (they are 1024px there against
-# 145/203px here, and the sheet's bramble carries cream trapped in its coils).
+# bramble)/bone wolf, row 3 wraith/toad/viper.
+#
+# As of 2026-08-08 the sheet supplies exactly ONE key: E09, the lava toad. Every
+# other creature now has its own 1024px plate. The sheet is kept because it is
+# the pose reference the solo plates were commissioned against — a solo plate is
+# a resolution swap, not a redesign — and because E09 still comes off it.
+#
+# Why the swap had to happen, measured before it did: the sheet gives each
+# creature a ~250px cell, and JPEG at that size flattens the thin magenta cracks
+# and the lit eyes into dark grey. `--hsv-report` counted 2.17-7.31% bright
+# magenta on the solo plates against 0.22-1.05% on the sheet cells, and five of
+# the eight sheet keys resolved NO eye at all, so the tier dial — which is a gain
+# on exactly those pixels — had nothing to turn up. See the design doc's
+# 需要補圖清單 for the per-key history.
 SHEET = os.path.join(REF, "monster", "monster1.jfif")
 SHEET_CELLS = {
-    "E01": (0, 0), "E02": (0, 1), "E03": (0, 2),
-    "E04": (1, 0), "E07": (1, 2),
-    "E08": (2, 0), "E09": (2, 1), "E10": (2, 2),
+    "E09": (2, 1),
 }
 SOLO = {
+    "E01": os.path.join(REF, "monster", "slime.jfif"),
+    "E02": os.path.join(REF, "monster", "rat.jfif"),
+    "E03": os.path.join(REF, "monster", "mushroom.jfif"),
+    "E04": os.path.join(REF, "monster", "beetle.jfif"),
     "E05": os.path.join(REF, "monster", "moth_solo.jfif"),
     "E06": os.path.join(REF, "monster", "vine_solo.jfif"),
+    "E07": os.path.join(REF, "monster", "wolf.jfif"),
+    "E08": os.path.join(REF, "monster", "wraith.jfif"),
+    "E10": os.path.join(REF, "monster", "viper.jfif"),
     "B3P2": os.path.join(REF, "monster", "boss3_phase2.jfif"),
     "B1": os.path.join(REF, "boss", "boss1.jfif"),
     "B2": os.path.join(REF, "boss", "boss2.jfif"),
@@ -66,8 +81,8 @@ SOLO = {
 # ink-threshold one — see `_background_pockets` below, which is what actually
 # resolves them.
 #
-# KNOWN DEFECT, DIAGNOSED AND PRICED BUT NOT FIXED HERE — E05's upper-right
-# wing. `binary_fill_holes` is all-or-nothing about a broken outline, and the
+# FIXED 2026-08-08 by moving this from 0.30 to 0.32 — E05's upper-right wing.
+# `binary_fill_holes` is all-or-nothing about a broken outline, and the
 # moth's outline breaks: at (x 885, y 383) of its 1024^2 plate the wing
 # dissolves into airbrushed dust with no ink line at all across a band 20+ px
 # wide, so the cream walks in. It then spreads, because the moth is the one
@@ -80,19 +95,20 @@ SOLO = {
 # right that it is real and a pipeline defect; its 18,000 px / 9.6% counted
 # bounding-box background as well.)
 #
-# INK_V = 0.32 fixes it: holes 12,440 -> 3,178, the wing renders whole, all 17
-# outputs keep their exact size and aspect so `PawnArt.EXTENT` does not move,
-# and `edge_rgb` moves by at most 1 of 255 on fourteen keys. It is NOT applied
-# because of what it does to the two keys it does move. E05's own `edge_rgb`
-# goes [33,23,38] -> [26,17,31]: the true wing edge is darker than the bitten
-# one was, which drops `ui_smoke`'s proxy for E05 ch1 tier1 to 2.407:1 against
-# `CARD_EDGE_FLOOR + CARD_EDGE_MARGIN` = 2.460 and reds the suite. And B2's two
-# named smoke wisps (see `cut_subject`) re-attach through the thicker ink,
-# +2,371 px and `edge_rgb` +4, which pushes the rendered optimistic bias to
-# +0.0794 and makes `enemy_legibility` print `MARGIN TOO SMALL` against
-# `CARD_EDGE_MARGIN` 0.06. Landing this therefore needs the Task 6 proxy/render
-# reconciliation re-run, not just a constant — and note that re-running
-# `enemy_legibility` after re-cutting requires forcing a Godot reimport, or it
+# 0.32 fixes it: holes 12,440 -> 3,178, the wing renders whole, all 17 outputs
+# keep their exact size and aspect so `PawnArt.EXTENT` does not move on E05's
+# account, and `edge_rgb` moves by at most 1 of 255 on fourteen keys.
+#
+# It was held back through 2026-08-07 because of the two keys it DOES move, and
+# both were re-priced when it landed on 2026-08-08 alongside the solo plates:
+# E05's own `edge_rgb` goes [33,23,38] -> [26,17,31] (the true wing edge is
+# darker than the bitten one was), and B2's two named smoke wisps (see
+# `cut_subject`) re-attach through the thicker ink, +2,371 px. Both land inside
+# the reconciliation that the plate swap forced anyway — `tools/enemy_legibility.gd`
+# is the arbiter and its verdict lines are quoted in DECISIONS.md.
+#
+# Re-running `enemy_legibility` after re-cutting REQUIRES forcing a Godot
+# reimport (delete `.godot/imported/<KEY>.png-*` or run `--import`), or it
 # renders the stale imported textures and reports the OLD picture unchanged.
 #
 # Rejected alternatives, all measured: guarding the background flood by colour
@@ -100,7 +116,7 @@ SOLO = {
 # bosses' (B6 +5,924), which is exactly the clutter this file exists to drop;
 # morphologically closing the ink mask is a knob with no principled stop and
 # recovers only 8,334 px at 2 iterations while moving B2 and B3 as much.
-INK_V = 0.30
+INK_V = 0.32
 # A real body part is large; smoke, spatter and the corner sparkle are not.
 # Anything under this fraction of the biggest ink component is clutter.
 KEEP_FRAC = 0.05
@@ -124,12 +140,51 @@ def subject_mask(rgb: np.ndarray) -> np.ndarray:
     for i, s in enumerate(sizes):
         if s >= sizes.max() * KEEP_FRAC:
             keep |= lab == i + 1
-    filled = ndimage.binary_fill_holes(keep)
-    # The subject is still found by ink alone; colour only adjudicates which
-    # of fill_holes's *additions* (never the ink-kept pixels themselves) are
-    # real background peeking through a pose gap — an armpit, a horn/shoulder
-    # notch — versus a real enclosed body part (an eye socket, a shield boss).
-    return filled & ~_background_pockets(rgb, filled & ~keep)
+    seed = keep | _attached_glow(rgb, keep)
+    filled = ndimage.binary_fill_holes(seed)
+    # The subject is still found by ink (plus the glow hanging off it); colour
+    # only adjudicates which of fill_holes's *additions* (never the seed pixels
+    # themselves) are real background peeking through a pose gap — an armpit, a
+    # horn/shoulder notch — versus a real enclosed body part (an eye socket, a
+    # shield boss).
+    return filled & ~_background_pockets(rgb, filled & ~seed)
+
+
+# Lit magic — the bone wolf's eye-flames, the croakomancer's rune arcs — is
+# painted OUTSIDE the closed ink outline, so the outline test alone cuts it off
+# and leaves its own thin ink curl enclosing a hole. Measured on E07: 14,345
+# saturated-bright pixels on the plate, only 4,870 of them inside the skull's
+# outline, and INK_V does not reach them — a 0.30-to-0.48 sweep moves that count
+# by 102 px, because the flame is genuinely outside the loop and not a broken
+# one (contrast E05's wing, which is a broken loop and which INK_V does fix).
+#
+# The gates are what separates lit magic from the clutter this file drops: the
+# painted smoke, the ✦ watermark and the ink spatter are all DESATURATED (the
+# smoke measures sat < 0.15), and cream is sat ~0.08. Requiring saturation as
+# well as adjacency therefore admits the flame and still drops the plume that
+# `cut_subject`'s own comment names on B2.
+#
+# Across all 17 plates this moves exactly two: E07 +8,930 px (both flames whole)
+# and B6 +3,202 px (four arcs of the rune circles that cross his sleeve and
+# staff; the free-floating rest of those circles stays dropped, as it has been
+# since the first cut). Everything else is 0.
+GLOW_SAT_MIN = 0.40
+GLOW_VAL_MIN = 0.45
+
+
+def _attached_glow(rgb: np.ndarray, ink: np.ndarray) -> np.ndarray:
+    """Saturated lit paint that hangs off the ink outline and belongs to it."""
+    f = rgb.astype(np.float32) / 255.0
+    mx, mn = f.max(axis=2), f.min(axis=2)
+    sat = np.where(mx > 0, (mx - mn) / np.maximum(mx, 1e-6), 0.0)
+    glow = (sat > GLOW_SAT_MIN) & (mx > GLOW_VAL_MIN) & ~ink
+    lab, n = ndimage.label(glow, structure=np.ones((3, 3), bool))
+    if n == 0:
+        return np.zeros(rgb.shape[:2], bool)
+    touch = ndimage.binary_dilation(ndimage.binary_fill_holes(ink),
+                                    np.ones((3, 3), bool))
+    ids = [i for i in np.unique(lab[touch & glow]) if i]
+    return np.isin(lab, ids) if ids else np.zeros(rgb.shape[:2], bool)
 
 
 def _background_pockets(rgb: np.ndarray, holes: np.ndarray) -> np.ndarray:

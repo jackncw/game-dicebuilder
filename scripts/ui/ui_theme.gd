@@ -135,10 +135,19 @@ const ROT_RIM := Color("cfa8dd")        # rim light that keeps a dark body legib
 
 
 ## The contrast a lit silhouette edge has to reach against the card behind it.
-## The same 2.4:1 `_t_enemy_legibility` asserts, on purpose: `rot_rim_for`
-## solves for this number, the test measures it, so the picture cannot quietly
-## stop meeting the bar the test is checking.
-const ROT_RIM_TARGET := 2.4
+##
+## 2.46, not the 2.4:1 `_t_enemy_legibility` reports, and the 0.06 difference is
+## that suite's `CARD_EDGE_MARGIN`. This constant is solved against the PINNED
+## model — a pure-black edge at full rim coverage — while the bound the suite
+## actually asserts is measured on the `seen_edge` band, minified and composited
+## at its own alpha. The two are not the same number, and until the solo plates
+## landed nothing in the set was dark enough for the gap to show: the sheet cells
+## edged around (33,23,38), the solo plates edge as dark as E03's (18,12,26), and
+## at 2.4 E03 ch2 came out at 2.453:1 against a 2.460 bar — passing the target
+## this constant names and failing the one the suite holds. Solving for the bar
+## that is actually asserted is what makes "the picture cannot quietly stop
+## meeting the bar the test is checking" true rather than nearly true.
+const ROT_RIM_TARGET := 2.46
 
 
 ## How hard the rim light has to work on a given chapter's enemy card.
