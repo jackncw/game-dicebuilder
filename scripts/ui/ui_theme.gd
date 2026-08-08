@@ -109,14 +109,20 @@ const DANGER_BG := Color("2a1e1e")
 
 # ── corruption — THE ENEMY SIDE ONLY ───────────────────────────────
 ## Everything hostile in the grove is the same story: an animal gone over to
-## the rot. Its body is pulled towards `ROT_UNDER`, magenta cracks the surface,
-## the eyes light up, and black mist comes off it.
+## the rot. Nothing here repaints its body — the body is a painted plate and
+## stays exactly as the illustration left it. What these colours do is re-light
+## it: magenta cracks and lit eyes glow where `enemy_cutout.py`'s mask says the
+## painter put them, mist comes off the base, and `ROT_RIM` runs a light inside
+## the silhouette so the plate does not sink into its card.
+##
+## (There used to be a `ROT_UNDER` here, the violet a hand-drawn body was tinted
+## towards. `PawnArt.rot_shade()` was its only reader and the plates replaced it
+## in Task 4; no pixel is pulled anywhere any more.)
 ##
 ## Magenta is the enemy's colour and nobody else's. A hero, a die, a button, a
 ## player status icon may not be tinted anywhere inside `is_magenta()` — that
 ## is what makes a magenta pixel on screen mean "this is not yours" without a
 ## legend. `_t_no_player_magenta()` in `ui_smoke` enforces it.
-const ROT_UNDER := Color("2c2038")      # the dead violet every body sinks toward
 const ROT_VEIN := Color("e13cc0")       # corruption crack, at full depth
 const ROT_VEIN_DIM := Color("a83a90")   # the same crack where the rot is young
 const ROT_EYE := Color("ff5ad8")        # lit eye
@@ -126,6 +132,78 @@ const ROT_EYE_DIM := Color("d34aae")    # eye at tier 1: awake, not yet burning
 ## the mist is one of the four things telling a tier-3 minion from a tier-1 one.
 const ROT_MIST := Color("4a4055")
 const ROT_RIM := Color("cfa8dd")        # rim light that keeps a dark body legible
+
+
+## The contrast a lit silhouette edge has to reach against the card behind it.
+##
+## 2.46, not the 2.4:1 `_t_enemy_legibility` reports, and the 0.06 difference is
+## that suite's `CARD_EDGE_MARGIN`. This constant is solved against the PINNED
+## model — a pure-black edge at full rim coverage — while the bound the suite
+## actually asserts is measured on the `seen_edge` band, minified and composited
+## at its own alpha. The two are not the same number, and until the solo plates
+## landed nothing in the set was dark enough for the gap to show: the sheet cells
+## edged around (33,23,38), the solo plates edge as dark as E03's (18,12,26), and
+## at 2.4 E03 ch2 came out at 2.453:1 against a 2.460 bar — passing the target
+## this constant names and failing the one the suite holds. Solving for the bar
+## that is actually asserted is what makes "the picture cannot quietly stop
+## meeting the bar the test is checking" true rather than nearly true.
+const ROT_RIM_TARGET := 2.46
+
+
+## How hard the rim light has to work on a given chapter's enemy card.
+##
+## The enemy plates are painted nearly black — they were drawn on a cream
+## sheet, where that reads fine. Our cards are `surface(chapter)`, all three
+## dark (this is a night-time grove), so the rim is always doing some work.
+##
+## Not equally, though, and NOT more on the darker card. Measured with
+## `luminance()`: chapter 1's card (`#1b3019`) is 0.0242, chapter 2's
+## (`#362414`) 0.0210, chapter 3's (`#1e1429`) 0.0094. A contrast ratio is
+## `(Lfg + 0.05) / (Lbg + 0.05)`, so a *brighter* card raises the luminance a
+## foreground has to hit to clear a fixed ratio. Chapter 1 is the brightest
+## card and therefore the hardest, chapter 3 the easiest. Solving each chapter
+## against the darkest edge a plate could possibly have (pure black) puts the
+## curve at ch1 0.552, ch2 0.536, ch3 0.473 — strictly DECREASING.
+##
+## Getting that backwards is not cosmetic. The previous curve ran the other way
+## (ch1 0.55 → ch3 1.00), and at strength 1.00 the shader's
+## `mix(lit, rim_color, clamp(edge * rim_strength))` lands on `rim_color`
+## exactly wherever `edge` reaches 1 — which is the outermost boundary, i.e.
+## precisely the ink outline the rim exists to light. Chapter 3 was not getting
+## a lit outline, it was getting a flat lavender one, and all twelve chapter-3
+## proxy rows came out the identical `#cfa8dd`.
+##
+## Solved rather than tabulated so a retuned chapter surface moves the rim the
+## right way on its own. What every chapter actually needs for its own worst
+## real edge (E09, the dimmest of the seventeen) is ch1 0.495 / ch2 0.477 /
+## ch3 0.405; the black-edge solve delivers +11.5% / +12.4% / +16.6% over that,
+## which is the whole margin — measured worst cases are 2.75:1 / 2.77:1 /
+## 2.84:1 against a 2.4:1 floor. Nothing is padded on top: the extra comes only
+## from real edges being brighter than the black this solves for.
+##
+## This is the SINGLE SOURCE for rim strength: `rot_pawn.gdshader` is handed
+## the result through its `rim_strength` uniform, and `_t_enemy_legibility`
+## predicts the lit edge with it. Two copies of this curve would let the test
+## and the picture drift apart silently.
+static func rot_rim_for(chapter: int) -> float:
+	# WCAG's ratio solved for the lighter side: the luminance a lit edge must
+	# reach to clear ROT_RIM_TARGET against this card.
+	var want := ROT_RIM_TARGET * (luminance(surface(chapter)) + 0.05) - 0.05
+	# `luminance(black -> ROT_RIM at r)` is strictly increasing in r, so bisect.
+	# Bisecting luminance and not `contrast()` is deliberate: contrast is
+	# V-shaped in r (it falls to 1:1 where the edge passes through the card's own
+	# luminance, then climbs), and a bisection needs a monotone predicate.
+	# `hi` always satisfies the target, and stays at 1.0 — full rim, the most
+	# this can do — if even that cannot reach it.
+	var lo := 0.0
+	var hi := 1.0
+	for _i in 30:
+		var mid := (lo + hi) * 0.5
+		if luminance(Color.BLACK.lerp(ROT_RIM, mid)) >= want:
+			hi = mid
+		else:
+			lo = mid
+	return hi
 
 ## The magenta wedge, in Godot's 0–1 hue. 285°–342°: everything from violet-
 ## magenta through to rose. Below it sits the game's existing purple family

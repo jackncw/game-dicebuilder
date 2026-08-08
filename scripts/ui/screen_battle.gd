@@ -678,7 +678,7 @@ func _make_enemy_card(j: int, e: Dictionary, is_target: bool, spec: Dictionary) 
 	art_holder.add_child(_ground_shadow(inner_w * 0.5, art_h + 4.0,
 			PawnArt.half_width(art_key, art_tier) * PawnArt.fit_height(art_key,
 					Vector2(inner_w, art_h)) * 0.95))
-	var art := PawnArt.fitted(art_key, Vector2(inner_w, art_h), true, art_tier)
+	var art := PawnArt.fitted(art_key, Vector2(inner_w, art_h), true, art_tier, chapter)
 	art.position = Vector2(inner_w * 0.5, art_h + 4.0)
 	art_holder.add_child(art)
 	vb.add_child(art_holder)

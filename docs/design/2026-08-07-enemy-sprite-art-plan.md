@@ -67,7 +67,7 @@
   - `assets/enemies/<KEY>.png`,KEY ∈ `E01…E10, B1…B6, B3P2`(17 個)
   - `assets/enemies/enemies.json`:`{KEY: {"size":[w,h], "aspect":float, "edge_rgb":[r,g,b]}}`
   - stdout 印一行 `PAWN_EXTENT: { "E01": Vector2(1.00, 0.42), ... }`
-  - `qa/enemy_cutout_contact.png`(洋紅格仔)、`qa/enemy_cutout_alpha.png`
+  - `qa/enemy_cutout_contact.png`(洋紅格仔 —— 格仔底已經足以曝露白邊、殘留奶白同浮空碎片,唔使另出一張 alpha 圖)
   - Python API:`subject_mask(rgb: np.ndarray) -> np.ndarray`、`cut_subject(img: Image) -> Image`、`edge_band_rgb(rgba: np.ndarray, px:int=3) -> tuple[int,int,int]`
 
 ### 分割演算法(核心判斷)
@@ -453,11 +453,22 @@ git commit -m "feat(art): 用墨線輪廓分割由參考圖切出 17 隻敵人 s
 
 ---
 
-## Task 2: HSV 斷層統計 —— 認色方案嘅前提驗證
+## Task 2: 分類器 —— 量色、形態學分眼紋、烘焙 rot mask
+
+> **本節喺執行途中改寫過。** 原本設計係 shader 自己用 `value > 0.72` 分眼同
+> 腐化紋。Task 2 第一輪量完數推翻咗呢個假設:眼 p25 = 0.49、腐化紋 p50 = 0.49,
+> 兩者完全重疊,喺 eye-p25 落刀有 **48.9%** 腐化紋會被誤認成眼;洋紅明度直方圖
+> 單調下降,單獨睇 9 張 1024px solo plate 一樣冇谷。分別喺**形狀**唔喺光暗。
+> fragment shader 做唔到連通區域分析,所以分類搬入 pipeline,烘焙成遮罩貼圖。
+> 用家揀認色方案時要嘅性質(零手工資料、換圖唔使重量、多眼位自動處理)全部保住。
+>
+> `tools/enemy_hsv.py`(commit 43235c2)保留 —— 佢係呢個判斷嘅證據,亦係
+> 補圖到咗之後重新驗證用嘅工具。
 
 **Files:**
-- Create: `tools/enemy_hsv.py`
-- Modify: `tools/enemy_cutout.py`(`--hsv-report` 已經 import 咗佢)
+- Create: `tools/enemy_hsv.py` ✅ 已完成(commit 43235c2)
+- Modify: `tools/enemy_cutout.py`(`--hsv-report` 已經 import 咗佢;今次加烘焙遮罩)
+- Modify: `tools/enemy_cutout_test.py`(加遮罩嘅斷言)
 
 **Interfaces:**
 - Consumes: Task 1 嘅 `load_all() -> {key: Image}`
@@ -556,26 +567,122 @@ def report(cuts: dict) -> int:
 Run: `python tools/enemy_cutout.py --hsv-report`
 Expected: 印出四段統計同一個 20-bin 直方圖。
 
-- [ ] **Step 3: 讀直方圖,揀界線**
+- [x] **Step 3: 讀直方圖 —— 收貨閘已判定為 FAIL,結論已入設計**
 
-睇 `val histogram of magenta sat>0.45`:眼係細舊高亮、腐化紋係大舊中亮,兩者之間應該有一個明顯低谷。
+量度結果(controller 覆核過):明度直方圖單調下降,冇谷;眼 p25 = 0.49 vs
+腐化紋 p50 = 0.49。**`EYE_VAL` 唔存在,唔准揀一個數頂上。** 詳見設計文件
+`docs/design/2026-08-07-enemy-sprite-art.md` §3。
 
-- 喺低谷中間揀 `EYE_VAL`
-- 由 `magenta-band pixels` 嘅 sat p5 揀 `SAT_MIN`(要低過腐化紋,高過身體嘅紫調)
-- 由 hue 分佈揀 `HUE_LO` / `HUE_HI`
-- 由 orange 段揀 `EMBER_HUE`
+以下界線量到而且有效,照用:
 
-**收貨閘:** 低谷要真係存在 —— 谷底至少要低過兩邊峰值嘅一半。如果直方圖係單峰、冇谷,即係眼同腐化紋分唔開。**停低,向用家報告**,唔准硬揀一個數。
+| 常數 | 值 | 證據 |
+|---|---|---|
+| `HUE_LO` / `HUE_HI` | 0.80 / 0.91 | 量出,窄過原本 0.78–0.97 嘅估算 |
+| `SAT_MIN` | 0.45 | 量出,同原估算一致 |
+| `VAL_MIN` | 0.35 | **新增。** 墨線係暗紫紅,色相混入洋紅帶;唔設明度下限,佢會佔晒直方圖(289k 之中 162k)。原本 Task 2 冇呢個下限,係方法學漏洞。 |
+| `EMBER_HUE` | 0.00 – 0.10 | 量出,但**單靠 hue+sat 唔夠** —— B2 拳套嘅啡皮革命中數量多過蟾蜍真岩漿。要加明度下限同連通區域判斷。 |
 
-- [ ] **Step 4: 記低數字**
+- [ ] **Step 4: 寫遮罩烘焙器**
 
-喺 `tools/enemy_hsv.py` 頂加一個常數 block,寫實揀咗嘅四個數同**點解**(引用直方圖邊個 bin 係谷底)。Task 3 嘅 shader uniform 預設值抄呢度。
+喺 `tools/enemy_cutout.py` 加,並喺主流程每隻 sprite 輸出後叫一次:
 
-- [ ] **Step 5: Commit**
+```python
+# --------------------------------------------------------------- rot mask
+
+# The corruption channels, baked here rather than recognised in the shader.
+#
+# The plates paint a lit eye and a corruption crack in the SAME value range —
+# measured across the nine full-resolution plates, the eye's 25th percentile
+# (0.49) and the crack's median (0.49) are the same number, and a split there
+# misreads 48.9% of crack pixels as eye. What separates them is shape: an eye
+# is a compact blob, a crack is a thin network. Two erosions delete the
+# network and leave the blobs, which a fragment shader cannot do — it has no
+# connected components. So the classification happens once, here, and the
+# shader only samples the result.
+#
+# VAL_MIN exists because the ink outline is a dark maroon, not black: it lands
+# inside the magenta hue band and, being dark, reports a high relative
+# saturation. Without a value floor it is 56% of every "magenta" pixel counted.
+MASK_HUE = (0.80, 0.91)
+MASK_SAT_MIN = 0.45
+MASK_VAL_MIN = 0.35
+EMBER_HUE = (0.00, 0.10)
+EMBER_SAT_MIN = 0.50
+# Brown leather (B2's boxing gloves) sits in the ember hue band and outnumbers
+# the lava toad's actual fissures. Lava is lit; leather is not.
+EMBER_VAL_MIN = 0.62
+EYE_ERODE = 2
+EYE_MIN_PX = 20
+
+
+def _hsv_planes(rgb: np.ndarray):
+    f = rgb.astype(np.float32) / 255.0
+    mx, mn = f.max(axis=2), f.min(axis=2)
+    d = mx - mn
+    h = np.zeros_like(mx)
+    r, g, b = f[:, :, 0], f[:, :, 1], f[:, :, 2]
+    nz = d > 1e-6
+    i = nz & (mx == r)
+    h[i] = ((g[i] - b[i]) / d[i]) % 6.0
+    i = nz & (mx == g)
+    h[i] = (b[i] - r[i]) / d[i] + 2.0
+    i = nz & (mx == b)
+    h[i] = (r[i] - g[i]) / d[i] + 4.0
+    return h / 6.0, np.where(mx > 0, d / np.maximum(mx, 1e-6), 0.0), mx
+
+
+def rot_mask(rgba: np.ndarray) -> Image.Image:
+    """R = lit eye, G = corruption crack, B = lava ember."""
+    h, s, v = _hsv_planes(rgba[:, :, :3])
+    body = rgba[:, :, 3] > 200
+    mag = (body & (h > MASK_HUE[0]) & (h < MASK_HUE[1])
+           & (s > MASK_SAT_MIN) & (v > MASK_VAL_MIN))
+    # blobs survive two erosions; thin crack networks do not
+    core = ndimage.binary_erosion(mag, np.ones((3, 3), bool), iterations=EYE_ERODE)
+    core = ndimage.binary_dilation(core, np.ones((3, 3), bool),
+                                   iterations=EYE_ERODE) & mag
+    lab, n = ndimage.label(core)
+    eye = np.zeros_like(mag)
+    if n:
+        sizes = ndimage.sum(core, lab, range(1, n + 1))
+        keep = [i + 1 for i, z in enumerate(sizes) if z >= EYE_MIN_PX]
+        if keep:
+            eye = np.isin(lab, keep)
+    ember = (body & (h < EMBER_HUE[1]) & (s > EMBER_SAT_MIN) & (v > EMBER_VAL_MIN))
+    out = np.zeros(rgba.shape[:2] + (3,), np.uint8)
+    out[:, :, 0] = np.where(eye, 255, 0)
+    out[:, :, 1] = np.where(mag & ~eye, 255, 0)
+    out[:, :, 2] = np.where(ember, 255, 0)
+    return Image.fromarray(out, "RGB")
+```
+
+每隻 sprite 存 `assets/enemies/<KEY>_rot.png`,同時喺 `enemies.json` 每個 key 加
+`"rot_px": {"eye": N, "vein": N, "ember": N}`。
+
+- [ ] **Step 5: 加測試斷言**
+
+喺 `tools/enemy_cutout_test.py` 加:每個 key 都有 `_rot.png`、尺寸同主 sprite
+一致、三條通道唔重疊(同一個像素唔可以又係眼又係紋)。
+
+另加一條**會捉到今次呢個 bug 嘅**斷言:每隻 sprite 嘅 `eye + vein` 像素數
+要 ≥ 主體嘅 1.5%。低過就係嗰隻冇足夠發光материал做 tier 遞進 —— 佢應該入補圖清單,
+唔應該靜靜地出街。(合集嗰 8 隻而家全部會 fail;補圖到咗之後應該全部過。)
+
+- [ ] **Step 6: 跑同驗**
 
 ```bash
-git add tools/enemy_hsv.py tools/enemy_cutout.py
-git commit -m "feat(art): 量出敵人 sprite 嘅 HSV 斷層,shader 認色界線有數據支持"
+python tools/enemy_cutout.py
+python tools/enemy_cutout_test.py
+```
+
+用 Read tool 開幾張 `_rot.png` 覆核:B1 惡兔應該啱啱兩點紅(佢兩隻眼),
+E09 蟾蜍應該有藍通道(岩漿)而 B2 拳套**唔應該**有。
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add tools/enemy_cutout.py tools/enemy_cutout_test.py assets/enemies
+git commit -m "feat(art): 喺 pipeline 烘焙眼/腐化紋/岩漿遮罩,shader 唔使自己認色"
 ```
 
 ---
@@ -588,10 +695,10 @@ git commit -m "feat(art): 量出敵人 sprite 嘅 HSV 斷層,shader 認色界線
 - Modify: `tests/ui_smoke.gd`(加 `_t_rot_rim()`,喺 `_ready()` 嘅 `_t_enemy_legibility()` 前面叫)
 
 **Interfaces:**
-- Consumes: Task 2 揀出嘅 `HUE_LO/HUE_HI/SAT_MIN/EYE_VAL/EMBER_HUE`
+- Consumes: Task 2 烘焙嘅 `assets/enemies/<KEY>_rot.png`(R = 眼、G = 腐化紋、B = 岩漿)
 - Produces:
   - `UITheme.rot_rim_for(chapter: int) -> float` —— rim 強度,0.0–1.0
-  - shader uniforms:`eye_gain`、`vein_gain`、`rim_strength`、`rim_color`、`rim_px`、`hot_bounds: vec4`、`ember_hue: vec2`、`ember_gain`
+  - shader uniforms:`rot_mask: sampler2D`、`eye_gain`、`vein_gain`、`ember_gain`、`rim_strength`、`rim_color`、`rim_px`
 
 ### rim 係內側 rim
 
@@ -669,18 +776,18 @@ shader_type canvas_item;
 // Corruption pass for the enemy plates.
 //
 // The plates are art in their own right and nothing here repaints them: this
-// shader only re-lights pixels the illustration already put down. The eyes and
-// the corruption cracks are painted in one magenta family and the lava toad's
-// fissures in orange, so the tier dials are gain values on colours that are
-// already there rather than shapes drawn on top.
+// shader only re-lights pixels the illustration already put down. Which pixels
+// those are was decided once, offline, by `tools/enemy_cutout.py`, and arrives
+// as a mask: red where a lit eye is, green along the corruption cracks, blue
+// on the lava toad's fissures. The tier dials are gains on that mask.
 //
-// Bounds come from `tools/enemy_hsv.py`, which measures where those four kinds
-// of pixel actually sit across all seventeen sprites.
+// The classification is not done here because it cannot be. A lit eye and a
+// corruption crack are painted in the same value range (measured: the eye's
+// 25th percentile and the crack's median are both 0.49), so no per-pixel
+// threshold separates them. What separates them is shape — a blob versus a
+// thin network — and a fragment shader has no connected components.
 
-// x = hue low, y = hue high, z = min saturation, w = the value that splits a
-// lit eye from a corruption crack.
-uniform vec4  hot_bounds = vec4(0.78, 0.97, 0.45, 0.72);
-uniform vec2  ember_hue  = vec2(0.00, 0.13);
+uniform sampler2D rot_mask : hint_default_black;
 uniform float eye_gain   : hint_range(0.0, 4.0) = 1.0;
 uniform float vein_gain  : hint_range(0.0, 4.0) = 0.0;
 uniform float ember_gain : hint_range(0.0, 2.0) = 0.6;
@@ -688,45 +795,22 @@ uniform float rim_strength : hint_range(0.0, 2.0) = 0.0;
 uniform vec3  rim_color : source_color = vec3(0.81, 0.66, 0.87);
 uniform float rim_px = 3.0;
 
-float hue_of(vec3 c) {
-	float mx = max(c.r, max(c.g, c.b));
-	float mn = min(c.r, min(c.g, c.b));
-	float d = mx - mn;
-	if (d < 0.0001) return 0.0;
-	float h;
-	if (mx == c.r)      h = mod((c.g - c.b) / d, 6.0);
-	else if (mx == c.g) h = (c.b - c.r) / d + 2.0;
-	else                h = (c.r - c.g) / d + 4.0;
-	return h / 6.0;
-}
-
-float sat_of(vec3 c) {
-	float mx = max(c.r, max(c.g, c.b));
-	if (mx < 0.0001) return 0.0;
-	return (mx - min(c.r, min(c.g, c.b))) / mx;
-}
-
 void fragment() {
 	vec4 src = texture(TEXTURE, UV);
 	vec3 lit = src.rgb;
 
-	// --- bloom: a 5x5 gathered tap, but only magenta and ember pixels put
-	// anything into it, so most of the sprite costs one branch per tap.
+	// --- bloom: a 5x5 gather over the mask, so only the eyes, the cracks and
+	// the lava contribute anything. The colour comes from the plate itself —
+	// the mask only says which pixels are allowed to glow and how hard.
 	vec3 glow = vec3(0.0);
 	for (int y = -2; y <= 2; y++) {
 		for (int x = -2; x <= 2; x++) {
 			vec2 o = vec2(float(x), float(y)) * TEXTURE_PIXEL_SIZE * 1.6;
-			vec4 s = texture(TEXTURE, UV + o);
-			if (s.a < 0.2) { continue; }
-			float h = hue_of(s.rgb);
-			float sa = sat_of(s.rgb);
-			float v = max(s.rgb.r, max(s.rgb.g, s.rgb.b));
+			vec3 m = texture(rot_mask, UV + o).rgb;
+			float g = m.r * eye_gain + m.g * vein_gain + m.b * ember_gain;
+			if (g < 0.001) { continue; }
 			float w = max(0.0, 1.0 - length(vec2(float(x), float(y))) / 3.2);
-			if (sa > hot_bounds.z && h > hot_bounds.x && h < hot_bounds.y) {
-				glow += s.rgb * w * (v > hot_bounds.w ? eye_gain : vein_gain);
-			} else if (sa > 0.50 && h >= ember_hue.x && h <= ember_hue.y) {
-				glow += s.rgb * w * ember_gain;
-			}
+			glow += texture(TEXTURE, UV + o).rgb * w * g;
 		}
 	}
 	lit += glow * 0.055;
@@ -747,7 +831,21 @@ void fragment() {
 		lit = mix(lit, rim_color, clamp(edge * rim_strength, 0.0, 1.0));
 	}
 
-	COLOR = vec4(lit, src.a) * COLOR;
+	// NOT `* COLOR`. By the time fragment() runs, COLOR already equals
+	// texture(TEXTURE, UV) * modulate, while `lit` and `src.a` are built from
+	// their own independent TEXTURE sample — so multiplying by COLOR bakes the
+	// plate in twice (alpha becomes src.a², every pixel darkens), even with
+	// rot_mask unset and rim_strength at 0.
+	//
+	// Godot 4.x has no MODULATE built-in in canvas_item fragment (verified
+	// against 4.7.1's shader_types.cpp), and the modulate is needed — the hit
+	// flash drives it. So vertex() captures COLOR before the texture is
+	// applied and passes it down:
+	//
+	//     varying vec4 v_modulate;
+	//     void vertex() { v_modulate = COLOR; }
+	//
+	COLOR = vec4(lit, src.a) * v_modulate;
 }
 ```
 
@@ -895,6 +993,18 @@ static func enemy_texture(p_kind: String) -> Texture2D:
 	return _tex_cache[p_kind]
 
 
+## The corruption mask baked beside each plate: red where a lit eye is, green
+## along the cracks, blue on the lava. `tools/enemy_cutout.py` decides this —
+## see the shader for why it cannot be decided per-pixel at draw time.
+static func rot_mask_texture(p_kind: String) -> Texture2D:
+	if not ENEMY_TEX.has(p_kind):
+		return null
+	var key := p_kind + "_rot"
+	if not _tex_cache.has(key):
+		_tex_cache[key] = load("res://assets/enemies/%s_rot.png" % p_kind) as Texture2D
+	return _tex_cache[key]
+
+
 ## The plate for any pawn, hero or enemy.
 static func plate(p_kind: String) -> Texture2D:
 	var t := hero_texture(p_kind)
@@ -946,8 +1056,10 @@ func _apply_rot_material() -> void:
 	var m := ShaderMaterial.new()
 	m.shader = _shader_cache
 	var i := clampi(tier, 1, 3) - 1
+	m.set_shader_parameter("rot_mask", rot_mask_texture(kind))
 	m.set_shader_parameter("eye_gain", EYE_GAIN[i])
 	m.set_shader_parameter("vein_gain", VEIN_GAIN[i])
+	m.set_shader_parameter("ember_gain", 0.6)
 	m.set_shader_parameter("rim_strength", UITheme.rot_rim_for(chapter))
 	m.set_shader_parameter("rim_color", Vector3(UITheme.ROT_RIM.r, UITheme.ROT_RIM.g,
 			UITheme.ROT_RIM.b))
@@ -1388,9 +1500,12 @@ Expected: `ALL SUITES PASSED`。
 - [ ] **Step 8: Commit**
 
 ```bash
-git add tools/pawn_extents.gd scripts/ui/pawn_art.gd art_iterations/sprite_1
+git add tools/pawn_extents.gd scripts/ui/pawn_art.gd
 git commit -m "chore(art): 由 sprite alpha bounds 覆核 extents,射 37 張 gallery 同三章實戰"
 ```
+
+**唔准 `git add art_iterations/`。** 佢係 gitignored 嘅截圖產物(已經 86MB),
+同 `art_export/` 一樣係跑出嚟嘅嘢,唔入 history。截圖係用嚟睇同判斷,唔係交付物。
 
 ---
 

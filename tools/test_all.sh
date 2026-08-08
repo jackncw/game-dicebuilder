@@ -17,6 +17,14 @@ for t in $SUITES; do
     *failures*) FAILED=$((FAILED+1));;
   esac
 done
+printf '%-24s ' "enemy_cutout"
+LINE=$(python tools/enemy_cutout_test.py 2>&1 | grep -E "tests, .* failures" | tail -1)
+echo "$LINE"
+case "$LINE" in
+  "") FAILED=$((FAILED+1));;
+  *" 0 failures"*) ;;
+  *failures*) FAILED=$((FAILED+1));;
+esac
 echo "-----"
 if [ "$FAILED" -eq 0 ]; then echo "ALL SUITES PASSED"; else echo "$FAILED SUITE(S) FAILED"; fi
 exit $FAILED
