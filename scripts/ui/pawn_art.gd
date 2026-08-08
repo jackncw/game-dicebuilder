@@ -85,6 +85,30 @@ const EYE_GAIN := [0.45, 0.85, 1.5]
 const VEIN_GAIN := [0.0, 0.0, 1.1]     # T1/T2 dark, T3 alight
 const MIST_COUNT := [0, 3, 5]
 
+## How far the rim's occlusion ray reaches, in TEXTURE pixels — the `rim_px`
+## uniform of `rot_pawn.gdshader`. This is the rim's WIDTH; its STRENGTH is
+## `UITheme.rot_rim_for` and stays there, because two knobs on one curve is how
+## a test and a picture drift apart.
+##
+## Not the shader's own default, and not 3. `edge = src.a * (1 - amin)` with
+## `amin` taken over 8 rays of this length is what decides how much of the band
+## the rim actually lights, and the band `edge_rgb` is measured over is 3 texels
+## deep (`alpha > 200` minus three 3x3 erosions). At `rim_px = 3` a ray cast
+## from the band's INNERMOST texel only just reaches the alpha boundary, where
+## alpha is still ~0.78, so `1 - amin` collapses there and the band-mean `edge`
+## comes out 0.562–0.677 instead of the ~1.0 the legibility model assumes. Task
+## 6 measured that on a real render: every one of the 37 (key, chapter) rows the
+## game produces missed the 2.4:1 floor, worst 1.516:1 (E09 ch1).
+##
+## 6 is the knee, priced by re-rendering and not by argument
+## (`tools/enemy_legibility.gd`'s `LEGIBILITY LEVER` lines): E09 ch1 goes
+## 1.516 -> 2.494:1 as band-mean `edge` goes 0.562 -> 0.957. rim_px 9 buys
+## 0.957 -> 0.969 and 2.494 -> 2.534:1, i.e. almost nothing, while eating twice
+## as far into the plate. Set explicitly below rather than left to the shader
+## default so this value sits with the other per-pawn shader parameters and
+## `ui_smoke.rim_coverage()` has one place to read it from.
+const ROT_RIM_PX := 6.0
+
 ## How much of its own art a design draws at each tier. `fit_height` sizes every
 ## card against tier 3 — the biggest — so a tier-1 minion simply sits smaller
 ## inside the same card, which is the point.
@@ -327,6 +351,7 @@ func _apply_rot_material() -> void:
 	m.set_shader_parameter("vein_gain", VEIN_GAIN[i])
 	m.set_shader_parameter("ember_gain", 0.6)
 	m.set_shader_parameter("rim_strength", UITheme.rot_rim_for(chapter))
+	m.set_shader_parameter("rim_px", ROT_RIM_PX)
 	m.set_shader_parameter("rim_color", Vector3(UITheme.ROT_RIM.r, UITheme.ROT_RIM.g,
 			UITheme.ROT_RIM.b))
 	material = m

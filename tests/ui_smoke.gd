@@ -365,7 +365,7 @@ func _colors_in(v: Variant) -> Array:
 ## wherever it went. The 2.4:1 floor is therefore owned by this file instead, as
 ## `CARD_EDGE_FLOOR`, so lowering `ROT_RIM_TARGET` is caught in
 ## `_t_enemy_legibility` rather than nowhere. Measured: drop it to 2.0 and the
-## worst real edge (E09 on chapter 1) falls to 2.35:1 and that test fires.
+## worst modelled edge (E09 on chapter 1) falls to 2.234:1 and that test fires.
 ##
 ## The background here is the BARE card, deliberately: that is the quantity
 ## `rot_rim_for` solves against, and this test's job is to check the curve
@@ -448,8 +448,11 @@ func _t_rot_rim() -> void:
 ##      is on bare card" quietly stopped being true and bound 1 stopped
 ##      describing what anyone sees.
 ##   3. `MIST_EDGE_FLOOR` — where the veil does sit, the edge still reaches
-##      1.9:1. Today's worst is E09 ch3 tier3 at 1.990:1. This bounds how bad
-##      the veiled tenth is allowed to get.
+##      1.9:1. Today's worst MODELLED row is E09 ch3 tier3 at 1.893:1, i.e. this
+##      bound is currently RED by 0.007. It is red on the wrong row: the render
+##      puts E09 ch3 at 1.930:1 (100 px) and E05 ch3 — which passes here at
+##      2.002:1 — at 1.600:1 (69 px). `lit_edge`'s residual note says why the
+##      model cannot resolve this bound to the precision 1.9 asks for.
 ##
 ## Do not simplify these back into one. Bound 1 alone measures a background that
 ## a tenth of the contour does not have; bound 3 alone applies a veiled-case bar
@@ -511,7 +514,9 @@ func _t_enemy_legibility() -> void:
 		for c in cases:
 			var ch: int = c[0]
 			var tier: int = c[1]
-			var lit := lit_edge(edge, ch)
+			# with the MEASURED rim coverage, not the pinned 1.0 — the number this
+			# row is about is what the band actually receives
+			var lit := lit_edge(edge, ch, -1.0, rim_coverage(String(key)))
 			# keyed on the raw channels, not `to_html`: at s ≈ 0.5 the lerp
 			# compresses differences by (1 - s), so two plates one 8-bit step
 			# apart can round to the same hex and fire this guard for a reason
@@ -603,8 +608,9 @@ func _colour_key(c: Color) -> String:
 
 
 ## The rim light applied to an edge colour, mirroring the `mix()` at the bottom
-## of `rot_pawn.gdshader` with that line's two other inputs pinned: the `edge`
-## scalar at 1.0 and `v_modulate` at white.
+## of `rot_pawn.gdshader` with that line's remaining input, `v_modulate`, pinned
+## at white. The `edge` scalar used to be pinned at 1.0 here too; it is now the
+## `coverage` argument and `rim_coverage()` measures it.
 ##
 ## SIX known ways this pair of functions is a model and not the picture, all six
 ## written out with numbers in `task-5-report.md`. There were seven: the mist
@@ -618,32 +624,35 @@ func _colour_key(c: Color) -> String:
 ##
 ## Five of the six make the proxy read HIGH (i.e. the real picture is less
 ## legible than this says):
-##  1. `edge` (`src.a * (1 - amin)`) is 1.0 only right at the alpha boundary and
-##     falls off inward, so part of the measured band is lit less than this.
-##     MEASURED in Task 6, and it is not a minor term — it is the whole
-##     divergence. Averaged over this very band, `edge` is 0.562 (E09) to 0.677
-##     (B6), never 1.0, because `rim_px` is 3 texels and the band is 3 texels:
-##     a ray cast from the band's innermost texel only just reaches the alpha
-##     boundary, so `1 - amin` collapses there. See `_t_enemy_legibility`'s
-##     header for what that does to the numbers below.
+##  1. WAS the whole divergence; it is now MODELLED, by `rim_coverage()`. `edge`
+##     (`src.a * (1 - amin)`) reaches 1.0 only right at the alpha boundary and
+##     falls off inward, and pinning it at 1.0 here made this function read
+##     0.99–1.33 HIGH on every one of the 37 rows Task 6 rendered. At the
+##     `rim_px = 3` this shipped with, the band mean was 0.562 (E09) to 0.677
+##     (B6) — the ray from the band's innermost texel only just reached the
+##     boundary. Both halves were fixed together: `rim_coverage()` computes the
+##     scalar, and `PawnArt.ROT_RIM_PX` went to 6 so the scalar is 0.957–0.982.
+##     What is left of this term is the residual under `— WHAT IS LEFT —` below.
 ##  2. `edge_rgb` was averaged over `alpha > 200` (`enemy_cutout.py`); the shader
 ##     lights everything with `alpha > 0.2`. Two different bands, and the extra
 ##     skirt the shader lights is the soft, semi-transparent part.
-##  3. Minification. The band is 3 TEXTURE px; on an enemy battle card the
-##     plates draw at 0.12–1.04 of source size, so that band is 0.37–3.11 SCREEN
-##     px — per key, and with mipmaps off on every plate. Task 5 expected this to
-##     be the term that broke Task 6's reconciliation. MEASURED: it does not
-##     affect the ratio at all. Rendering every key at both its smallest and its
-##     largest battle-card box — a 2–2.2x change in scale — moves the card-backed
-##     edge by at most 0.05:1 (E03 ch1 1.810 vs 1.760; E05 ch1 1.566 vs 1.560).
-##     With mipmaps off, a fragment's bilinear fetch spans 2x2 texels whatever
-##     the scale, and `amin` is cast at a fixed 3-TEXEL radius, so the shader's
-##     output at a given UV does not know how big the plate is being drawn. What
-##     scale does change is how MANY screen pixels land in the band — the rim is
-##     3 x scale px thick, i.e. sub-pixel on the big plates — which is a real
-##     defect in how thin the light reads, but not one this ratio can see.
+##  3. Minification. The band is 3 TEXTURE px, drawn at 0.12–1.04 of source size.
+##     Task 5 predicted this would dominate. MEASURED TWICE, and the answer
+##     depends on `rim_px`:
+##       at `rim_px = 3` it did not move the ratio at all — smallest versus
+##       largest battle-card box, a 2–2.2x scale change, moved the card-backed
+##       edge by at most 0.05:1 (E03 ch1 1.810 vs 1.760);
+##       at `rim_px = 6` it does. Smallest card versus draw scale 1.0 now moves
+##       it by up to 0.20:1 (E05 ch1 2.469 vs 2.669; E10 ch1 2.568 vs 2.704).
+##     The reason is that a 6-texel rim puts a real GRADIENT across the 3-texel
+##     band (rings run 1.95/2.63/3.23 on E10 ch1, innermost brightest), and a
+##     minified screen pixel averages that gradient together with the exterior
+##     texels outside it. At `rim_px = 3` there was no gradient worth averaging.
+##     This is now the largest single term in the residual, it is scale-dependent,
+##     and nothing headless can see it: this function has no card size.
 ##  4. Alpha compositing at the cut boundary: the proxy compares an opaque colour
-##     to the card, the renderer blends the boundary's own alpha into it.
+##     to the card, the renderer blends the boundary's own alpha into it. Band
+##     mean alpha 0.974–0.987, so worth ~2%.
 ##  5. `v_modulate` is white here, and the shader multiplies by it. Nothing puts
 ##     a non-white modulate on an enemy BATTLE-card pawn — the one place that
 ##     does, `screen_codex.gd`'s unseen-entry silhouette, is meant to be
@@ -652,40 +661,165 @@ func _colour_key(c: Color) -> String:
 ##  6. The bloom pass adds `glow * 0.055` before the rim mix. Small at the
 ##     silhouette's boundary — the mask it gathers is eyes and cracks, which are
 ##     interior — but it is real and it is unmodelled.
-## Task 6 renders the real thing and reconciles at 0.15:1 — the render wins.
 ##
-## ── AND IT DID NOT RECONCILE. READ THIS BEFORE TRUSTING A GREEN RUN ──
-## `tools/enemy_legibility.gd` measured all 37 rows on a real render. Every row
-## disagrees, in the same direction and by roughly the same amount: this function
-## reads 0.99 to 1.33 HIGH on bound 1 and 0.53 to 1.33 high on bound 3. The
-## card-backed edge is 1.516:1 (E09 ch1) to 2.202:1 (E08 ch3) in the picture, not
-## the 2.752–3.376 printed below, so bound 1's 2.4:1 floor is met by NO enemy at
-## any chapter, and bound 3's 1.9:1 by few. Bound 2 is the one that holds — the
-## rendered mist cover is at or under the modelled figure on every key.
+## ── WHAT IS LEFT, MEASURED. READ THIS BEFORE TRUSTING A GREEN RUN ──
+## Task 6 rendered all 37 rows again with `rim_coverage()` in place. Correcting
+## `edge` took the worst bound-1 disagreement from 1.326 to 0.093 at the SAME
+## `rim_px = 3` the render was taken at — that is the validation, and it was done
+## before the lever moved, so it is a check on the model and not on the change.
 ##
-## Approximation #1 is the whole of it, confirmed two independent ways: the rim
-## strength fitted back out of the rendered pixels (0.530–0.659 of
-## `rot_rim_for`) matches the `edge` scalar computed straight off each plate's
-## alpha channel with the shader's own 8-ray formula (0.562–0.677), worst
-## agreement 0.041.
+## At the shipped `rim_px = 6` the residual is larger again, and #3 is why:
+##   bound 1 — this function still reads 0.09 to 0.26 HIGH, on all 37 rows, the
+##     gap tracking draw scale (worst E05 ch1 at scale 0.124, best E06 ch2 at the
+##     native-scale end). Every row is conservative in the same direction.
+##   bound 3 — 0.008 to 0.409, and NOT one-directional. The big ones are rows
+##     where a wisp stands behind almost none of the contour (E09 ch2: 0.4% of
+##     the band, 14 rendered pixels), plus the covariance this function cannot
+##     represent: `edge_rgb` is ONE colour for the whole band, and the veiled
+##     sub-band has its own. E05 ch3 renders at 1.600:1 where this says 2.002:1.
 ##
-## The correction is one factor on the blend below — `rot_rim_for(chapter)` times
-## that per-key coverage — and it is DELIBERATELY NOT APPLIED. Applying it turns
-## 37 rows red, and the bounds do not move; which lever to pull instead is the
-## controller's call, and the one the mechanism points at is `rim_px`, which is
-## 3 texels precisely because the band is 3 texels. Re-rendered at `rim_px = 6`,
-## E09 ch1 goes 1.516 -> 2.494:1 and `edge` goes 0.562 -> 0.957. So until that is
-## decided, the numbers this function prints are an upper bound on the picture
-## and not a description of it, and a passing `_t_enemy_legibility` says only
-## that the MODEL clears the floor.
+## So a green `_t_enemy_legibility` means the model clears the floor, and on
+## bound 1 that is now a conservative statement about the picture — every render
+## came in below this and every render still cleared 2.4:1. On bound 3 it is not:
+## the model resolves that bound to about ±0.4, the floor is 1.9, and the render
+## disagrees with it in both directions. E05 ch3 fails bound 3 in the picture
+## (1.600:1, 69 rendered pixels) while passing here, and `rim_px` cannot fix it —
+## swept 3/6/7/8/9/12, that row tops out at 1.631:1. See `task-6-report.md`.
 ##
 ## `strength` defaults to `rot_rim_for(chapter)`; pass it only to ask what a
 ## DIFFERENT rim would do to this edge, as `_t_rot_rim`'s tightness check does.
 ## Both halves of that check go through here on purpose, so a term added to this
 ## function lands on both.
-func lit_edge(edge: Color, chapter: int, strength := -1.0) -> Color:
+## `coverage` is the shader's `edge` scalar averaged over this band, i.e. the
+## fraction of the declared rim that the band actually receives — measure it with
+## `rim_coverage(key)`. It defaults to 1.0, which is the PURE-CURVE case
+## `_t_rot_rim` asks about ("does `rot_rim_for` reach its own declared target"),
+## and is not the picture; every caller that is predicting a real silhouette
+## passes the measured number.
+func lit_edge(edge: Color, chapter: int, strength := -1.0, coverage := 1.0) -> Color:
 	var s := UITheme.rot_rim_for(chapter) if strength < 0.0 else strength
-	return edge.lerp(UITheme.ROT_RIM, clampf(s, 0.0, 1.0))
+	# ONE factor on the SAME curve, not a second copy of it: `rot_rim_for` still
+	# owns how hard the rim is asked to work, and `coverage` says how much of that
+	# ask lands on the band. Multiplying here means a retuned curve and a retuned
+	# `rim_px` both move this number, and neither can move it alone.
+	return edge.lerp(UITheme.ROT_RIM, clampf(s * coverage, 0.0, 1.0))
+
+
+var _cover_rim_cache := {}
+var _alpha_cache := {}
+
+
+## The shader's own `edge` scalar — `src.a * (1.0 - amin)` from
+## `rot_pawn.gdshader`'s rim line — averaged over exactly the band `_edge_band`
+## marks and `lit_edge` speaks for. This is the term `lit_edge` used to pin at
+## 1.0, and pinning it there was the whole of the 0.99–1.33 gap Task 6's render
+## found on all 37 rows.
+##
+## COMPUTED, not tabulated, and computed from geometry rather than from a fitted
+## constant: the plate's own alpha channel, the band `enemy_cutout.py` averaged
+## `edge_rgb` over, and `PawnArt.ROT_RIM_PX`. That matters because `rim_px` is
+## the tuning lever — a hardcoded 0.56 would have stopped tracking the moment the
+## lever moved, which is precisely when it needs to track. Change `ROT_RIM_PX`
+## and this follows on its own.
+##
+## Why it is not 1.0: `amin` is the minimum over 8 rays of length `rim_px`
+## TEXELS, so a band texel at depth `d` inside the `alpha > 200` contour has its
+## most-outward ray land `rim_px - d` texels OUTSIDE that contour. The band is 3
+## texels deep. At `rim_px = 3` the innermost ring's ray lands on the contour
+## itself, where alpha is still ~0.78, so `1 - amin` is ~0.2 there and the band
+## mean comes out 0.562–0.677. At `rim_px = 6` every ring clears the skirt and
+## the mean is 0.95–0.97, i.e. `lit_edge`'s old assumption becomes very nearly
+## true — which is why the correction and the lever were applied together.
+##
+## Cross-checked against the picture two ways in Task 6 and it is the mechanism,
+## not a fudge: the rim strength fitted back out of the RENDERED pixels
+## (`enemy_legibility._fit_strength`, bisected on luminance) agrees with this to
+## 0.041 worst over the seventeen plates, and orders the keys the same way.
+##
+## Bilinear, clamped at the plate's border, mipmaps off — what the GPU samples
+## under the project's default linear canvas filter with repeat off, which is how
+## every plate is imported.
+func rim_coverage(p_kind: String, p_rim_px := -1.0) -> float:
+	var r: float = PawnArt.ROT_RIM_PX if p_rim_px < 0.0 else p_rim_px
+	var ck := "%s/%.3f" % [p_kind, r]
+	if _cover_rim_cache.has(ck):
+		return float(_cover_rim_cache[ck])
+	# seeded before the work so a re-entrant call on a broken plate cannot loop,
+	# and so a bail-out below leaves the neutral 1.0 rather than a stale number
+	_cover_rim_cache[ck] = 1.0
+	var band := _edge_band(p_kind)
+	if band.is_empty() or int(band["n"]) <= 0:
+		return 1.0
+	var w: int = band["w"]
+	var h: int = band["h"]
+	var mask: PackedByteArray = band["px"]
+	var a := _plate_alpha(p_kind)
+	if a.is_empty():
+		return 1.0
+	# the shader's 8 fixed directions, resolved to texel offsets once
+	var ox := PackedFloat32Array()
+	var oy := PackedFloat32Array()
+	for i in 8:
+		var ang := float(i) * 0.7853981
+		ox.append(cos(ang) * r)
+		oy.append(sin(ang) * r)
+	var acc := 0.0
+	var n := 0
+	for y in h:
+		var row := y * w
+		for x in w:
+			if mask[row + x] == 0:
+				continue
+			var amin := 1.0
+			for i in 8:
+				amin = minf(amin, _bilinear_a(a, w, h, float(x) + ox[i], float(y) + oy[i]))
+			acc += a[row + x] * (1.0 - amin)
+			n += 1
+	var out := acc / maxf(float(n), 1.0)
+	_cover_rim_cache[ck] = out
+	return out
+
+
+## A plate's alpha channel as 0–1 floats, once per key.
+func _plate_alpha(p_kind: String) -> PackedFloat32Array:
+	if _alpha_cache.has(p_kind):
+		return _alpha_cache[p_kind]
+	var empty := PackedFloat32Array()
+	_alpha_cache[p_kind] = empty
+	var tex := PawnArt.enemy_texture(p_kind)
+	if tex == null:
+		_check(false, "%s has no plate to read a rim coverage off" % p_kind)
+		return empty
+	var img := tex.get_image()
+	if img == null:
+		_check(false, "%s plate has no image" % p_kind)
+		return empty
+	if img.is_compressed():
+		img.decompress()
+	img.convert(Image.FORMAT_RGBA8)
+	var d := img.get_data()
+	var a := PackedFloat32Array()
+	a.resize(img.get_width() * img.get_height())
+	for i in a.size():
+		a[i] = float(d[i * 4 + 3]) / 255.0
+	_alpha_cache[p_kind] = a
+	return a
+
+
+## Bilinear alpha at TEXEL coordinates (`x + 0.5` is texel `x`'s centre), edges
+## clamped. `fx` is already the shader's `UV.x * width - 0.5`, so a caller adds
+## its ray offset in texels directly.
+func _bilinear_a(a: PackedFloat32Array, w: int, h: int, fx: float, fy: float) -> float:
+	var x0 := int(floor(fx))
+	var y0 := int(floor(fy))
+	var tx := fx - float(x0)
+	var ty := fy - float(y0)
+	var x1 := clampi(x0 + 1, 0, w - 1)
+	var y1 := clampi(y0 + 1, 0, h - 1)
+	x0 = clampi(x0, 0, w - 1)
+	y0 = clampi(y0, 0, h - 1)
+	return lerpf(lerpf(a[y0 * w + x0], a[y0 * w + x1], tx),
+			lerpf(a[y1 * w + x0], a[y1 * w + x1], tx), ty)
 
 
 ## What is behind the MIST-BACKED part of an enemy's silhouette on a battle

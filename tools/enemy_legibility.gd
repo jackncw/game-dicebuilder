@@ -101,6 +101,7 @@ func _ready() -> void:
 	var worst_card_row := []
 	var worst_mist := 99.0
 	var worst_mist_what := ""
+	var worst_mist_row := []
 	var worst_cover := -1.0
 	var worst_cover_what := ""
 
@@ -115,11 +116,26 @@ func _ready() -> void:
 			var tier := ch
 			var boxes := _boxes(key)
 			var small: Dictionary = await _measure(key, tier, ch, boxes[0])
-			var large: Dictionary = await _measure(key, tier, ch, boxes[1])
+			# ── why bound 3 is read off a SECOND, native-scale render ──
+			# The mist-backed sample is a fraction of a fraction: on the smallest
+			# card E05 ch3 lands 413 band pixels and a wisp stands behind 0.5% of
+			# them — TWO pixels. A mean of two pixels, both of them on a wisp's own
+			# rasterised boundary, is not a measurement, and at rim_px 3 that row
+			# read 1.000:1 while its neighbours read 1.2–1.7.
+			#
+			# What bound 3 constrains is a pair of colours — lit edge against
+			# mist-over-card — and that pair is scale-free: `rim_px` is a fixed
+			# TEXEL radius, so the shader's output at a given UV does not know how
+			# large the plate is drawn. Rendering the same row at draw scale 1.0
+			# therefore measures the same quantity with 1/scale^2 (7x to 65x) the
+			# samples. Both are printed — `mist real` is the native one, `mist@sm`
+			# the small card's — and where the small card has enough pixels to be
+			# worth anything the two agree.
+			var nat: Dictionary = await _measure(key, tier, ch, boxes[0], -1.0, true)
 
 			var edge_v: Variant = proxy._edge_colour(meta, key)
 			var edge: Color = edge_v if edge_v != null else Color.BLACK
-			var lit: Color = proxy.lit_edge(edge, ch)
+			var lit: Color = proxy.lit_edge(edge, ch, -1.0, proxy.rim_coverage(key))
 			var card_bg: Color = UITheme.surface(ch)
 			var mist_bg: Color = proxy.card_behind(ch, key, tier)
 			var p_card: float = UITheme.contrast(lit, card_bg)
@@ -130,33 +146,39 @@ func _ready() -> void:
 			if d_card > worst_delta:
 				worst_delta = d_card
 				worst_what = "%s ch%d bound1" % [key, ch]
+			var mist_real := 0.0
+			var mist_n := 0
+			if nat["mist_n"] > 0:
+				mist_real = nat["mist"]
+				mist_n = int(nat["mist_n"])
+			elif int(PawnArt.MIST_COUNT[PawnArt.dial_row(key, tier)]) == 0:
+				# no wisps at all: bound 3's background IS the bare card and it
+				# collapses onto bound 1, exactly as `card_behind` says it does.
+				# Read off the SMALL card, because that is the row bound 1 owns.
+				mist_real = small["card"]
+				mist_n = int(small["band_n"])
 			var mist_txt := "  n/a"
 			var d_mist_txt := "  n/a"
-			if small["mist_n"] > 0:
-				var d_mist: float = absf(small["mist"] - p_mist)
-				mist_txt = "%5.3f" % small["mist"]
+			if mist_n > 0:
+				var d_mist: float = absf(mist_real - p_mist)
+				mist_txt = "%5.3f" % mist_real
 				d_mist_txt = "%5.3f" % d_mist
 				if d_mist > worst_delta:
 					worst_delta = d_mist
 					worst_what = "%s ch%d bound3" % [key, ch]
-				if small["mist"] < worst_mist:
-					worst_mist = small["mist"]
+				if mist_real < worst_mist:
+					worst_mist = mist_real
 					worst_mist_what = "%s ch%d tier%d" % [key, ch, tier]
-			elif int(PawnArt.MIST_COUNT[PawnArt.dial_row(key, tier)]) == 0:
-				# no wisps at all: bound 3's background IS the bare card and it
-				# collapses onto bound 1, exactly as `card_behind` says it does
-				mist_txt = "%5.3f" % small["card"]
-				d_mist_txt = "%5.3f" % absf(small["card"] - p_mist)
-				if small["card"] < worst_mist:
-					worst_mist = small["card"]
-					worst_mist_what = "%s ch%d tier%d" % [key, ch, tier]
+					worst_mist_row = [key, ch, tier, boxes[0]]
 
 			if small["card"] < worst_card:
 				worst_card = small["card"]
 				worst_card_what = "%s ch%d tier%d" % [key, ch, tier]
 				worst_card_row = [key, ch, tier, boxes[0]]
-			if small["cover"] > worst_cover:
-				worst_cover = small["cover"]
+			# from the native render: the same fraction, resolved on 7x–65x the
+			# pixels, so the cap is judged on a number that has samples behind it
+			if nat["cover"] > worst_cover:
+				worst_cover = nat["cover"]
 				worst_cover_what = "%s ch%d tier%d" % [key, ch, tier]
 
 			# what rim strength the render actually laid down, as a fraction of
@@ -168,18 +190,18 @@ func _ready() -> void:
 
 			rows.append(("LEGIBILITY %-4s ch%d t%d scale=%.3f band=%d "
 					+ "card real=%5.3f proxy=%5.3f delta=%5.3f "
-					+ "mist real=%s proxy=%5.3f delta=%s "
+					+ "mist real=%s n=%4d proxy=%5.3f delta=%s "
 					+ "cover real=%4.1f%% proxy=%4.1f%% "
 					+ "| s_eff=%.3f cov=%.3f edge=%.3f alpha=%.3f "
 					+ "| rings %5.3f/%5.3f/%5.3f "
-					+ "| big scale=%.3f card=%5.3f")
+					+ "| nat card=%5.3f mist@sm=%5.3f n=%3d")
 					% [key, ch, tier, small["scale"], small["band_n"],
 					small["card"], p_card, d_card,
-					mist_txt, p_mist, d_mist_txt,
-					small["cover"] * 100.0, p_cover * 100.0,
+					mist_txt, mist_n, p_mist, d_mist_txt,
+					nat["cover"] * 100.0, p_cover * 100.0,
 					se, se / rim, float(sh["edge"]), float(sh["alpha"]),
 					small["rings"][0], small["rings"][1], small["rings"][2],
-					large["scale"], large["card"]])
+					nat["card"], small["mist"], int(small["mist_n"])])
 
 	for r in rows:
 		print(r)
@@ -204,27 +226,103 @@ func _ready() -> void:
 			else "PROXY NEEDS FIXING"))
 
 	# ── the lever, priced ──
-	# The divergence is the `edge` scalar, and `edge = 1 - amin` is a function of
-	# `rim_px`: a longer ray leaves the silhouette from deeper in the band. So
-	# what `rim_px` buys is measurable, and it is measured here rather than
-	# reasoned about — the worst row is re-rendered at 6 and 9 and read back the
-	# same way. Nothing is changed; `rot_pawn.gdshader` still ships rim_px = 3.
-	if not worst_card_row.is_empty():
-		var k: String = worst_card_row[0]
-		var ch2: int = worst_card_row[1]
-		var ti: int = worst_card_row[2]
-		var bx: Vector2 = worst_card_row[3]
-		var sh2: Dictionary = _shader_edge(k)
-		for rp in [3.0, 6.0, 9.0]:
-			var got: Dictionary = await _measure(k, ti, ch2, bx, rp)
-			var cov_key := "edge" if rp == 3.0 else ("edge6" if rp == 6.0 else "edge9")
-			print("LEGIBILITY LEVER %s ch%d rim_px=%.0f edge=%.3f real=%.3f:1 (floor %.2f)"
-					% [k, ch2, rp, float(sh2[cov_key]), got["card"],
-					float(proxy.CARD_EDGE_FLOOR)])
+	# `edge = src.a * (1 - amin)` is a function of `rim_px`: a longer ray leaves
+	# the silhouette from deeper in the band. So what `rim_px` buys is measurable,
+	# and it is measured here rather than reasoned about — the worst row of EACH
+	# failing bound is re-rendered across the sweep and read back the same way.
+	# Both rows are swept even when one bound passes, because the question the
+	# sweep answers is where the lever saturates, and that is what says whether a
+	# bound is reachable at all.
+	for what in [["BOUND1", worst_card_row], ["BOUND3", worst_mist_row]]:
+		var row: Array = what[1]
+		if row.is_empty():
+			continue
+		var k: String = row[0]
+		var ch2: int = row[1]
+		var ti: int = row[2]
+		var bx: Vector2 = row[3]
+		for rp in [3.0, 6.0, 7.0, 8.0, 9.0, 12.0]:
+			# bound 1 off the small card (the box the player gets), bound 3 off
+			# the native render (the only one with enough veiled pixels to mean
+			# anything) — the same rulers the table above uses
+			var sm: Dictionary = await _measure(k, ti, ch2, bx, rp)
+			var nt: Dictionary = await _measure(k, ti, ch2, bx, rp, true)
+			print(("LEGIBILITY LEVER %s %s ch%d rim_px=%4.1f edge=%.3f "
+					+ "card=%.3f:1 (floor %.2f) mist=%.3f:1 n=%d (floor %.2f)")
+					% [what[0], k, ch2, rp, float(proxy.rim_coverage(k, rp)),
+					sm["card"], float(proxy.CARD_EDGE_FLOOR),
+					nt["mist"] if int(nt["mist_n"]) > 0 else nt["card"],
+					int(nt["mist_n"]), float(proxy.MIST_EDGE_FLOOR)])
+
+	# ── the second-order cost of a wider rim ──
+	# A rim is light taken off the painting. `rim_px` is a fixed TEXEL radius, so
+	# doubling it eats a fixed number of texels inward on every plate — which is a
+	# far bigger fraction of a small plate than of a large one, and the plates run
+	# 266x143 (E02) to 808x448 (E05). Nothing in the contrast numbers above can
+	# see this: they measure the band, and the band is where the rim is supposed
+	# to be. This is the number that says how much of the CREATURE it has reached.
+	for key in MINIONS + BOSSES:
+		var a3 := _rim_area(key, 3.0)
+		var a6 := _rim_area(key, float(PawnArt.ROT_RIM_PX))
+		print(("LEGIBILITY RIMAREA %-4s plate=%dx%d body=%d px "
+				+ "half-lit rim_px=3 %5.1f%% -> rim_px=%.0f %5.1f%% (x%.2f) "
+				+ "| mean edge %.3f -> %.3f | inward reach %.1f%% of short side")
+				% [key, int(a3["w"]), int(a3["h"]), int(a3["solid"]),
+				float(a3["frac"]) * 100.0, float(PawnArt.ROT_RIM_PX),
+				float(a6["frac"]) * 100.0,
+				float(a6["frac"]) / maxf(float(a3["frac"]), 0.0001),
+				float(a3["mean"]), float(a6["mean"]),
+				100.0 * float(PawnArt.ROT_RIM_PX) / float(mini(int(a3["w"]), int(a3["h"])))])
 
 	proxy.free()
 	battle.free()
 	get_tree().quit()
+
+
+## How much of the silhouette the rim now stands on, at one `rim_px`.
+##
+## `solid` is the shader's own gate (`src.a > 0.2`) — every pixel the rim is
+## allowed to touch. A pixel counts as rim if `edge = src.a * (1 - amin)` reaches
+## HALF, i.e. the `mix()` has moved it at least half of `rim_strength` of the way
+## to `ROT_RIM`; below that the plate's own paint still dominates. `mean` is the
+## same `edge` averaged over the whole silhouette rather than over the band, so
+## it says how much of the painting has been re-lit at all.
+##
+## Deliberately NOT the band: `rim_coverage()` already reports the band mean, and
+## the band is where the rim belongs. What a wider rim costs is measured by how
+## far past the band it reaches.
+func _rim_area(key: String, r: float) -> Dictionary:
+	var pa := _plate_alpha(key)
+	var w := int(pa["w"])
+	var h := int(pa["h"])
+	var a: PackedFloat32Array = pa["a"]
+	var ox := PackedFloat32Array()
+	var oy := PackedFloat32Array()
+	for i in 8:
+		var ang := float(i) * 0.7853981
+		ox.append(cos(ang) * r)
+		oy.append(sin(ang) * r)
+	var solid := 0
+	var lit := 0
+	var acc := 0.0
+	for y in h:
+		var row := y * w
+		for x in w:
+			var src_a := a[row + x]
+			if src_a <= 0.2:
+				continue
+			solid += 1
+			var amin := 1.0
+			for i in 8:
+				amin = minf(amin, proxy._bilinear_a(a, w, h,
+						float(x) + ox[i], float(y) + oy[i]))
+			var e := src_a * (1.0 - amin)
+			acc += e
+			if e >= 0.5:
+				lit += 1
+	return {"w": w, "h": h, "solid": solid, "lit": lit,
+			"frac": float(lit) / maxf(float(solid), 1.0),
+			"mean": acc / maxf(float(solid), 1.0)}
 
 
 ## The smallest and the largest art box the battle screen can hand this key —
@@ -247,9 +345,12 @@ func _boxes(key: String) -> Array:
 ## `card_behind`, bound 3's), `cover` (what fraction of the band those are,
 ## bound 2's), plus the draw `scale` and the band's pixel count.
 func _measure(key: String, tier: int, chapter: int, box: Vector2,
-		p_rim_px := -1.0) -> Dictionary:
+		p_rim_px := -1.0, p_native := false) -> Dictionary:
 	var tex := PawnArt.enemy_texture(key)
 	var body_h := PawnArt.fit_height(key, box)
+	if p_native:
+		# draw scale exactly 1.0 — one screen pixel per texel
+		body_h = float(tex.get_height()) / maxf(PawnArt.bulk(key, tier), 0.001)
 	var h := body_h * PawnArt.bulk(key, tier)
 	var w := h * float(tex.get_width()) / maxf(float(tex.get_height()), 1.0)
 	var vw := int(ceil(w)) + PAD * 2
@@ -364,19 +465,22 @@ func _mean(acc: Color, n: int) -> Color:
 	return Color(acc.r / float(n), acc.g / float(n), acc.b / float(n))
 
 
-## The rim's own `edge` scalar, averaged over the band — `src.a * (1 - amin)`,
-## computed exactly as `rot_pawn.gdshader:66-73` computes it: 8 rays at
-## `TEXTURE_PIXEL_SIZE * rim_px` = 3 texels, bilinear, clamped at the plate's
-## border, minimum taken. Plus the band's mean alpha, which is what the final
-## `vec4(lit, src.a)` composites the lit colour over the card with.
+## The rim's own `edge` scalar averaged over the band — `src.a * (1 - amin)` —
+## at the radius the game ships (`PawnArt.ROT_RIM_PX`) and at the two sweep
+## points, plus the band's mean alpha, which is what the final `vec4(lit, src.a)`
+## composites the lit colour over the card with.
 ##
-## `lit_edge()` pins this scalar at 1.0. That is approximation #1 on its own
-## doc-comment, and this is the number that says how wrong that is.
+## The scalar itself is NOT computed here: `proxy.rim_coverage()` is, and this
+## asks it. That function is the one `lit_edge` now multiplies by, so asking it
+## keeps the tool honest — if the proxy's model of `edge` were wrong, this column
+## would show the same wrongness instead of quietly hiding it behind a second,
+## correct implementation. What checks the model against the picture is the
+## independent `s_eff`/`cov` fit, which comes out of the rendered pixels and
+## touches none of this.
 ##
-## Also evaluated at `rim_px` 6 and 9. That is not a proposal — it is the price
-## of the only lever the mechanism points at, so the controller has it in
-## numbers. `LEGIBILITY LEVER` re-renders the worst row at each to check the
-## prediction against the picture rather than trusting the arithmetic.
+## The `rim_px` 3 / 6 / 9 sweep is the lever, priced. `LEGIBILITY LEVER`
+## re-renders the worst row at each so the prediction is checked against the
+## picture rather than trusted.
 func _shader_edge(key: String) -> Dictionary:
 	if _edge_cache.has(key):
 		return _edge_cache[key]
@@ -385,8 +489,6 @@ func _shader_edge(key: String) -> Dictionary:
 	var h := int(band_info["h"])
 	var mask: PackedByteArray = band_info["px"]
 	var a: PackedFloat32Array = _plate_alpha(key)["a"]
-	var radii := [3.0, 6.0, 9.0]
-	var acc := [0.0, 0.0, 0.0]
 	var acc_a := 0.0
 	var n := 0
 	for y in h:
@@ -394,22 +496,15 @@ func _shader_edge(key: String) -> Dictionary:
 		for x in w:
 			if mask[row + x] == 0:
 				continue
-			var src_a := a[row + x]
-			var u := (float(x) + 0.5) / float(w)
-			var v := (float(y) + 0.5) / float(h)
-			for r in 3:
-				var amin := 1.0
-				for i in 8:
-					var ang := float(i) * 0.7853981
-					amin = minf(amin, _bilinear(a, w, h,
-							u + cos(ang) * float(radii[r]) / float(w),
-							v + sin(ang) * float(radii[r]) / float(h)))
-				acc[r] += src_a * (1.0 - amin)
-			acc_a += src_a
+			acc_a += a[row + x]
 			n += 1
-	var d := maxf(float(n), 1.0)
-	var out := {"edge": acc[0] / d, "edge6": acc[1] / d, "edge9": acc[2] / d,
-			"alpha": acc_a / d}
+	var out := {
+		"edge": float(proxy.rim_coverage(key)),
+		"edge3": float(proxy.rim_coverage(key, 3.0)),
+		"edge6": float(proxy.rim_coverage(key, 6.0)),
+		"edge9": float(proxy.rim_coverage(key, 9.0)),
+		"alpha": acc_a / maxf(float(n), 1.0),
+	}
 	_edge_cache[key] = out
 	return out
 
@@ -502,24 +597,6 @@ func _plate_alpha(key: String) -> Dictionary:
 	var out := {"w": w, "h": h, "a": a}
 	_alpha_cache[key] = out
 	return out
-
-
-## Bilinear alpha at normalised `(u, v)`, clamped at the edges — what the GPU
-## samples with the project's default linear canvas filter, repeat off, and
-## mipmaps off on every plate.
-func _bilinear(a: PackedFloat32Array, w: int, h: int, u: float, v: float) -> float:
-	var fx := u * float(w) - 0.5
-	var fy := v * float(h) - 0.5
-	var x0 := int(floor(fx))
-	var y0 := int(floor(fy))
-	var tx := fx - float(x0)
-	var ty := fy - float(y0)
-	var x1 := clampi(x0 + 1, 0, w - 1)
-	var y1 := clampi(y0 + 1, 0, h - 1)
-	x0 = clampi(x0, 0, w - 1)
-	y0 = clampi(y0, 0, h - 1)
-	return lerpf(lerpf(a[y0 * w + x0], a[y0 * w + x1], tx),
-			lerpf(a[y1 * w + x0], a[y1 * w + x1], tx), ty)
 
 
 ## The rim strength that WOULD have produced the colour the render actually put

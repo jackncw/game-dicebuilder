@@ -23,6 +23,12 @@ uniform float rim_strength : hint_range(0.0, 2.0) = 0.0;
 // set_shader_parameter(), so this default is never what actually ships —
 // don't treat it as authoritative.
 uniform vec3  rim_color : source_color = vec3(0.81, 0.66, 0.87);
+// How far the occlusion ray below reaches, in TEXTURE pixels. Like rim_color,
+// this default is NOT what ships: `PawnArt._apply_rot_material` pushes
+// `PawnArt.ROT_RIM_PX` (6.0) in at runtime, and the reasoning for that number —
+// the band `edge_rgb` is measured over is 3 texels deep, so a 3-texel ray
+// collapses `1 - amin` at its inner end — lives there. 3.0 is left here only so
+// the uniform has a value if something instantiates this shader bare.
 uniform float rim_px : hint_range(0.0, 8.0) = 3.0;
 
 // canvas_item shaders have no MODULATE built-in in Godot 4.x (it existed in
