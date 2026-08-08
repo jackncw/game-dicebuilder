@@ -26,9 +26,22 @@ extends Node
 ## `DELTA_MAX` is a contrast tolerance and applies to bounds 1 and 3.
 ##
 ## The proxy is not re-implemented here. `ui_smoke.gd` is instantiated and its
-## own `lit_edge` / `card_behind` / `mist_coverage` are called, so the numbers in
+## own `seen_edge` / `card_behind` / `mist_coverage` are called, so the numbers in
 ## the `proxy=` column are the numbers the headless suite actually asserts on,
 ## and there is no second copy to drift.
+##
+## ── What the deltas are FOR ──────────────────────────────────────
+## `ui_smoke` cannot render. What it can do is be conservative about the fact,
+## and `CARD_EDGE_MARGIN` is how: bound 1's headless check is `2.4 + 0.044`, the
+## 0.044 being the largest amount by which the model has been measured to read
+## ABOVE this render. That is a claim about a number only this tool can produce,
+## so this tool prints it — `LEGIBILITY BOUND1 worst OPTIMISTIC bias` — and says
+## whether the margin still covers it. If that line ever reads MARGIN TOO SMALL,
+## the headless suite has stopped implying anything about the picture and the
+## constant has to move (or the term behind it has to be modelled).
+##
+## Bound 3 has no such margin and is not reconcilable from here; the run says so
+## in as many words. See `LEGIBILITY BOUND3` at the bottom of the output.
 ##
 ## ── Which size is "the picture" ──────────────────────────────────
 ## `rim_px` is in TEXTURE pixels (`rot_pawn.gdshader` multiplies it by
@@ -58,10 +71,13 @@ const BOSSES := ["B1", "B2", "B3", "B3P2", "B4", "B5", "B6"]
 ## 2.71:1 the rim actually gets to two pixels further in. Same picture, wrong
 ## ruler. Anchoring on `alpha > 200` puts the two rulers on the same set.
 ##
-## In SCREEN pixels that band is `3 x draw scale` wide, which is the whole
-## minification story: at scale 1.04 it is three pixels, at 0.12 it is a third of
-## one, and one screen pixel then averages eight texels of which at most three
-## are lit.
+## In SCREEN pixels that band is `3 x draw scale` wide: at scale 1.04 it is three
+## pixels, at 0.12 a third of one, and a screen pixel then does a single bilinear
+## tap at an arbitrary sub-texel phase rather than reading a texel. That was the
+## last large term in the proxy's residual and it is no longer unmodelled —
+## `ui_smoke._screen_band` walks this same grid at the same draw scale. What this
+## tool now checks is whether that model matches the picture, which is a much
+## sharper question than it used to be asking.
 const DELTA_MAX := 0.15
 const PAD := 10
 
@@ -96,8 +112,20 @@ func _ready() -> void:
 	await get_tree().process_frame
 
 	var rows := []
-	var worst_delta := 0.0
-	var worst_what := ""
+	# one worst-delta per bound, not one overall. They are reconciled to
+	# different standards now and rolling them together hid that: bound 1 is
+	# modelled (minification included) and lands inside DELTA_MAX, bound 3 is not
+	# and does not. A single "PROXY NEEDS FIXING" would have kept saying nothing
+	# useful about the bound that IS fixed.
+	var worst_d1 := 0.0
+	var worst_d1_what := ""
+	var worst_d3 := 0.0
+	var worst_d3_what := ""
+	# the signed worst in the OPTIMISTIC direction on bound 1 (proxy above
+	# render), which is the number `ui_smoke.CARD_EDGE_MARGIN` has to cover for a
+	# green suite to imply a passing picture
+	var worst_hi := -99.0
+	var worst_hi_what := ""
 	var worst_card := 99.0
 	var worst_card_what := ""
 	var worst_card_row := []
@@ -137,20 +165,35 @@ func _ready() -> void:
 
 			var edge_v: Variant = proxy._edge_colour(meta, key)
 			var edge: Color = edge_v if edge_v != null else Color.BLACK
-			var lit: Color = proxy.lit_edge(edge, ch, -1.0, proxy.rim_coverage(key))
 			var card_bg: Color = UITheme.surface(ch)
 			var mist_bg: Color = proxy.card_behind(ch, key, tier)
-			var p_card: float = UITheme.contrast(lit, card_bg)
-			var p_mist: float = UITheme.contrast(lit, mist_bg)
+			# ── the proxy column, on the SAME ruler as the render beside it ──
+			# `seen_edge` models this row at the draw scale the four-up card gives
+			# it and composites at the alpha each fragment carries, which is what
+			# `_measure` above just rendered. `lit_edge` alone is the un-minified,
+			# un-composited colour and is no longer what the suite asserts on.
+			var p_card: float = UITheme.contrast(
+					proxy.seen_edge(edge, ch, key, tier, card_bg), card_bg)
 			var p_cover: float = proxy.mist_coverage(key, tier)
 
 			var d_card: float = absf(small["card"] - p_card)
-			if d_card > worst_delta:
-				worst_delta = d_card
-				worst_what = "%s ch%d bound1" % [key, ch]
+			if d_card > worst_d1:
+				worst_d1 = d_card
+				worst_d1_what = "%s ch%d" % [key, ch]
+			if p_card - small["card"] > worst_hi:
+				worst_hi = p_card - small["card"]
+				worst_hi_what = "%s ch%d" % [key, ch]
 			var mist_real := 0.0
 			var mist_n := 0
-			if nat["mist_n"] > 0:
+			# and bound 3's proxy on the ruler bound 3's RENDER was taken at —
+			# native scale where the row is veiled (the four-up card leaves as
+			# few as 14 veiled pixels), the four-up card where it is not and
+			# bound 3 has collapsed onto bound 1. Model one scale against a
+			# render of the other and the minification term lands in the delta
+			# twice, which would read as a modelling failure that is not there.
+			var mist_n_nat: int = nat["mist_n"]
+			var mist_native: bool = mist_n_nat > 0
+			if mist_native:
 				mist_real = nat["mist"]
 				mist_n = int(nat["mist_n"])
 			elif int(PawnArt.MIST_COUNT[PawnArt.dial_row(key, tier)]) == 0:
@@ -159,15 +202,17 @@ func _ready() -> void:
 				# Read off the SMALL card, because that is the row bound 1 owns.
 				mist_real = small["card"]
 				mist_n = int(small["band_n"])
+			var p_mist: float = UITheme.contrast(
+					proxy.seen_edge(edge, ch, key, tier, mist_bg, mist_native), mist_bg)
 			var mist_txt := "  n/a"
 			var d_mist_txt := "  n/a"
 			if mist_n > 0:
 				var d_mist: float = absf(mist_real - p_mist)
 				mist_txt = "%5.3f" % mist_real
 				d_mist_txt = "%5.3f" % d_mist
-				if d_mist > worst_delta:
-					worst_delta = d_mist
-					worst_what = "%s ch%d bound3" % [key, ch]
+				if d_mist > worst_d3:
+					worst_d3 = d_mist
+					worst_d3_what = "%s ch%d" % [key, ch]
 				if mist_real < worst_mist:
 					worst_mist = mist_real
 					worst_mist_what = "%s ch%d tier%d" % [key, ch, tier]
@@ -207,8 +252,23 @@ func _ready() -> void:
 
 	for r in rows:
 		print(r)
-	print("LEGIBILITY WORST-DELTA %.3f at %s (max allowed %.2f)"
-			% [worst_delta, worst_what, DELTA_MAX])
+	print("LEGIBILITY WORST-DELTA bound1 %.3f at %s (max allowed %.2f) %s"
+			% [worst_d1, worst_d1_what, DELTA_MAX,
+			"OK" if worst_d1 <= DELTA_MAX else "OVER"])
+	print("LEGIBILITY WORST-DELTA bound3 %.3f at %s (max allowed %.2f) %s"
+			% [worst_d3, worst_d3_what, DELTA_MAX,
+			"OK" if worst_d3 <= DELTA_MAX else "OVER"])
+	# THE number the headless suite's guarantee rests on. `ui_smoke` adds
+	# `CARD_EDGE_MARGIN` to bound 1 so that a green model implies a passing
+	# picture; that margin is only honest while it covers this.
+	var m: float = proxy.CARD_EDGE_MARGIN
+	# four decimals, not three: this is the number `CARD_EDGE_MARGIN` is SET to,
+	# and a constant quoted at the same precision as the thing it must exceed can
+	# land a thousandth under it. The rest of the table stays at three.
+	print("LEGIBILITY BOUND1 worst OPTIMISTIC bias (proxy above render) %+.4f at %s "
+			% [worst_hi, worst_hi_what]
+			+ "vs ui_smoke.CARD_EDGE_MARGIN %.4f %s"
+			% [m, "COVERED" if worst_hi <= m else "MARGIN TOO SMALL"])
 	# the bounds are read off `ui_smoke` and not restated — a tool that carried
 	# its own copy of the floor could report OK against a bar the suite no
 	# longer holds
@@ -224,8 +284,16 @@ func _ready() -> void:
 	print("LEGIBILITY BOUND2 mist cover worst real %.1f%% at %s (cap %.1f%%) %s"
 			% [worst_cover * 100.0, worst_cover_what, f_cover * 100.0,
 			"OK" if worst_cover <= f_cover else "FAIL"])
-	print("LEGIBILITY %s" % ("CALIBRATED" if worst_delta <= DELTA_MAX
+	# Per bound, because they are in genuinely different states and one verdict
+	# for both was hiding it. Bound 1 is reconciled: the model carries the draw
+	# geometry now and agrees with the picture inside DELTA_MAX. Bound 3 is not,
+	# and cannot be from here — its residual is `edge_rgb` being ONE colour for a
+	# whole band when the veil stands on a specific piece of it, which is a
+	# change to what `tools/enemy_cutout.py` measures.
+	print("LEGIBILITY BOUND1 %s" % ("CALIBRATED" if worst_d1 <= DELTA_MAX
 			else "PROXY NEEDS FIXING"))
+	print("LEGIBILITY BOUND3 %s" % ("CALIBRATED" if worst_d3 <= DELTA_MAX
+			else "PROXY IS AN INDICATOR ONLY — THIS RENDER IS THE INSTRUMENT OF RECORD"))
 
 	# ── the lever, priced ──
 	# `edge = src.a * (1 - amin)` is a function of `rim_px`: a longer ray leaves

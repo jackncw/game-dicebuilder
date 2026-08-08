@@ -12,6 +12,39 @@ var fails := 0
 ## constant would move with the thing it is checking. See the header on
 ## `_t_enemy_legibility` for why there are three of them and not one.
 const CARD_EDGE_FLOOR := 2.4      # lit edge vs the bare chapter card
+
+## The one thing that makes a green run here mean something about the PICTURE.
+##
+## THE BAR IS STILL 2.4:1. This is not a tightened standard — it is the proxy's
+## own measured error against the render, added on so that "the model clears the
+## floor" implies "the render clears the floor" instead of merely suggesting it.
+##
+## Derived, not chosen. `tools/enemy_legibility.gd` renders all 37 rows and
+## `_screen_band` models the same 37; the largest amount by which the model reads
+## ABOVE the render — the optimistic direction, the one that can hide a failure —
+## is **+0.0447** (E05 ch1: modelled 2.513:1, rendered 2.469:1; next E10 ch1
+## +0.043, then E03 ch2 +0.032). So a row that clears 2.4448 here has cleared
+## 2.400 there. The other direction runs to −0.028 and needs nothing.
+##
+## The only padding is the last digit: 0.0448, not 0.0447, because the tool
+## prints that bias to four places and a constant quoted at the same precision as
+## the thing it must exceed can land underneath it. Nothing beyond that is added,
+## because a bigger number would be one nobody measured — and there is not much
+## room for one either: the thinnest MODELLED row is E09 ch1 at 2.490, so
+## anything past 0.090 would red a row the render passes. Spent 0.0448,
+## left 0.045.
+##
+## It goes stale like any measurement. The render is what refreshes it, and the
+## run prints `LEGIBILITY BOUND1 worst OPTIMISTIC bias ... COVERED` or
+## `MARGIN TOO SMALL` against this very constant, so the staleness is not silent.
+##
+## This covers BOUND 1 ONLY. Bound 2 is a cap that the model already overstates
+## on all 37 rows (worst modelled 20.2% at B2 against 9.2% rendered), so it is
+## conservative without help. Bound 3 gets no margin on purpose — its residual is
+## two-sided at ±0.443 and a one-sided margin there would be a false guarantee,
+## while one big enough to cover it would red rows the picture passes; see
+## `MIST_EDGE_FLOOR` and `lit_edge`'s residual note for what stands in instead.
+const CARD_EDGE_MARGIN := 0.0448
 ## RE-PRICED IN TASK 6 FROM 1.9, AND THE REASON IS THE RULER, NOT THE BAR.
 ## Task 5 set 1.9 as "just below today's worst modelled row, 1.990". That 1.990
 ## came out of a `lit_edge()` that pinned the shader's `edge` scalar at 1.0 —
@@ -462,21 +495,29 @@ func _t_rot_rim() -> void:
 ## together are what make that safe:
 ##
 ##   1. `CARD_EDGE_FLOOR` — the card-backed edge keeps the full 2.4:1. This is
-##      the original guarantee and it is not relaxed anywhere.
+##      the original guarantee and it is not relaxed anywhere. What IS added is
+##      `CARD_EDGE_MARGIN`, the model's own measured error against the render,
+##      so that clearing the bar here means clearing it there. Rendered worst is
+##      E05 ch1 at 2.469:1 (+0.069 on the floor); modelled worst is E09 ch1 at
+##      2.490:1 (+0.045 on floor-plus-margin).
 ##   2. `MIST_COVER_CAP` — the mist may never stand on more than 25% of an edge
 ##      band. Today's worst is B2 at 20.2%. THIS is what makes bound 1
 ##      meaningful: without it, the veil could grow until "most of the contour
 ##      is on bare card" quietly stopped being true and bound 1 stopped
-##      describing what anyone sees.
+##      describing what anyone sees. It needs no margin: it is a cap and the
+##      model sits at or above the render on all 37 rows (B2 is 9.2% in the
+##      picture against the 20.2% modelled here).
 ##   3. `MIST_EDGE_FLOOR` — where the veil does sit, the edge still reaches
 ##      1.55:1. Re-priced in Task 6 from 1.9, off the RENDER rather than off a
 ##      model that had been measured wrong; the constant carries the derivation.
 ##      Rendered worst is E05 ch3 at 1.600:1 (69 px, margin +0.050); modelled
-##      worst is E09 ch3 tier3 at 1.893:1 (+0.343). The model still cannot
-##      resolve this bound better than about ±0.4 — see `lit_edge`'s residual
-##      note — which is exactly why the floor is derived from the instrument
-##      that can, and why `tools/enemy_legibility.gd` is the thing that has to
-##      be re-run when a plate or a dial moves.
+##      worst is E09 ch3 tier3 at 1.816:1 (+0.266). The model cannot resolve
+##      this bound better than ±0.443 and errs in BOTH directions, so no margin
+##      is added — a one-sided one would be a false guarantee and a two-sided
+##      one would red rows the picture passes. THIS BOUND IS NOT GATED HERE.
+##      `tools/enemy_legibility.gd` is its instrument of record and has to be
+##      re-run when a plate, a dial, a card layout or a chapter colour moves.
+##      See `lit_edge`'s residual note for the two causes.
 ##
 ## Do not simplify these back into one. Bound 1 alone measures a background that
 ## a tenth of the contour does not have; bound 3 alone applies a veiled-case bar
@@ -552,15 +593,21 @@ func _t_enemy_legibility() -> void:
 			var where := "%s ch%d tier%d (%d wisps)" % [key, ch, tier, wisps]
 
 			# ── bound 1: the card-backed edge, at the full 2.4:1 ──
+			# `seen_edge`, not `lit`: on the four-up card this row is minified,
+			# and the fragment the screen gets is a bilinear tap composited at
+			# its own alpha, not a texel. That term used to be missing and it
+			# read 0.09–0.26 HIGH on all 37 rows — the optimistic direction for
+			# a floor. See `_screen_band`.
 			var card := UITheme.surface(ch)
-			var r_card := UITheme.contrast(lit, card)
+			var seen := seen_edge(edge, ch, String(key), tier, card)
+			var r_card := UITheme.contrast(seen, card)
 			if r_card < worst_card:
 				worst_card = r_card
 				worst_card_what = where
-			_check(r_card >= CARD_EDGE_FLOOR,
-					"%s: lit edge %s over the bare card %s is %.3f:1, needs %.2f:1"
-					% [where, lit.to_html(false), card.to_html(false), r_card,
-					CARD_EDGE_FLOOR])
+			_check(r_card >= CARD_EDGE_FLOOR + CARD_EDGE_MARGIN,
+					"%s: lit edge %s over the bare card %s is %.3f:1, needs %.2f:1 + %.3f of proxy margin"
+					% [where, seen.to_html(false), card.to_html(false), r_card,
+					CARD_EDGE_FLOOR, CARD_EDGE_MARGIN])
 
 			# ── bound 2: how much contour the veil is allowed to stand on ──
 			# Measured off this plate's own alpha and `_auto_mist`'s own
@@ -579,20 +626,22 @@ func _t_enemy_legibility() -> void:
 			# runs on every row; on those it is bound 1 again with a slacker
 			# bar, which is what "no veil to allow for" ought to mean.
 			var bg := card_behind(ch, String(key), tier)
-			var r_mist := UITheme.contrast(lit, bg)
+			var seen_m := seen_edge(edge, ch, String(key), tier, bg)
+			var r_mist := UITheme.contrast(seen_m, bg)
 			if r_mist < worst_mist:
 				worst_mist = r_mist
 				worst_mist_what = where
 			_check(r_mist >= MIST_EDGE_FLOOR,
 					"%s: lit edge %s over mist-on-card %s is %.3f:1, needs %.2f:1"
-					% [where, lit.to_html(false), bg.to_html(false), r_mist,
+					% [where, seen_m.to_html(false), bg.to_html(false), r_mist,
 					MIST_EDGE_FLOOR])
 	for ch in [1, 2, 3]:
 		_check(lits_out[ch].size() == edges_in[ch].size(),
 				"chapter %d: %d distinct edge colours went in, %d came out — the rim is washing the plates out, not lighting them"
 				% [ch, edges_in[ch].size(), lits_out[ch].size()])
-	print("enemy legibility: card-backed edge worst is %s at %.3f:1 (floor %.2f, margin %+.3f)"
-			% [worst_card_what, worst_card, CARD_EDGE_FLOOR, worst_card - CARD_EDGE_FLOOR])
+	print("enemy legibility: card-backed edge worst is %s at %.3f:1 (floor %.2f + %.4f proxy margin, spare %+.3f)"
+			% [worst_card_what, worst_card, CARD_EDGE_FLOOR, CARD_EDGE_MARGIN,
+			worst_card - CARD_EDGE_FLOOR - CARD_EDGE_MARGIN])
 	print("enemy legibility: mist-backed edge worst is %s at %.3f:1 (floor %.2f, margin %+.3f)"
 			% [worst_mist_what, worst_mist, MIST_EDGE_FLOOR, worst_mist - MIST_EDGE_FLOOR])
 	print("enemy legibility: mist covers at most %.1f%% of a band, at %s (cap %.1f%%, margin %+.1f pt)"
@@ -600,6 +649,10 @@ func _t_enemy_legibility() -> void:
 			(MIST_COVER_CAP - worst_cover) * 100.0])
 	print("enemy legibility: distinct lit edges %d/%d/%d"
 			% [lits_out[1].size(), lits_out[2].size(), lits_out[3].size()])
+	if _metrics != null:
+		# a bare `.new()` Control that never entered the tree — nothing frees it
+		_metrics.free()
+		_metrics = null
 
 
 ## `edge_rgb` for one key as a Colour, or null with a named failure already
@@ -634,12 +687,18 @@ func _colour_key(c: Color) -> String:
 ## The rim light applied to an edge colour, mirroring the `mix()` at the bottom
 ## of `rot_pawn.gdshader` with that line's remaining input, `v_modulate`, pinned
 ## at white. The `edge` scalar used to be pinned at 1.0 here too; it is now the
-## `coverage` argument and `rim_coverage()` measures it.
+## `coverage` argument, and `rim_coverage()` / `_screen_band()` measure it.
 ##
-## FIVE known ways this pair of functions is a model and not the picture, all
-## five written out with numbers in `task-5-report.md` and `task-6-report.md`.
-## There were seven. TWO have come off the list, and both for the same reason —
-## they stopped being approximated and started being measured:
+## THIS FUNCTION IS ONE FRAGMENT. What the bounds are held to is `seen_edge()`,
+## which calls this once per screen pixel the band lands on — each with that
+## pixel's own coverage — and composites the results over the card at the alpha
+## each one carries. This is the colour; that one is the geometry.
+##
+## THREE known ways the family is a model and not the picture, plus one newly
+## named below, all written out with numbers in `task-5-report.md` and
+## `task-6-report.md`. There were seven. FOUR have come off the list, every one
+## for the same reason — they stopped being approximated and started being
+## measured:
 ##   • the mist, which used to read "one flat layer covering the whole edge": a
 ##     single number standing for two different backgrounds. Now MODELLED, by
 ##     `mist_coverage()` measuring how much contour the veil actually stands on
@@ -655,68 +714,83 @@ func _colour_key(c: Color) -> String:
 ##     expression over the same band off the plate's own alpha channel; and
 ##     `PawnArt.ROT_RIM_PX` went to 6 so the scalar is 0.957–0.982. Correcting it
 ##     took the worst bound-1 disagreement from 1.326 to 0.093 at the unchanged
-##     `rim_px = 3`, which is the validation. What residual is left of it is not
-##     this term but #2 below — the scale-dependence a headless model cannot see.
+##     `rim_px = 3`, which is the validation.
+##   • MINIFICATION, which was the largest term left after `edge` and the
+##     dangerous one, because it was one-directional in the OPTIMISTIC sense: the
+##     model read 0.090 to 0.260 HIGH on all 37 rows, so a green suite did not
+##     imply a passing picture. The band is 3 TEXELS and a four-up card draws it
+##     at 0.12–0.49 of source size, so a screen pixel does one bilinear tap at an
+##     arbitrary sub-texel phase rather than reading a texel. Now MODELLED, by
+##     `_screen_band()` walking the renderer's own sampling grid at the draw
+##     scale `screen_battle` gives the row. It is real and it is large: the same
+##     row on its four-up card and at draw scale 1.0 differs by up to 0.20:1
+##     (E05 ch1 2.469 vs 2.669; E10 ch1 2.568 vs 2.704).
+##   • alpha compositing at the cut boundary, which used to be "the proxy
+##     compares an opaque colour to the card, the renderer blends the boundary's
+##     own alpha into it, worth ~2%". Now MODELLED by the same walk, per fragment
+##     rather than as a band mean — `seen_edge` composites `bg.lerp(lit, src.a)`
+##     with each sample's own alpha, which is what makes the covariance between a
+##     weak rim and a thin alpha come out right instead of averaging separately.
 ##
-## Four of the five make the proxy read HIGH (i.e. the real picture is less
-## legible than this says):
+## One of the four left makes the proxy read LOW and three read HIGH, and the
+## worst measured optimistic bias — the only direction that can hide a failure —
+## is +0.0447:1 on bound 1. `CARD_EDGE_MARGIN` is that number, added to the bound
+## so the suite's green means something. `tools/enemy_legibility.gd` reprints the
+## bias every run and says whether the margin still covers it.
 ##  1. `edge_rgb` was averaged over `alpha > 200` (`enemy_cutout.py`); the shader
 ##     lights everything with `alpha > 0.2`. Two different bands, and the extra
-##     skirt the shader lights is the soft, semi-transparent part.
-##  2. Minification. The band is 3 TEXTURE px, drawn at 0.12–1.04 of source size.
-##     Task 5 predicted this would dominate. MEASURED TWICE, and the answer
-##     depends on `rim_px`:
-##       at `rim_px = 3` it did not move the ratio at all — smallest versus
-##       largest battle-card box, a 2–2.2x scale change, moved the card-backed
-##       edge by at most 0.05:1 (E03 ch1 1.810 vs 1.760);
-##       at `rim_px = 6` it does. Smallest card versus draw scale 1.0 now moves
-##       it by up to 0.20:1 (E05 ch1 2.469 vs 2.669; E10 ch1 2.568 vs 2.704).
-##     The reason is that a 6-texel rim puts a real GRADIENT across the 3-texel
-##     band (rings run 1.95/2.63/3.23 on E10 ch1, innermost brightest), and a
-##     minified screen pixel averages that gradient together with the exterior
-##     texels outside it. At `rim_px = 3` there was no gradient worth averaging.
-##     This is now the largest single term in the residual, it is scale-dependent,
-##     and nothing headless can see it: this function has no card size.
-##  3. Alpha compositing at the cut boundary: the proxy compares an opaque colour
-##     to the card, the renderer blends the boundary's own alpha into it. Band
-##     mean alpha 0.974–0.987, so worth ~2%.
-##  4. `v_modulate` is white here, and the shader multiplies by it. Nothing puts
+##     skirt the shader lights is the soft, semi-transparent part. HIGH.
+##  2. `edge_rgb` is ONE colour for a whole band. The renderer samples the
+##     plate's own RGB per texel and, at a minified tap, blends it with whatever
+##     lies beyond the contour. Newly named here rather than newly discovered —
+##     it was already written up as bound 3's residual — and promoted because
+##     with minification modelled it is now the largest term left. It is what
+##     makes bound 3 unresolvable from here: where a wisp stands on one specific
+##     piece of contour, the mean colour of the whole band is the wrong colour
+##     for it. Mixed direction, and closing it means a per-region `edge_rgb`,
+##     i.e. a change to what `tools/enemy_cutout.py` measures.
+##  3. `v_modulate` is white here, and the shader multiplies by it. Nothing puts
 ##     a non-white modulate on an enemy BATTLE-card pawn — the one place that
 ##     does, `screen_codex.gd`'s unseen-entry silhouette, is meant to be
-##     unreadable, so this number does not speak for it.
-## And one that makes it read LOW:
-##  5. The bloom pass adds `glow * 0.055` before the rim mix. Small at the
+##     unreadable, so this number does not speak for it. HIGH where it applies.
+##  4. The bloom pass adds `glow * 0.055` before the rim mix. Small at the
 ##     silhouette's boundary — the mask it gathers is eyes and cracks, which are
-##     interior — but it is real and it is unmodelled.
+##     interior — but it is real and it is unmodelled. LOW.
 ##
 ## ── WHAT IS LEFT, MEASURED. READ THIS BEFORE TRUSTING A GREEN RUN ──
-## Task 6 rendered all 37 rows again with `rim_coverage()` in place. Correcting
-## `edge` took the worst bound-1 disagreement from 1.326 to 0.093 at the SAME
-## `rim_px = 3` the render was taken at — that is the validation, and it was done
-## before the lever moved, so it is a check on the model and not on the change.
+## Task 6 rendered all 37 rows a third time with `_screen_band()` in place
+## (`art_export/legib.log`; the picture did not change, and the rendered column
+## is identical to the previous run's to the last digit, which is the
+## determinism check):
+##   bound 1 — RECONCILED. Worst disagreement 0.045 (E05 ch1), against a
+##     DELTA_MAX of 0.15, and the residual is now two-sided: −0.028 (E01 ch3,
+##     E02 ch2) to +0.045. It is no longer a bias with a direction, it is noise
+##     around the picture. The one-sided part that remains, +0.0447, is what
+##     `CARD_EDGE_MARGIN` is set to.
+##   bound 2 — CONSERVATIVE WITHOUT HELP. It is a CAP, and the model is at or
+##     above the render on all 37 rows (worst modelled 20.2% at B2 against 9.2%
+##     rendered; worst rendered anywhere 14.8%). Reading high is the safe
+##     direction for a cap, so no margin is needed or added.
+##   bound 3 — NOT RECONCILED, AND NOT RECONCILABLE FROM HERE. 0.000 to 0.443,
+##     in BOTH directions, against a floor of 1.55. Two causes, both named and
+##     neither correctable in a headless test: rows where the veil stands on
+##     almost none of the contour, so the render's own mean is over a handful of
+##     pixels sitting on a wisp's rasterised boundary (E09 ch2: 0.4% of the band,
+##     14 rendered pixels, and the worst delta in the table); and #2 above, the
+##     one-colour-per-band covariance — E05 ch3 renders at 1.600:1 where this
+##     says 1.973:1, and it is the row the bound stands on.
 ##
-## At the shipped `rim_px = 6` the residual is larger again, and #2 (minification)
-## is why:
-##   bound 1 — this function still reads 0.09 to 0.26 HIGH, on all 37 rows, the
-##     gap tracking draw scale (worst E05 ch1 at scale 0.124, best E06 ch2 at the
-##     native-scale end). Every row is conservative in the same direction.
-##   bound 3 — 0.008 to 0.409, and NOT one-directional. The big ones are rows
-##     where a wisp stands behind almost none of the contour (E09 ch2: 0.4% of
-##     the band, 14 rendered pixels), plus the covariance this function cannot
-##     represent: `edge_rgb` is ONE colour for the whole band, and the veiled
-##     sub-band has its own. E05 ch3 renders at 1.600:1 where this says 2.002:1.
-##
-## So a green `_t_enemy_legibility` means the model clears the floor, and on
-## bound 1 that is now a conservative statement about the picture — every render
-## came in below this and every render still cleared 2.4:1. On bound 3 it is a
-## WEAKER statement, and the weakness is the reason `MIST_EDGE_FLOOR` is derived
-## from the render rather than from here: the model resolves that bound to about
-## ±0.4 and disagrees with the render in both directions (E05 ch3 renders 1.600
-## where this says 2.002; E09 ch2 renders 2.575 where this says 2.166). Both rows
-## clear the re-priced 1.55 on both rulers, so the bound holds in the picture as
-## well as in the model — but the model alone could not have told you that, and
-## `tools/enemy_legibility.gd` is what has to be re-run when a plate, a dial or a
-## card layout moves. See `task-6-report.md`.
+## So: a green `_t_enemy_legibility` implies the render clears BOUND 1, because
+## the model is reconciled to 0.045 and the check carries a 0.045 margin on top
+## of the floor; and it implies the render clears BOUND 2, because the model
+## overstates a cap. It does NOT imply anything about bound 3 in either
+## direction. A one-sided margin there would be a false guarantee — the model is
+## wrong both ways — and one large enough to cover 0.443 would red rows the
+## picture passes. BOUND 3'S INSTRUMENT OF RECORD IS
+## `tools/enemy_legibility.gd`, and it has to be re-run whenever a plate, a mist
+## dial, a card layout or a chapter colour moves. That is also true of
+## `CARD_EDGE_MARGIN`, which is a measurement and goes stale like one; the tool
+## prints `MARGIN TOO SMALL` the moment it does. See `task-6-report.md`.
 ##
 ## `strength` defaults to `rot_rim_for(chapter)`; pass it only to ask what a
 ## DIFFERENT rim would do to this edge, as `_t_rot_rim`'s tightness check does.
@@ -852,6 +926,162 @@ func _bilinear_a(a: PackedFloat32Array, w: int, h: int, fx: float, fy: float) ->
 	y0 = clampi(y0, 0, h - 1)
 	return lerpf(lerpf(a[y0 * w + x0], a[y0 * w + x1], tx),
 			lerpf(a[y1 * w + x0], a[y1 * w + x1], tx), ty)
+
+
+var _screen_cache := {}
+var _metrics: Control = null
+
+
+## The SMALLEST art box `screen_battle` can hand this key — four minions on
+## screen, or a boss (height-bound by the enemy band budget in every layout, so
+## its boxes all agree). All three bounds are floors, so the smallest box is the
+## one that has to hold, and it is also the most minified.
+##
+## Read off `screen_battle._enemy_metrics()` rather than restated, so a retuned
+## card layout moves this check with it — the same reason `tools/enemy_legibility.gd`
+## asks the screen for its render sizes instead of tabulating them. The instance
+## is a bare `.new()`: no `_ready`, no tree, nothing used but the geometry.
+func _art_box(p_kind: String) -> Vector2:
+	if _metrics == null:
+		_metrics = load("res://scripts/ui/screen_battle.gd").new()
+	var m: Dictionary = _metrics._enemy_metrics(4, PawnArt.is_boss(p_kind))
+	return Vector2(float(m["w"]) - 2.0 * UIKit.S3, float(m["art"]))
+
+
+## The edge band AS THE SCREEN SAMPLES IT — one entry per screen pixel that
+## lands on the band, at the draw scale this row is really given, carrying the
+## two per-fragment quantities `rot_pawn.gdshader`'s last two lines need: the
+## rim's `edge` scalar and `src.a`.
+##
+## ── Why this exists: minification ────────────────────────────────
+## The band is 3 TEXELS deep and the plates are drawn at 0.12–0.49 of source
+## size on a four-up card, so a screen pixel does not read a texel — it does ONE
+## bilinear tap at an arbitrary sub-texel phase (mipmaps are off on every plate,
+## so there is no second sample and no LOD). Two things follow, both of which
+## pull the rendered contrast DOWN and neither of which a texel-wise band mean
+## can see:
+##   • `src.a` at that tap is a blend of band texels with the exterior beyond
+##     them, so the fragment composites over the card at less than full opacity;
+##   • `edge = src.a * (1 - amin)` is evaluated from that same blended alpha and
+##     at a ray origin off the texel grid, so the rim is weaker there too.
+## Task 6 measured the size of it: the same row rendered on its four-up card and
+## at draw scale 1.0 differs by up to 0.20:1 (E05 ch1 2.469 vs 2.669), and the
+## gap tracked draw scale. It was the largest remaining term in the proxy's
+## residual, and it is the term this function exists to remove.
+##
+## The sampling grid is the renderer's, not an approximation of it: `PawnArt`
+## draws the plate into `Rect2(-w/2, -h, w, h)`, so screen pixel `i`'s centre
+## interpolates to `u = (i + 0.5) / w`, and the texel coordinate the GPU
+## bilinearly filters around is `u * tex_w - 0.5`. Band membership is decided by
+## the texel that pixel is IN (`int(u * tex_w)`), which is the same projection
+## `tools/enemy_legibility.gd` uses to pick its screen pixels — the two rulers
+## have to select the same set or the deltas mean nothing.
+##
+## `p_native` samples at draw scale 1.0 instead, where the grid lands on texel
+## centres and this degenerates to the texel-wise band mean. That is the ruler
+## `tools/enemy_legibility.gd` reads bound 3 off (the four-up card leaves as few
+## as 14 veiled pixels, which is not a measurement), so the tool asks for it and
+## compares like with like.
+func _screen_band(p_kind: String, p_tier: int, p_native := false) -> Dictionary:
+	var ck := "%s/%d/%s" % [p_kind, p_tier, p_native]
+	if _screen_cache.has(ck):
+		return _screen_cache[ck]
+	var empty := {"edge": PackedFloat32Array(), "alpha": PackedFloat32Array(), "scale": 0.0}
+	_screen_cache[ck] = empty
+	var band := _edge_band(p_kind)
+	if band.is_empty() or int(band["n"]) <= 0:
+		return empty
+	var a := _plate_alpha(p_kind)
+	if a.is_empty():
+		return empty
+	var tw: int = band["w"]
+	var th: int = band["h"]
+	var mask: PackedByteArray = band["px"]
+
+	# the height the card gives this row, and the scale that lands the plate at
+	# it — `fit_height` sizes against tier 3, `bulk` puts the row back at its own
+	# tier, exactly as `PawnArt.make` does when the battle screen builds the pawn
+	var h := float(th)
+	if not p_native:
+		h = PawnArt.fit_height(p_kind, _art_box(p_kind)) * PawnArt.bulk(p_kind, p_tier)
+	var w := h * float(tw) / maxf(float(th), 1.0)
+	var scale := h / maxf(float(th), 1.0)
+
+	# the shader's 8 fixed directions at `rim_px` TEXELS, resolved once
+	var r: float = PawnArt.ROT_RIM_PX
+	var ox := PackedFloat32Array()
+	var oy := PackedFloat32Array()
+	for i in 8:
+		var ang := float(i) * 0.7853981
+		ox.append(cos(ang) * r)
+		oy.append(sin(ang) * r)
+	# the column geometry does not depend on the row, so it is resolved once too
+	var cx_n := PackedInt32Array()
+	var cx_f := PackedFloat32Array()
+	for px in int(ceil(w)):
+		var u := (float(px) + 0.5) / w
+		if u >= 1.0:
+			break
+		cx_n.append(clampi(int(u * float(tw)), 0, tw - 1))
+		cx_f.append(u * float(tw) - 0.5)
+
+	var e_out := PackedFloat32Array()
+	var a_out := PackedFloat32Array()
+	for py in int(ceil(h)):
+		var v := (float(py) + 0.5) / h
+		if v >= 1.0:
+			break
+		var fy := v * float(th) - 0.5
+		var row := clampi(int(v * float(th)), 0, th - 1) * tw
+		for i in cx_n.size():
+			if mask[row + cx_n[i]] == 0:
+				continue
+			var fx := cx_f[i]
+			var sa := _bilinear_a(a, tw, th, fx, fy)
+			var e := 0.0
+			# `rim_strength > 0.001 && src.a > 0.2` is the shader's own gate: a
+			# tap that lands too far into the skirt gets no rim at all, which is
+			# part of what minification costs and not a special case here
+			if sa > 0.2:
+				var amin := 1.0
+				for k in 8:
+					amin = minf(amin, _bilinear_a(a, tw, th, fx + ox[k], fy + oy[k]))
+				e = sa * (1.0 - amin)
+			e_out.append(e)
+			a_out.append(sa)
+	var out := {"edge": e_out, "alpha": a_out, "scale": scale}
+	_screen_cache[ck] = out
+	return out
+
+
+## What the eye is actually handed: the modelled lit edge composited over `bg`
+## at the alpha each fragment carries, averaged over the screen pixels the band
+## lands on. This is the quantity bounds 1 and 3 are held to.
+##
+## Per-sample rather than mean-of-terms on purpose. `edge` and `src.a` fall off
+## together across the band, so a lit colour built from the two means would miss
+## their covariance; this composites each fragment the way the renderer does and
+## then averages the result, which is what the render's own band mean is.
+##
+## The blend itself is still `lit_edge` — one source for the rim curve, called
+## once per sample with that sample's own coverage instead of once with the band
+## mean. `bg.lerp(lit, a)` is `COLOR = vec4(lit, src.a)` under the canvas
+## blend mode, i.e. straight alpha over whatever is already there.
+func seen_edge(edge: Color, chapter: int, p_kind: String, p_tier: int, bg: Color,
+		p_native := false) -> Color:
+	var s := _screen_band(p_kind, p_tier, p_native)
+	var es: PackedFloat32Array = s["edge"]
+	var als: PackedFloat32Array = s["alpha"]
+	var n := es.size()
+	if n <= 0:
+		# no band to sample — fall back to the un-composited model rather than
+		# silently reporting the background, which would read as a hard failure
+		# for a reason that has nothing to do with the rim
+		return lit_edge(edge, chapter, -1.0, rim_coverage(p_kind))
+	var acc := Color(0.0, 0.0, 0.0)
+	for i in n:
+		acc += bg.lerp(lit_edge(edge, chapter, -1.0, es[i]), clampf(als[i], 0.0, 1.0))
+	return Color(acc.r / float(n), acc.g / float(n), acc.b / float(n))
 
 
 ## What is behind the MIST-BACKED part of an enemy's silhouette on a battle
