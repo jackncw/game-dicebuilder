@@ -132,7 +132,11 @@ body {
 		<div id="brand">骰林 Dice Grove<small>Loading</small></div>
 		<div id="bar" class="wait"><i></i></div>
 		<div id="pct">準備緊… Preparing…</div>
-		<div id="hint">首次載入約 17 MB,之後會由瀏覽器快取<br>First load is ~17 MB; later visits come from cache</div>
+		<!-- No size in this line. The counter above it reports the engine's
+		     `total`, which is the UNCOMPRESSED payload (44 MB); Pages serves it
+		     gzipped, so about 17 MB crosses the wire. Printing one number here
+		     and a different one two lines up just reads as a bug. -->
+		<div id="hint">首次載入之後會由瀏覽器快取<br>Later visits come from cache</div>
 		<div id="status-notice"></div>
 	</div>
 
