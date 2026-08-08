@@ -6,6 +6,24 @@ extends Node
 
 var fails := 0
 
+## The three bounds `_t_enemy_legibility` holds the enemy silhouettes to. They
+## live here, as literals this file owns, and not in `ui_theme.gd`: `rot_rim_for`
+## already solves against `UITheme.ROT_RIM_TARGET`, so a check that read the same
+## constant would move with the thing it is checking. See the header on
+## `_t_enemy_legibility` for why there are three of them and not one.
+const CARD_EDGE_FLOOR := 2.4      # lit edge vs the bare chapter card
+const MIST_EDGE_FLOOR := 1.9      # lit edge vs mist-over-card, where mist sits behind it
+const MIST_COVER_CAP := 0.25      # how much of an edge band the mist may ever stand on
+
+## Sub-rows per texture row when `_stamp_wisp` scan-converts a wisp. Four, and
+## the x-spans round outward, so a pixel counts as veiled if the polygon touches
+## it at all rather than if its centre happens to fall inside. That is the
+## conservative direction for a CAP — and it is the convention the round-2
+## measurement in `task-5-report.md` used, so the number this file prints is the
+## number the 25% was chosen against. Centre sampling reads 0.3–1.5 points lower
+## across the seventeen; both orderings are identical.
+const SUB_ROWS := 4
+
 
 func _check(cond: bool, msg: String) -> void:
 	if not cond:
@@ -344,17 +362,17 @@ func _colors_in(v: Variant) -> Array:
 ##
 ## The checks below read `UITheme.ROT_RIM_TARGET` because what they test is that
 ## the curve reaches its own declared target — they would follow that constant
-## wherever it went. The 2.4:1 floor is therefore spelled out as a literal in
-## `_t_enemy_legibility` instead, so lowering `ROT_RIM_TARGET` is caught there
-## rather than nowhere. Measured: drop it to 2.0 and the worst real edge (E09 on
-## chapter 1) falls to 2.35:1 and that test fires.
+## wherever it went. The 2.4:1 floor is therefore owned by this file instead, as
+## `CARD_EDGE_FLOOR`, so lowering `ROT_RIM_TARGET` is caught in
+## `_t_enemy_legibility` rather than nowhere. Measured: drop it to 2.0 and the
+## worst real edge (E09 on chapter 1) falls to 2.35:1 and that test fires.
 ##
 ## The background here is the BARE card, deliberately: that is the quantity
 ## `rot_rim_for` solves against, and this test's job is to check the curve
 ## reaches its own declared target, not to re-litigate what that target should
-## be. What is actually behind a silhouette is `card_behind()`, which is mist
-## over the card on every misted row — so clearing this bar is necessary and
-## not sufficient, and `_t_enemy_legibility` is where that shows up.
+## be. What is behind the veiled part of a silhouette is `card_behind()`, mist
+## over the card — so clearing this bar is necessary and not sufficient, and
+## `_t_enemy_legibility`'s three bounds are where that shows up.
 func _t_rot_rim() -> void:
 	var l1 := UITheme.luminance(UITheme.surface(1))
 	var l2 := UITheme.luminance(UITheme.surface(2))
@@ -406,12 +424,37 @@ func _t_rot_rim() -> void:
 ## picture — `tools/enemy_legibility.gd` renders the real thing, and the two
 ## are reconciled before this number is trusted. See DECISIONS.md.
 ##
-## The background is `card_behind()`, NOT a bare `surface(chapter)`. `PawnArt`
-## draws `_auto_mist` before the plate, so on every row that carries mist the
-## thing behind the silhouette is mist over the card, and mist is brighter than
-## all three cards. Measured — see the header on `card_behind` — the mist is
-## behind 1.5%–20.3% of each plate's own edge band, so this is a case the
-## picture really produces and not a hypothetical.
+## ── Why THREE bounds and not one ─────────────────────────────────
+## `PawnArt._draw` lays `_auto_mist` down BEFORE the plate, inside the plate's
+## own footprint, and `ROT_MIST` (luminance 0.0578) is brighter than every
+## chapter card (0.0242 / 0.0210 / 0.0094). So a silhouette's contour is read
+## against two different backgrounds at once: bare card over most of it, mist
+## over the rest. Rolling those into one number means either measuring the easy
+## case everywhere or the hard case everywhere, and neither is the picture.
+##
+## The mist is a deliberate soft veil — one of the five tier dials — and
+## `mist_coverage()` measures that it occludes about a tenth of the contour: at
+## five wisps, 1.5% (E05) to 20.2% (B2) per key and 16799 of 158496 band px
+## (10.6%) over the seventeen; at three, 1.1% (E09) to 14.4% (E03), 7.9%
+## overall. The eye reads the silhouette off the remaining nine tenths. So the
+## mist-backed edge is accepted as a SEPARATE case, and the three bounds
+## together are what make that safe:
+##
+##   1. `CARD_EDGE_FLOOR` — the card-backed edge keeps the full 2.4:1. This is
+##      the original guarantee and it is not relaxed anywhere.
+##   2. `MIST_COVER_CAP` — the mist may never stand on more than 25% of an edge
+##      band. Today's worst is B2 at 20.2%. THIS is what makes bound 1
+##      meaningful: without it, the veil could grow until "most of the contour
+##      is on bare card" quietly stopped being true and bound 1 stopped
+##      describing what anyone sees.
+##   3. `MIST_EDGE_FLOOR` — where the veil does sit, the edge still reaches
+##      1.9:1. Today's worst is E09 ch3 tier3 at 1.990:1. This bounds how bad
+##      the veiled tenth is allowed to get.
+##
+## Do not simplify these back into one. Bound 1 alone measures a background that
+## a tenth of the contour does not have; bound 3 alone applies a veiled-case bar
+## to nine tenths of a contour that is not veiled; and either one without
+## bound 2 is an assertion about a fraction nothing is holding still.
 ##
 ## Which (chapter, tier) pairs a key is actually met at is not a free choice:
 ## `battle_core.gd:123` gives a minion `tier = chapter`, and `:179` files a
@@ -442,8 +485,12 @@ func _t_enemy_legibility() -> void:
 	_check(got == want, "enemies.json describes %s; the drawn plates are %s" % [got, want])
 	_check(want.size() == 17, "expected 17 enemy plates, PawnArt.ENEMY_TEX lists %d" % want.size())
 
-	var worst := 99.0
-	var worst_what := ""
+	var worst_card := 99.0
+	var worst_card_what := ""
+	var worst_mist := 99.0
+	var worst_mist_what := ""
+	var worst_cover := -1.0
+	var worst_cover_what := ""
 	# per chapter: how many distinct edge colours went in, how many came out. A
 	# lerp with strength < 1 is injective, so those two counts have to agree. They
 	# stop agreeing exactly when the rim is strong enough to stop lighting the
@@ -465,8 +512,6 @@ func _t_enemy_legibility() -> void:
 			var ch: int = c[0]
 			var tier: int = c[1]
 			var lit := lit_edge(edge, ch)
-			var bg := card_behind(ch, String(key), tier)
-			var r := UITheme.contrast(lit, bg)
 			# keyed on the raw channels, not `to_html`: at s ≈ 0.5 the lerp
 			# compresses differences by (1 - s), so two plates one 8-bit step
 			# apart can round to the same hex and fire this guard for a reason
@@ -475,18 +520,57 @@ func _t_enemy_legibility() -> void:
 			edges_in[ch][_colour_key(edge)] = true
 			lits_out[ch][_colour_key(lit)] = true
 			var wisps: int = PawnArt.MIST_COUNT[PawnArt.dial_row(String(key), tier)]
-			if r < worst:
-				worst = r
-				worst_what = "%s ch%d tier%d (%d wisps)" % [key, ch, tier, wisps]
-			_check(r >= 2.4,
-					"%s ch%d tier%d (%d wisps): lit edge %s over %s is %.2f:1, needs 2.4:1"
-					% [key, ch, tier, wisps, lit.to_html(false), bg.to_html(false), r])
+			var where := "%s ch%d tier%d (%d wisps)" % [key, ch, tier, wisps]
+
+			# ── bound 1: the card-backed edge, at the full 2.4:1 ──
+			var card := UITheme.surface(ch)
+			var r_card := UITheme.contrast(lit, card)
+			if r_card < worst_card:
+				worst_card = r_card
+				worst_card_what = where
+			_check(r_card >= CARD_EDGE_FLOOR,
+					"%s: lit edge %s over the bare card %s is %.3f:1, needs %.2f:1"
+					% [where, lit.to_html(false), card.to_html(false), r_card,
+					CARD_EDGE_FLOOR])
+
+			# ── bound 2: how much contour the veil is allowed to stand on ──
+			# Measured off this plate's own alpha and `_auto_mist`'s own
+			# polygons, so it moves the moment either does. It is what stops
+			# bound 1 from being a claim about a majority nothing is holding.
+			var cover := mist_coverage(String(key), tier)
+			if cover > worst_cover:
+				worst_cover = cover
+				worst_cover_what = where
+			_check(cover <= MIST_COVER_CAP,
+					"%s: mist stands on %.1f%% of the edge band, cap is %.1f%% — the veil is covering the silhouette, not softening it"
+					% [where, cover * 100.0, MIST_COVER_CAP * 100.0])
+
+			# ── bound 3: and where it does stand, the edge still reads ──
+			# `card_behind` is the bare card on a row with no wisps, so this
+			# runs on every row; on those it is bound 1 again with a slacker
+			# bar, which is what "no veil to allow for" ought to mean.
+			var bg := card_behind(ch, String(key), tier)
+			var r_mist := UITheme.contrast(lit, bg)
+			if r_mist < worst_mist:
+				worst_mist = r_mist
+				worst_mist_what = where
+			_check(r_mist >= MIST_EDGE_FLOOR,
+					"%s: lit edge %s over mist-on-card %s is %.3f:1, needs %.2f:1"
+					% [where, lit.to_html(false), bg.to_html(false), r_mist,
+					MIST_EDGE_FLOOR])
 	for ch in [1, 2, 3]:
 		_check(lits_out[ch].size() == edges_in[ch].size(),
 				"chapter %d: %d distinct edge colours went in, %d came out — the rim is washing the plates out, not lighting them"
 				% [ch, edges_in[ch].size(), lits_out[ch].size()])
-	print("enemy legibility (proxy): worst is %s at %.2f:1 (distinct lit edges %d/%d/%d)"
-			% [worst_what, worst, lits_out[1].size(), lits_out[2].size(), lits_out[3].size()])
+	print("enemy legibility: card-backed edge worst is %s at %.3f:1 (floor %.2f, margin %+.3f)"
+			% [worst_card_what, worst_card, CARD_EDGE_FLOOR, worst_card - CARD_EDGE_FLOOR])
+	print("enemy legibility: mist-backed edge worst is %s at %.3f:1 (floor %.2f, margin %+.3f)"
+			% [worst_mist_what, worst_mist, MIST_EDGE_FLOOR, worst_mist - MIST_EDGE_FLOOR])
+	print("enemy legibility: mist covers at most %.1f%% of a band, at %s (cap %.1f%%, margin %+.1f pt)"
+			% [worst_cover * 100.0, worst_cover_what, MIST_COVER_CAP * 100.0,
+			(MIST_COVER_CAP - worst_cover) * 100.0])
+	print("enemy legibility: distinct lit edges %d/%d/%d"
+			% [lits_out[1].size(), lits_out[2].size(), lits_out[3].size()])
 
 
 ## `edge_rgb` for one key as a Colour, or null with a named failure already
@@ -522,9 +606,18 @@ func _colour_key(c: Color) -> String:
 ## of `rot_pawn.gdshader` with that line's two other inputs pinned: the `edge`
 ## scalar at 1.0 and `v_modulate` at white.
 ##
-## SEVEN known ways this pair of functions is a model and not the picture, all
-## seven written out with numbers in `task-5-report.md`. Six make the proxy read
-## HIGH (i.e. the real picture is less legible than this says):
+## SIX known ways this pair of functions is a model and not the picture, all six
+## written out with numbers in `task-5-report.md`. There were seven: the mist
+## used to be on this list as "one flat layer covering the whole edge", which was
+## an approximation because a single number was being asked to stand for two
+## different backgrounds. It is not on the list any more because it is no longer
+## approximated — it is MODELLED, by `mist_coverage()` measuring how much contour
+## the veil actually stands on and by the card-backed and mist-backed edges being
+## bounded separately. What residual it still has lives on `card_behind` and
+## `mist_coverage`, where the measurement is.
+##
+## Five of the six make the proxy read HIGH (i.e. the real picture is less
+## legible than this says):
 ##  1. `edge` (`src.a * (1 - amin)`) is 1.0 only right at the alpha boundary and
 ##     falls off inward, so part of the measured band is lit less than this.
 ##  2. `edge_rgb` was averaged over `alpha > 200` (`enemy_cutout.py`); the shader
@@ -539,11 +632,8 @@ func _colour_key(c: Color) -> String:
 ##     a non-white modulate on an enemy BATTLE-card pawn — the one place that
 ##     does, `screen_codex.gd`'s unseen-entry silhouette, is meant to be
 ##     unreadable, so this number does not speak for it.
-##  6. The mist is modelled as ONE flat layer at `PawnArt.mist_alpha`, covering
-##     the whole edge. Both halves of that are approximations, and they pull
-##     opposite ways — see `card_behind`, which owns this term.
 ## And one that makes it read LOW:
-##  7. The bloom pass adds `glow * 0.055` before the rim mix. Small at the
+##  6. The bloom pass adds `glow * 0.055` before the rim mix. Small at the
 ##     silhouette's boundary — the mask it gathers is eyes and cracks, which are
 ##     interior — but it is real and it is unmodelled.
 ## Task 6 renders the real thing and reconciles at 0.15:1 — the render wins.
@@ -557,36 +647,31 @@ func lit_edge(edge: Color, chapter: int, strength := -1.0) -> Color:
 	return edge.lerp(UITheme.ROT_RIM, clampf(s, 0.0, 1.0))
 
 
-## What is actually behind an enemy's silhouette on a battle card.
+## What is behind the MIST-BACKED part of an enemy's silhouette on a battle
+## card — the background bound 3 is measured against.
 ##
 ## Not the card. `PawnArt._draw` calls `_auto_mist` BEFORE `draw_texture_rect`,
-## so on any row whose dial gives it wisps the local background is
-## `ROT_MIST` over `surface(chapter)` — and `ROT_MIST` (luminance 0.0578) is
-## brighter than every card (0.0242 / 0.0210 / 0.0094), so it RAISES the
-## luminance the lit edge has to clear. This is the single largest gap between
-## the proxy and the picture and it was missing until fix round 2.
+## and inside the plate's own footprint, so wherever a wisp falls the local
+## background is `ROT_MIST` over `surface(chapter)` — and `ROT_MIST` (luminance
+## 0.0578) is brighter than every card (0.0242 / 0.0210 / 0.0094), so it RAISES
+## the luminance the lit edge has to clear. On a row with no wisps this is the
+## bare card and bound 3 collapses onto bound 1.
 ##
-## Measured, not assumed. Rasterising `_auto_mist`'s five (tier 3 / boss) wisp
-## polygons into each plate's own texture grid and intersecting them with the
-## same `alpha > 200` minus three 3×3 erosions band `enemy_cutout.py` averages:
+## HOW MUCH of the contour this speaks for is not assumed here — it is measured,
+## per key, by `mist_coverage()`, and bounded by `MIST_COVER_CAP`. That is what
+## makes it legitimate to hold this background to a different (1.9:1) bar than
+## the bare card's 2.4:1 instead of applying one bar to a blend of the two.
 ##
-##   E05 1.5% · E09 3.2% · E01 3.9% · E02 4.9% · B3 6.4% · E10 7.3% · B5 7.3%
-##   B6 8.8% · E04 9.6% · B4 10.4% · E07 12.2% · B1 13.0% · E03 13.5%
-##   E08 16.1% · E06 16.6% · B3P2 17.6% · B2 20.3%      (10.6% of all band px)
+## One flat layer is a measured claim, not a convenience: instrumenting
+## `_stamp_wisp` to count band pixels claimed by a second wisp, over all
+## seventeen plates and both idle frames, finds them on exactly one key — B2, 32
+## px, 0.3% of its own band — and zero everywhere else. So alphas are not
+## compounded. (Round 2's independent rasteriser found the same 32.)
 ##
-## and the 3px ring of card immediately OUTSIDE the silhouette — the colour the
-## eye actually compares against — comes out the same, 10.1% overall. The
-## three-wisp tier-2 row runs 1.1%–14.4%. Every key, at every misted row, has a
-## real run of contour standing on mist. Wisps overlapping each other is NOT a
-## live case: across all seventeen bands exactly 32 pixels (B2, 0.3% of its own
-## band) see two layers, so one flat `mist_alpha` is the right model.
-##
-## Two approximations remain, pulling opposite ways. HIGH: the wisps have soft
-## polygon edges and cover only that 1.5%–20.3%, so most of the contour is on
-## bare card and this number is the worst case rather than the average — which
-## is what a legibility FLOOR wants. LOW: `draw_colored_polygon` blends in sRGB
-## under `gl_compatibility` exactly as this `lerp` does, but the wisp's own
-## anti-aliased boundary is not modelled.
+## One approximation remains, and it reads LOW: `draw_colored_polygon` blends in
+## sRGB under `gl_compatibility` exactly as this `lerp` does, but the wisp's own
+## anti-aliased boundary is not modelled, so the true edge of a wisp is slightly
+## more transparent than this says.
 ##
 ## `MIST_COUNT`, `mist_alpha` and `rot_of` are read from `PawnArt` rather than
 ## restated, so the mist has one source the way the rim has one.
@@ -596,6 +681,197 @@ func card_behind(chapter: int, kind: String, tier: int) -> Color:
 		return UITheme.surface(chapter)
 	return UITheme.surface(chapter).lerp(UITheme.ROT_MIST,
 			clampf(PawnArt.mist_alpha(kind, tier), 0.0, 1.0))
+
+
+var _band_cache := {}
+var _cover_cache := {}
+
+
+## What fraction of `p_kind`'s edge band has a wisp behind it at `p_tier` — the
+## quantity `MIST_COVER_CAP` bounds, and the reason bounds 1 and 3 are allowed
+## to be different numbers.
+##
+## Measured, not tabulated. `PawnArt.mist_spots` / `wisp_outline` / `wisp_phase`
+## hand back the very polygons `_auto_mist` draws (statics, so there is one copy
+## of the geometry and the test cannot drift from the picture), asked for in
+## normalised units — `w = aspect, h = 1` — and scan-converted into the plate's
+## own texture grid, where `_edge_band` has already marked the band
+## `tools/enemy_cutout.py:295` averages `edge_rgb` over: `alpha > 200`, minus
+## three 3×3 erosions.
+##
+## Both stepped idle frames are rasterised and the WORSE of the two is returned:
+## only one of them is on screen at a time, so the max is the worst instant a
+## player can be looking at, which is what a floor wants.
+##
+## Scale-free, so one number covers every card layout: `_auto_mist` places
+## everything in units of the pawn's own `w` and `h`, and `w/h` is the texture's
+## own aspect at every size, so the fraction depends on the silhouette and the
+## aspect and on nothing else. Flip is irrelevant for the same reason —
+## `_draw` mirrors the wisps (`_c`) and the plate (`draw_texture_rect`'s
+## `flip_h`) about the same x = 0, so a flipped pawn is the mirror image of this
+## one and covers the same count.
+##
+## Where it stops being exact: a wisp boundary cuts through pixels, and
+## `SUB_ROWS` decides those in the conservative direction — touched counts as
+## covered. Measured against the alternative, centre sampling reads 0.3–1.5
+## points lower on every one of the seventeen and reorders none of them.
+##
+## Reconciles with the independent round-2 rasterisation recorded in
+## `task-5-report.md`: identical band sizes (158496 px over the seventeen), and
+## 16799 covered band px at five wisps against its 16785 — fourteen pixels apart
+## in 158496, one of them on B2 (1874 here, 1875 there, i.e. 20.25% vs 20.26%).
+func mist_coverage(p_kind: String, p_tier: int) -> float:
+	var ck := "%s/%d" % [p_kind, p_tier]
+	if _cover_cache.has(ck):
+		return float(_cover_cache[ck])
+	_cover_cache[ck] = 0.0
+	var band := _edge_band(p_kind)
+	if band.is_empty():
+		return 0.0
+	var w: int = band["w"]
+	var h: int = band["h"]
+	var total: int = band["n"]
+	var mask: PackedByteArray = band["px"]
+	if total <= 0:
+		_check(false, "%s has no measurable edge band to put the mist fraction over" % p_kind)
+		return 0.0
+	var aspect := float(w) / float(h)
+	var spots := PawnArt.mist_spots(p_kind, p_tier, aspect, 1.0)
+	if spots.is_empty():
+		return 0.0
+	var worst := 0.0
+	for step in [0.0, 1.0]:
+		var hit := PackedByteArray()
+		hit.resize(w * h)
+		var covered := 0
+		for i in spots.size():
+			var s: Array = spots[i]
+			covered += _stamp_wisp(PawnArt.wisp_outline(
+					Vector2(float(s[0]), float(s[1])), float(s[2]),
+					PawnArt.wisp_phase(i, step)), w, h, aspect, hit, mask)
+		worst = maxf(worst, float(covered) / float(total))
+	_cover_cache[ck] = worst
+	return worst
+
+
+## Scan-converts one wisp polygon into `hit` and returns how many BAND pixels it
+## newly covered — newly, so two wisps overlapping cannot double-count the same
+## pixel. Crossings are taken at each row's pixel-centre y, sorted, and filled
+## in pairs (even-odd), which is the region `draw_colored_polygon` fills for a
+## simple polygon like this one.
+##
+## Texture pixel (x, y) sits at drawing-space (`(x + 0.5) / w - 0.5`) * aspect,
+## (`y + 0.5) / h - 1`: `_draw` places the plate in `Rect2(-w/2, -h, w, h)`, so
+## texture row 0 is the TOP of the drawn rect, at y = -h.
+func _stamp_wisp(poly: PackedVector2Array, w: int, h: int, aspect: float,
+		hit: PackedByteArray, mask: PackedByteArray) -> int:
+	var lo := poly[0].y
+	var hi := poly[0].y
+	for p in poly:
+		lo = minf(lo, p.y)
+		hi = maxf(hi, p.y)
+	var y0 := maxi(0, int(floor((lo + 1.0) * float(h))))
+	var y1 := mini(h - 1, int(floor((hi + 1.0) * float(h))))
+	var n := poly.size()
+	var added := 0
+	for py in range(y0, y1 + 1):
+		for sub in SUB_ROWS:
+			var yu := (float(py) + (float(sub) + 0.5) / float(SUB_ROWS)) / float(h) - 1.0
+			var xs := PackedFloat32Array()
+			for i in n:
+				var a := poly[i]
+				var b := poly[(i + 1) % n]
+				if (a.y <= yu) == (b.y <= yu):
+					continue
+				xs.append(a.x + (yu - a.y) / (b.y - a.y) * (b.x - a.x))
+			if xs.size() < 2:
+				continue
+			xs.sort()
+			var row := py * w
+			var k := 0
+			while k + 1 < xs.size():
+				var x0 := maxi(0, int(floor((xs[k] / aspect + 0.5) * float(w))))
+				var x1 := mini(w - 1, int(floor((xs[k + 1] / aspect + 0.5) * float(w))))
+				for px in range(x0, x1 + 1):
+					if hit[row + px] == 0:
+						hit[row + px] = 1
+						if mask[row + px] == 1:
+							added += 1
+				k += 2
+	return added
+
+
+## The outermost band of a plate's silhouette, as a `w * h` byte mask — the same
+## set `tools/enemy_cutout.py:295` averages `edge_rgb` over, so the fraction
+## `mist_coverage` reports is a fraction of exactly the pixels `lit_edge` is
+## speaking for.
+##
+## `binary_erosion(solid, ones((3,3)), iterations=3)` is one erosion by a 7×7
+## square, and a square structuring element is separable, so this is two
+## run-length passes instead of 49 neighbour reads per pixel — 17 plates and
+## 2.8M pixels is enough for that to matter in GDScript. `scipy`'s default
+## `border_value=0` pads with background, so a window reaching outside the image
+## does not erode; the `x >= 3 and x + 3 < w` guards are that padding.
+func _edge_band(p_kind: String) -> Dictionary:
+	if _band_cache.has(p_kind):
+		return _band_cache[p_kind]
+	_band_cache[p_kind] = {}
+	var tex := PawnArt.enemy_texture(p_kind)
+	if tex == null:
+		_check(false, "%s has no plate to measure a mist fraction against" % p_kind)
+		return {}
+	var img := tex.get_image()
+	if img == null:
+		_check(false, "%s plate has no image" % p_kind)
+		return {}
+	if img.is_compressed():
+		img.decompress()
+	img.convert(Image.FORMAT_RGBA8)
+	var w := img.get_width()
+	var h := img.get_height()
+	var count := w * h
+	var data := img.get_data()
+	var solid := PackedByteArray()
+	solid.resize(count)
+	for i in count:
+		solid[i] = 1 if data[i * 4 + 3] > 200 else 0
+	# horizontal: run[i] = how many solid pixels end at i, so the 7-wide window
+	# centred on x is all-solid exactly when run[x + 3] >= 7
+	var run := PackedInt32Array()
+	run.resize(count)
+	var eroded_h := PackedByteArray()
+	eroded_h.resize(count)
+	for y in h:
+		var row := y * w
+		var r := 0
+		for x in w:
+			r = r + 1 if solid[row + x] == 1 else 0
+			run[row + x] = r
+		for x2 in w:
+			eroded_h[row + x2] = 1 if (x2 >= 3 and x2 + 3 < w
+					and run[row + x2 + 3] >= 7) else 0
+	# vertical, over the horizontally-eroded mask
+	for x3 in w:
+		var r2 := 0
+		for y2 in h:
+			r2 = r2 + 1 if eroded_h[y2 * w + x3] == 1 else 0
+			run[y2 * w + x3] = r2
+	var band := PackedByteArray()
+	band.resize(count)
+	var n := 0
+	for y3 in h:
+		var row2 := y3 * w
+		var inside := y3 >= 3 and y3 + 3 < h
+		var ahead := (y3 + 3) * w
+		for x4 in w:
+			var b := 0
+			if solid[row2 + x4] == 1 and not (inside and run[ahead + x4] >= 7):
+				b = 1
+				n += 1
+			band[row2 + x4] = b
+	var out := {"w": w, "h": h, "n": n, "px": band}
+	_band_cache[p_kind] = out
+	return out
 
 
 ## Every enemy is a plate now. This is the rule that keeps the hand-drawn

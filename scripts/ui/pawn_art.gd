@@ -361,12 +361,23 @@ func _mist(spots: Array) -> void:
 	var step := floorf(fmod(_t * 2.2 + _bob_seed, 2.0))
 	for i in spots.size():
 		var s: Array = spots[i]
-		_wisp(Vector2(float(s[0]), float(s[1])), float(s[2]), float(i) * 1.1 + step * 0.7, a)
+		_wisp(Vector2(float(s[0]), float(s[1])), float(s[2]), wisp_phase(i, step), a)
 
 
-## One curl of smoke: an S-shaped column that swells in the middle and closes
-## to a point at the top.
-func _wisp(base: Vector2, h: float, phase: float, a: float) -> void:
+## Which way the i-th wisp leans on the current stepped idle frame. Static and
+## named for the same reason `dial_row` and `mist_alpha` are: `ui_smoke.gd`
+## rasterises these polygons to measure how much of a silhouette's edge stands
+## on mist, and a second copy of `i * 1.1 + step * 0.7` in the test would be a
+## second place for the picture and the measurement to drift.
+static func wisp_phase(p_i: int, p_step: float) -> float:
+	return float(p_i) * 1.1 + p_step * 0.7
+
+
+## One curl of smoke as a closed polygon, in whatever units `base` and `h` are
+## given in: an S-shaped column that swells in the middle and closes to a point
+## at the top. Pure geometry, so the test can ask for it in normalised units
+## (`w = aspect, h = 1`) and get exactly the shape `_wisp` draws.
+static func wisp_outline(base: Vector2, h: float, phase: float) -> PackedVector2Array:
 	var steps := 9
 	var left := PackedVector2Array()
 	var right := PackedVector2Array()
@@ -375,11 +386,31 @@ func _wisp(base: Vector2, h: float, phase: float, a: float) -> void:
 		var y := base.y - h * f
 		var x := base.x + sin(phase + f * PI * 1.7) * h * 0.20
 		var w := h * 0.17 * (1.0 - f) * (0.35 + f * 1.7)
-		left.append(_c(Vector2(x - w, y)))
-		right.append(_c(Vector2(x + w, y)))
+		left.append(Vector2(x - w, y))
+		right.append(Vector2(x + w, y))
 	right.reverse()
-	draw_colored_polygon(left + right,
+	return left + right
+
+
+func _wisp(base: Vector2, h: float, phase: float, a: float) -> void:
+	var pts := PackedVector2Array()
+	for p in wisp_outline(base, h, phase):
+		pts.append(_c(p))
+	draw_colored_polygon(pts,
 			Color(UITheme.ROT_MIST.r, UITheme.ROT_MIST.g, UITheme.ROT_MIST.b, a))
+
+
+## Where the wisps stand, for a pawn drawn `w` wide and `h` tall — `[x, y, h]`
+## per wisp, spread across the sprite's own width. Static for the same reason as
+## `wisp_phase`.
+static func mist_spots(p_kind: String, p_tier: int, w: float, h: float) -> Array:
+	var n: int = MIST_COUNT[dial_row(p_kind, p_tier)]
+	var spots := []
+	for i in n:
+		var f := (float(i) + 0.5) / float(n)
+		spots.append([lerpf(-w * 0.46, w * 0.46, f), -h * 0.22,
+				h * lerpf(0.30, 0.46, fmod(float(i) * 0.37, 1.0))])
+	return spots
 
 
 ## Black mist along the base of the silhouette. Its spots used to be listed per
@@ -387,15 +418,7 @@ func _wisp(base: Vector2, h: float, phase: float, a: float) -> void:
 ## with the plates they are spread across the sprite's own width instead, so
 ## swapping a plate cannot leave the smoke hanging in the wrong place.
 func _auto_mist(w: float, h: float) -> void:
-	var n: int = MIST_COUNT[_dial_row()]
-	if n <= 0:
-		return
-	var spots := []
-	for i in n:
-		var f := (float(i) + 0.5) / float(n)
-		spots.append([lerpf(-w * 0.46, w * 0.46, f), -h * 0.22,
-				h * lerpf(0.30, 0.46, fmod(float(i) * 0.37, 1.0))])
-	_mist(spots)
+	_mist(mist_spots(kind, tier, w, h))
 
 
 # ============================================================ draw
