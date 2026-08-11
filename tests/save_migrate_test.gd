@@ -56,6 +56,7 @@ func _ready() -> void:
 	_t_meta_migration_is_idempotent()
 	_t_run_migration()
 	_t_run_keeps_shared_pool_faces()
+	_t_deleted_faces_are_reseated()
 	_t_round_trip_through_game_state()
 	print("SAVEMIGRATE: %d tests, %d failures" % [tests, fails])
 	if fails == 0:
@@ -250,6 +251,38 @@ func _t_run_keeps_shared_pool_faces() -> void:
 
 
 ## The path the player actually walks: an old meta.json on disk, then a launch.
+## Round 8 deleted two faces that were STARTING faces on the build that was live
+## at the time, so a save sitting in somebody's browser still names them. An
+## unknown id is not a cosmetic problem: `hero_face()` indexes `GameData.faces`
+## directly and errors out the moment that die is rolled.
+func _t_deleted_faces_are_reseated() -> void:
+	var def: Dictionary = GameData.heroes["BADGER"]
+	var faces: Array = def.start.duplicate()
+	faces.append_array(def.start_b.duplicate())
+	# Slots 0-5 are the A die, 6-11 the B die, so the retired 格擋4 sat at slot 11
+	# (start_b's last) — this is the real round-8 case, not a made-up one. Slot 2
+	# holds a shared-pool face the player won and must keep.
+	faces[11] = "bdgb_guard4"
+	faces[2] = "sp_venom_knife"
+	var run := {
+		"save_version": 3,
+		"team": [{"id": "BADGER", "hp": 20, "max_hp": 26, "faces": faces,
+			"face_mods": [], "face_plus": [], "face_extras": []}],
+	}
+	_check(SaveMigrate.migrate_run(run), "a v3 run still migrates")
+	var out: Array = run.team[0].faces
+	_check(GameData.faces.has(String(out[11])),
+			"the retired id was re-seated to a face that exists, got %s" % String(out[11]))
+	_check(String(out[11]) == String(def.start_b[5]),
+			"…and it is that hero's own B-die slot-5 face, got %s" % String(out[11]))
+	_check(String(out[2]) == "sp_venom_knife", "a won shared-pool face is untouched")
+	_check(int(run.save_version) == SaveMigrate.SAVE_VERSION, "version stamped forward")
+	# every slot must resolve, which is the thing that actually crashes
+	for fid in out:
+		_check(String(fid) == "blank" or GameData.faces.has(String(fid)),
+				"slot face %s resolves after migration" % String(fid))
+
+
 func _t_round_trip_through_game_state() -> void:
 	var f := FileAccess.open("user://meta.json", FileAccess.WRITE)
 	f.store_string(JSON.stringify(_legacy_meta(), "\t"))

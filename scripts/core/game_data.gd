@@ -176,6 +176,27 @@ static func relic_rarity(rid: String) -> String:
 	return String(relics.get(rid, {}).get("rarity", "common"))
 
 
+## The XP-unlock faces a hero of this level is allowed to be OFFERED. Levels
+## never change the starting twelve — they widen the pool the reward screen
+## draws that hero's face from, which is the whole "sideways, not stronger"
+## promise the unlock table is supposed to keep.
+##
+## Pure and data-derived on purpose: the live game asks it through
+## `Game.unlocked_faces()` (which supplies the meta save's level) and the
+## balance harness asks it with a level it was handed. One function, so the
+## simulator cannot be measuring a different unlock rule than the game plays.
+static func unlocked_faces_at(id: String, level: int) -> Array:
+	load_all()
+	var out := []
+	var unlocks: Dictionary = heroes.get(id, {}).get("unlocks", {})
+	var lvls: Array = unlocks.keys()
+	lvls.sort_custom(func(a, b): return int(a) < int(b))
+	for l in lvls:
+		if int(l) <= level:
+			out.append(String(unlocks[l]))
+	return out
+
+
 ## Every real face id. The data files carry a leading `_comment` explaining
 ## their own shape, and a loop that hands that string to code expecting a face
 ## dict fails in a way that is miserable to trace back — it surfaced as

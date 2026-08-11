@@ -294,15 +294,12 @@ func grant_xp(hero_ids: Array, amount: int) -> Dictionary:
 	return ups
 
 
-## Faces unlocked for a hero at its current meta level.
+## Faces unlocked for a hero at its current meta level. The rule itself lives in
+## GameData so the balance harness can ask it with a level of its own choosing —
+## a simulator running a different unlock rule than the game is a simulator
+## measuring a game nobody plays.
 func unlocked_faces(id: String) -> Array:
-	var out := []
-	var lvl := hero_level(id)
-	var unlocks: Dictionary = GameData.heroes[id].unlocks
-	for l in unlocks:
-		if int(l) <= lvl:
-			out.append(unlocks[l])
-	return out
+	return GameData.unlocked_faces_at(id, hero_level(id))
 
 
 # ------------------------------------------------------------ navigation

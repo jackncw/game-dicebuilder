@@ -73,16 +73,6 @@
   "heal": 2,
   "target": "ally"
  },
- "bdgb_guard4": {
-  "zh": "格擋",
-  "en": "Guard",
-  "cat": "defense",
-  "rarity": "S",
-  "hero": "BADGER",
-  "die": "B",
-  "block": 4,
-  "target": "self"
- },
  "bdg_heavy5": {
   "zh": "重劈",
   "en": "Heavy Chop",
@@ -765,16 +755,6 @@
   "hero": "BOAR",
   "block": 2,
   "target": "self"
- },
- "boar_rampage": {
-  "zh": "暴走",
-  "en": "Rampage",
-  "cat": "special",
-  "rarity": "S",
-  "hero": "BOAR",
-  "self_atk_now": 2,
-  "pain": 1,
-  "target": "none"
  },
  "boarb_smash5": {
   "zh": "猛擊",

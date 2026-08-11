@@ -96,6 +96,8 @@ python tools/font_build.py          # 砌返隻字體(要上網)
 bash tools/gallery.sh <name>        # 全遊戲截圖(要真視窗)
 godot --headless --path . -- --sim 200      # 平衡模擬器
 godot --headless --path . -- --balance 150  # 驗收矩陣 + 零使用審計
+godot --headless --path . -- --levels 150 1,5,8   # 等級對照:解鎖面係橫向定強度?
+godot --headless --path . -- --commons 400 # 普通遺物影響力(排名一定要用 400)
 ```
 
 ## 呢個 repo 入面 / Repository layout

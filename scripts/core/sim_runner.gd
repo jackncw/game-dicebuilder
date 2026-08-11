@@ -86,8 +86,16 @@ static func batch(n: int, base_seed := 20260805, team := [], opts := {}) -> Dict
 		"advanced": {},   # relic id → {picks, wins} for the pick-rate report
 		"relic_runs": {}, # relic id → runs that ended holding it (zero-use audit)
 	}
+	# `hero_level`: every hero in the party starts the run at this level, which
+	# is what puts their XP-unlock faces into the reward screen's pool. Level 1
+	# (the default) leaves the pool empty and behaves exactly as before.
+	var meta := {}
+	var lvl := int(opts.get("hero_level", 1))
+	if lvl > 1:
+		for id in team:
+			meta[String(id)] = lvl
 	for i in n:
-		var res := simulate_run(team, base_seed + i * 7919, {}, 3, opts)
+		var res := simulate_run(team, base_seed + i * 7919, meta, 3, opts)
 		if res.win:
 			r.wins += 1
 		if int(res.chapters_cleared) >= 1:
@@ -275,7 +283,12 @@ static func _median(vals: Array) -> float:
 ## plays is a number BALANCE.md is quoting without evidence, so the report now
 ## says so itself.
 ##   godot --headless --path . -- --balance [n]
-static func print_matrix(n := 150, seeds := ACCEPT_SEEDS, team := []) -> Array:
+##
+## `level`: what level every hero in the party starts at, which decides how much
+## of their XP-unlock table the reward screen may offer. The acceptance number
+## is judged at level 1 so it stays comparable with every earlier round; the
+## level sweep is `--levels`.
+static func print_matrix(n := 150, seeds := ACCEPT_SEEDS, team := [], level := 1) -> Array:
 	if team.is_empty():
 		team = GameData.starter_hero_ids()
 	var reports := []
@@ -283,12 +296,12 @@ static func print_matrix(n := 150, seeds := ACCEPT_SEEDS, team := []) -> Array:
 	# batch — these are the very runs the shipped numbers come from
 	face_tel_begin()
 	for sd in seeds:
-		var r := batch(n, int(sd), team)
+		var r := batch(n, int(sd), team, {"hero_level": level})
 		reports.append(r)
 		print_report(r)
 		print("")
-	print("=== TARGETS vs RESULT (%d seeds x %d runs, judged on median) ===" % [
-			seeds.size(), n])
+	print("=== TARGETS vs RESULT (%d seeds x %d runs, hero level %d, judged on median) ===" % [
+			seeds.size(), n, level])
 	var header := "%-20s" % "metric"
 	for sd2 in seeds:
 		header += "  %6d" % int(sd2)
@@ -349,8 +362,132 @@ static func print_matrix(n := 150, seeds := ACCEPT_SEEDS, team := []) -> Array:
 	print_advanced(pooled)
 	var face_t: Dictionary = face_tel.duplicate(true)
 	face_tel_end()
-	print_zero_use_audit(reports, face_t, n * seeds.size(), team)
+	print_zero_use_audit(reports, face_t, n * seeds.size(), team, level)
 	return reports
+
+
+# ============================================================ level sweep
+##
+## The unlock table's design promise, in one sentence: **levelling gives you
+## different faces, not stronger ones.** Nobody had ever tested it, because
+## until round 8 the harness could not level anybody up — `gen_offers` was
+## handed an empty unlock map, so a level-8 party played exactly the run a
+## level-1 party played.
+##
+## This is the experiment: the same acceptance matrix, same seeds, same party,
+## run at several party levels. If the promise holds, the full-clear rate barely
+## moves. If it does not, the unlock table is a power curve wearing a
+## horizontal-progression costume, and every balance number this project has
+## ever shipped was measured on the weakest version of the game.
+##   godot --headless --path . -- --levels [n] [lvl,lvl,…]
+
+## How far the full-clear rate may move across the level sweep before it counts
+## as power creep rather than variety. Three points is this harness's own noise
+## floor (`BAND_EDGE_MARGIN`), so five is "moved further than noise, but not by
+## much".
+const LEVEL_CREEP_MAX := 5.0
+
+
+static func print_level_compare(n := 150, levels := [1, 5, 8], seeds := ACCEPT_SEEDS) -> Dictionary:
+	GameData.load_all()
+	var team := GameData.starter_hero_ids()
+	var rows := []
+	for lv in levels:
+		print("")
+		print("################ HERO LEVEL %d ################" % int(lv))
+		var reports := print_matrix(n, seeds, team, int(lv))
+		var row := {"level": int(lv)}
+		for band in TARGET_BANDS:
+			var vals := []
+			for rep in reports:
+				vals.append(int(round(100.0 * int(rep[band.key]) / n)))
+			row[String(band.key)] = _median(vals)
+		var turn_vals := []
+		for rep2 in reports:
+			turn_vals.append(float(rep2.turns) / maxi(int(rep2.battles), 1))
+		turn_vals.sort()
+		row["turns"] = turn_vals[turn_vals.size() / 2]
+		rows.append(row)
+	print("")
+	print("=== LEVEL SWEEP: is the unlock table sideways or upwards? ===")
+	print("%d seeds x %d runs per level, same seeds and same party at every level."
+			% [seeds.size(), n])
+	print("%-8s %10s %10s %12s %10s" % ["level", "ch1", "ch2", "full clear", "turns"])
+	for row2 in rows:
+		print("%-8d %9.1f%% %9.1f%% %11.1f%% %10.2f" % [int(row2.level),
+				float(row2.ch1), float(row2.ch2), float(row2.wins), float(row2.turns)])
+	var lo := 999.0
+	var hi := -999.0
+	for row3 in rows:
+		lo = minf(lo, float(row3.wins))
+		hi = maxf(hi, float(row3.wins))
+	var spread := hi - lo
+	# Direction matters and the spread alone cannot see it. "Levelling makes you
+	# stronger" and "levelling makes you weaker" are both failures of the design
+	# promise, but they are DIFFERENT failures with opposite fixes, and a single
+	# max-minus-min number reports them identically. Measured against the level-1
+	# baseline, which is the run a fresh account actually plays.
+	var base := float(rows[0].wins)
+	var creep := hi - base      # how far ABOVE the unlevelled party the best level got
+	var drop := base - lo       # how far BELOW it the worst level got
+	print("")
+	print("full-clear spread across levels: %.1fpt  (design promise: <= %.1fpt)"
+			% [spread, LEVEL_CREEP_MAX])
+	print("  vs the level-%d baseline (%.1f%%):  best level %+.1fpt,  worst level %+.1fpt"
+			% [int(rows[0].level), base, creep, -drop])
+	if creep > LEVEL_CREEP_MAX:
+		print("VERDICT: POWER CREEP — levelling is worth %.1f points of full-clear "
+				% creep + "rate on top of the baseline. The usage table")
+		print("         names which faces are doing it. A design call, not a "
+				+ "number to quietly file down.")
+	elif drop > LEVEL_CREEP_MAX:
+		print("VERDICT: NET DOWNGRADE — levelling costs %.1f points against the "
+				% drop + "baseline. Not power creep; the opposite. Most likely")
+		print("         the unlock offers are DISPLACING better shared-pool draws "
+				+ "rather than the faces being bad.")
+	elif spread > LEVEL_CREEP_MAX:
+		print("VERDICT: promise holds on the power axis (best level is only %+.1fpt), "
+				% creep + "but the sweep is not flat: %.1fpt between" % spread)
+		print("         the extremes, straddling the baseline. Read the per-level "
+				+ "rows, not the spread.")
+	else:
+		print("VERDICT: promise HOLDS — levelling reads as variety, not power.")
+	return {"rows": rows, "spread": spread, "creep": creep, "drop": drop}
+
+
+## Which of the party's newly-unlocked faces the policy actually reached for,
+## ranked. This is the "who did it" half of the sweep: a power-creep verdict
+## without this table is an accusation without a suspect.
+static func print_unlock_usage(n := 150, level := 8, seeds := ACCEPT_SEEDS) -> void:
+	GameData.load_all()
+	var team := GameData.starter_hero_ids()
+	face_tel_begin()
+	for sd in seeds:
+		batch(n, int(sd), team, {"hero_level": level})
+	var t: Dictionary = face_tel.duplicate(true)
+	face_tel_end()
+	var rolled := {}
+	var used := {}
+	for k in t.rolled:
+		var fid := String(k).split("|")[2]
+		rolled[fid] = int(rolled.get(fid, 0)) + int(t.rolled[k])
+	for k2 in t.used:
+		var fid2 := String(k2).split("|")[2]
+		used[fid2] = int(used.get(fid2, 0)) + int(t.used[k2])
+	var rows := []
+	for hid in team:
+		for fid3 in GameData.unlocked_faces_at(String(hid), level):
+			var rl := int(rolled.get(String(fid3), 0))
+			rows.append({"id": String(fid3), "hero": String(hid), "rolled": rl,
+				"used": int(used.get(String(fid3), 0)),
+				"rate": 100.0 * float(used.get(String(fid3), 0)) / maxf(float(rl), 1.0)})
+	rows.sort_custom(func(a, b): return int(a.used) > int(b.used))
+	print("")
+	print("=== UNLOCK-FACE USAGE, party at level %d (%d runs) ===" % [level, n * seeds.size()])
+	print("%-22s %-8s %8s %8s %8s" % ["face", "hero", "rolled", "used", "rate"])
+	for row in rows:
+		print("%-22s %-8s %8d %8d %7.1f%%" % [String(row.id), String(row.hero),
+				int(row.rolled), int(row.used), float(row.rate)])
 
 
 # ============================================================ zero-use audit
@@ -377,10 +514,10 @@ const AUDIT_DEAD_PCT := 0.5
 
 
 static func print_zero_use_audit(reports: Array, face_t: Dictionary, runs: int,
-		team := []) -> void:
+		team := [], level := 1) -> void:
 	GameData.load_all()
 	print("")
-	print("=== ZERO-USE AUDIT (%d runs) — anything the harness never played ===" % runs)
+	print("=== ZERO-USE AUDIT (%d runs, hero level %d) — anything the harness never played ===" % [runs, level])
 	print("threshold: a face spent on %.1f%% or fewer of the turns it was rolled;" % AUDIT_DEAD_PCT)
 	print("           a relic carried by %.1f%% or fewer of the runs." % AUDIT_DEAD_PCT)
 	print("Every line below needs a written explanation in BALANCE.md before the")
@@ -425,23 +562,40 @@ static func print_zero_use_audit(reports: Array, face_t: Dictionary, runs: int,
 	# rolled — listing those individually would bury the ones that matter under
 	# forty expected zeros. In scope: the shared pool, and the party's own
 	# heroes' faces.
+	#
+	# Third bucket since round 8: a face this party's level has not unlocked yet
+	# is out of reach by the RULES, not by accident. Before the level sweep
+	# existed every U-rarity face landed in "in scope" and the honest reading was
+	# "this harness has never measured a single one of them" — true, and useless
+	# as a per-face signal. Now the level the run was played at decides which
+	# bucket they fall in, so what is left in scope is genuinely unexplained.
+	var unlocked_here := {}
+	for hid in team:
+		for fid_u in GameData.unlocked_faces_at(String(hid), level):
+			unlocked_here[String(fid_u)] = true
 	var in_scope := []
 	var off_party := {}
+	var level_gated := []
 	for fid4 in never:
 		var owner := String(GameData.faces[fid4].get("hero", ""))
 		if owner != "" and owner not in team:
 			off_party[owner] = int(off_party.get(owner, 0)) + 1
+		elif owner != "" and String(GameData.faces[fid4].get("rarity", "")) == "U" 				and not unlocked_here.has(fid4):
+			level_gated.append(fid4)
 		else:
 			in_scope.append(fid4)
 	print("")
 	print("--- faces never rolled at all, party %s: %d in scope ---"
 			% ["+".join(PackedStringArray(team)), in_scope.size()])
 	if in_scope.is_empty():
-		print("  (none — every shared-pool and party face reached a die)")
+		print("  (none — every reachable shared-pool and party face reached a die)")
 	for fid5 in in_scope:
 		var f2: Dictionary = GameData.faces[fid5]
 		print("  %-22s %-10s %-6s owner %s" % [fid5, String(f2.get("zh", "")),
 				String(f2.get("rarity", "")), String(f2.get("hero", "(shared)"))])
+	if not level_gated.is_empty():
+		print("  (plus %d U faces this party has not unlocked at level %d — out of "
+				% [level_gated.size(), level] + "reach by the rules. Sweep: --levels)")
 	if not off_party.is_empty():
 		var owners: Array = off_party.keys()
 		owners.sort()
@@ -533,7 +687,7 @@ static func _do_battle(run: Dictionary, rng: RandomNumberGenerator, enemy_keys: 
 			out["advanced"] = seen
 	RunState.post_battle_recovery(run)
 	# offers: greedy pick (upgrade rarity), else skip for gold
-	var offers := RunState.gen_offers(run, rng, kind, {})
+	var offers := RunState.gen_offers(run, rng, kind, _unlocked_map(run))
 	# the player now chooses which of the hero's 12 faces is replaced: the sim
 	# swaps out that hero's weakest face when the offer beats it
 	var took := false
@@ -549,6 +703,17 @@ static func _do_battle(run: Dictionary, rng: RandomNumberGenerator, enemy_keys: 
 	if not took:
 		run.gold = int(run.gold) + int(GameData.balance.offer_skip_gold)
 	return {}
+
+
+## What each hero in this party may be OFFERED from their own unlock table,
+## asked of the same GameData function the reward screen asks. Until round 8
+## the sim passed `{}` here — hero faces could never be offered at any level,
+## so the harness had never once measured a U-rarity face.
+static func _unlocked_map(run: Dictionary) -> Dictionary:
+	var out := {}
+	for h in run.team:
+		out[String(h.id)] = GameData.unlocked_faces_at(String(h.id), int(h.get("level", 1)))
+	return out
 
 
 static func _team_hp(run: Dictionary) -> int:

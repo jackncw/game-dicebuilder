@@ -36,6 +36,15 @@ const STRUCTURAL := ["zh", "en", "cat", "rarity", "target", "hero", "die", "id",
 ## check that only knew about BattleCore would have called both of them dead.
 const EFFECT_READERS := "res://scripts"
 
+## Faces that are allowed to have no way in, and why. This list is meant to
+## stay one entry long — it is an escape hatch for faces that are not loot,
+## not a parking space for faces nobody got round to wiring up.
+const NO_PATH_OK := {
+	"blank": "The cursed-slot placeholder. It is what a slot shows after a "
+		+ "boss blanks it, so it is WRITTEN onto a die rather than acquired — "
+		+ "an acquisition path for it would be a bug, not a fix.",
+}
+
 var fails := 0
 var tests := 0
 
@@ -50,6 +59,7 @@ func _check(cond: bool, msg: String) -> void:
 func _ready() -> void:
 	GameData.load_all()
 	_t_face_policy_coverage()
+	_t_every_face_has_a_way_in()
 	_t_policy_table_matches_source()
 	_t_blind_list_is_still_needed()
 	_t_face_keys_are_known_terms()
@@ -114,6 +124,71 @@ func _t_face_policy_coverage() -> void:
 				+ "SimRunner.POLICY_BLIND with the reason.")
 	print("policy coverage: %d faces, %d unplayable (%d declared)"
 			% [faces.size(), uncovered.size(), SimRunner.POLICY_BLIND.size()])
+
+
+# ============================================================ 1b. every face has a way in
+
+## A face nobody can obtain is dead data, and dead data does not read as dead:
+## it shows up in the codex-adjacent lists, in comments, in tests, and in the
+## zero-use audit as a face "nobody plays". Round 6 evicted 獾's 格擋4 and
+## 野豬's 暴走 from the starting kits to make room for the Essence faces and
+## left both entries in `faces.json`; they sat there unobtainable for two
+## rounds, and round 7's audit only found them because it went looking. This is
+## the check that would have caught them the same day.
+##
+## The four ways a face can reach a die:
+##   · a hero's starting six on either die;
+##   · a hero's XP unlock table;
+##   · the shared drop pool (no `hero`, rarity C/R/E) — offers, shop, chests;
+##   · named by an event.
+func _t_every_face_has_a_way_in() -> void:
+	var faces := _defs(GameData.faces)
+	var paths := {}
+	for hid in _defs(GameData.heroes):
+		var hd: Dictionary = GameData.heroes[hid]
+		for fid in Array(hd.get("start", [])) + Array(hd.get("start_b", [])):
+			_note_path(paths, String(fid), "%s start" % hid)
+		var unlocks: Dictionary = hd.get("unlocks", {})
+		for lvl in unlocks:
+			_note_path(paths, String(unlocks[lvl]), "%s L%s" % [hid, String(lvl)])
+	# the shared pool, asked of the same function the drop tables ask
+	for fid2 in GameData.shared_pool():
+		_note_path(paths, String(fid2), "shared pool")
+	# events: no event names a face today, but the path exists in principle and
+	# a check that ignored it would go red the day one does
+	var ev_src := FileAccess.get_file_as_string("res://data/events.json")
+	for fid3 in faces:
+		if ev_src.contains("\"%s\"" % String(fid3)):
+			_note_path(paths, String(fid3), "event")
+	var orphans := []
+	for fid4 in faces:
+		if not paths.has(String(fid4)):
+			orphans.append(String(fid4))
+	for o in orphans:
+		var fd: Dictionary = faces[o]
+		_check(NO_PATH_OK.has(o),
+				"%s (%s %s, owner %s) has no way in: not in any start six, no XP "
+				% [o, String(fd.get("zh", "")), String(fd.get("rarity", "")),
+				String(fd.get("hero", "(shared)"))]
+				+ "unlock, not in the shared pool, named by no event. Wire it up, "
+				+ "delete it, or declare it in NO_PATH_OK with the reason.")
+	# and the whitelist itself has to stay honest
+	for w in NO_PATH_OK:
+		_check(faces.has(String(w)),
+				"NO_PATH_OK names %s, which is not a face any more — drop it" % String(w))
+		_check(not paths.has(String(w)),
+				"NO_PATH_OK still names %s, but it IS obtainable now — delete the "
+				% String(w) + "exemption so the check guards it")
+		_check(String(NO_PATH_OK[w]).length() > 40,
+				"NO_PATH_OK[%s] needs a real reason, not a shrug" % String(w))
+	print("acquisition paths: %d faces, %d with no way in (%d declared)"
+			% [faces.size(), orphans.size(), NO_PATH_OK.size()])
+
+
+func _note_path(paths: Dictionary, fid: String, where: String) -> void:
+	var lst: Array = paths.get(fid, [])
+	lst.append(where)
+	paths[fid] = lst
 
 
 # ============================================================ 2. the table is not stale

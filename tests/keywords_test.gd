@@ -26,6 +26,17 @@ func _mk(team_ids: Array, enemy_keys: Array, opts := {}) -> BattleCore:
 	return bc
 
 
+## A face that exists only for this suite, registered under an id no data file
+## uses. The engine supports keywords that no SHIPPED face currently carries —
+## `self_atk_now` is one since round 8 deleted 暴走 as unobtainable — and the
+## engine rule still has to be tested. Testing it against a data face would
+## have meant keeping a face in the roster to hold a test up, which is how the
+## two orphan faces survived two rounds in the first place.
+func _fixture(face_id: String, fd: Dictionary) -> void:
+	GameData.load_all()
+	GameData.faces[face_id] = fd
+
+
 ## Force hero i's A die to show face_id (injected into slot 0) and take the
 ## B die off the table, so each test drives exactly one face.
 func _face(bc: BattleCore, i: int, face_id: String) -> void:
@@ -1089,12 +1100,19 @@ func _t_war_cry() -> void:
 	_check(bc.s.team_atk_buff == 0, "war cry expired")
 
 
+## `self_atk_now`: +X to the USER's own attacks for the rest of this turn.
+## No shipped face carries it since round 8 (暴走 was deleted — a hero acts once
+## a turn, so buffing your own later attacks bought nothing), so the face is a
+## test fixture. The engine rule stays covered for whoever wires the keyword to
+## a hero who CAN act twice.
 func _t_rampage() -> void:
+	_fixture("_fx_rampage", {"zh": "暴走", "en": "Rampage", "cat": "special",
+		"rarity": "S", "hero": "BOAR", "self_atk_now": 2, "pain": 1, "target": "none"})
 	var bc := _mk(["BOAR", "HARE", "BADGER", "OWL"], ["E04"])
 	_silence_enemies(bc)
 	bc.s.heroes[0].hp = bc.s.heroes[0].max_hp   # above the fury line
 	var hp0: int = bc.s.heroes[0].hp
-	_face_pair(bc, 0, "boar_rampage", "boar_wild3")
+	_face_pair(bc, 0, "_fx_rampage", "boar_wild3")
 	bc.use_face(0, 0)
 	_check(bc.s.heroes[0].hp == hp0 - 1, "rampage cost 1 HP")
 	_check(int(bc.s.heroes[0].atk_now) == 2, "rampage armed +2 for the turn")

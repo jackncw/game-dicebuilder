@@ -80,6 +80,23 @@ func _ready() -> void:
 			SimRunner.print_common_impact(cmn)
 			get_tree().quit()
 			return
+		if all[i] == "--levels":
+			# the unlock table on trial: same matrix at several party levels.
+			#   --levels [n] [lvl,lvl,…]
+			var ln := 150
+			var lv := [1, 5, 8]
+			if i + 1 < all.size() and all[i + 1].is_valid_int():
+				ln = int(all[i + 1])
+			if i + 2 < all.size() and all[i + 2].contains(","):
+				lv = []
+				for part in all[i + 2].split(","):
+					if part.is_valid_int():
+						lv.append(int(part))
+			print("level sweep: %s x 3 seed sets x %d runs…" % [str(lv), ln])
+			SimRunner.print_level_compare(ln, lv)
+			SimRunner.print_unlock_usage(ln, int(lv[lv.size() - 1]))
+			get_tree().quit()
+			return
 		if all[i] == "--balance":
 			# the acceptance matrix: three seed sets against the spec targets,
 			# judged on the median

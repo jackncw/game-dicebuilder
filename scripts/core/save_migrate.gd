@@ -23,8 +23,8 @@ extends RefCounted
 ## the slot-order fallback the brief asks for produces the same table.
 
 ## Bumped whenever a save needs work on load. 1 = pre-B-die, 2 = dual dice,
-## 3 = the character overhaul.
-const SAVE_VERSION := 3
+## 3 = the character overhaul, 4 = faces deleted from the data (round 8).
+const SAVE_VERSION := 4
 
 const HERO_MAP := {
 	"H1": "HARE", "H2": "BADGER", "H3": "OWL",
@@ -204,5 +204,34 @@ static func migrate_run(run: Dictionary) -> bool:
 		var ratio := float(int(h.get("hp", new_max))) / float(old_max)
 		h["max_hp"] = new_max
 		h["hp"] = clampi(int(round(new_max * ratio)), 0, new_max)
+	_reseat_deleted_faces(team)
 	run["save_version"] = SAVE_VERSION
 	return true
+
+
+## Any die slot naming a face the data no longer has, re-seated to whatever that
+## hero starts with in that slot.
+##
+## This is not about one deletion. `hero_face()` indexes `GameData.faces`
+## directly, so a save holding a retired id is a hard runtime error the moment
+## the player rolls that die — and saves live in the browser's IndexedDB, where
+## nobody can go and fix them. Round 8 deleted 格擋4 and 暴走, both of which were
+## STARTING faces on the build that was live until 2026-08-11, so this is not
+## hypothetical: anyone mid-run with the Badger or the Boar has one of them on a
+## die right now. Written as a general sweep so the next deletion is free.
+static func _reseat_deleted_faces(team: Array) -> void:
+	for h in team:
+		var def: Dictionary = GameData.heroes.get(String(h.get("id", "")), {})
+		if def.is_empty():
+			continue
+		var fresh: Array = def.start.duplicate()
+		fresh.append_array(def.start_b.duplicate())
+		var faces: Array = h.get("faces", [])
+		while faces.size() < GameData.SLOTS:
+			faces.append("blank")
+		for i in GameData.SLOTS:
+			var fid := String(faces[i])
+			if fid == "blank" or GameData.faces.has(fid):
+				continue
+			faces[i] = String(fresh[i]) if i < fresh.size() else "blank"
+		h["faces"] = faces
