@@ -10,6 +10,20 @@ func _ready() -> void:
 	var cmd := OS.get_cmdline_args()
 	var user := OS.get_cmdline_user_args()
 	var all := cmd + user
+	# `--accept=<mode>` is a MODIFIER, not a command: it changes how the sim
+	# decides to take a face offer and then lets whichever report was asked for
+	# run as normal (`--accept=score --levels 150 1,5,8`). Parsed in its own pass
+	# so it works whatever order the flags arrive in.
+	for a in all:
+		if a.begins_with("--accept="):
+			var mode := a.substr(len("--accept="))
+			if mode in SimRunner.ACCEPT_MODES:
+				SimRunner.accept_mode = mode
+			else:
+				print("unknown --accept mode \"%s\" — expected one of: %s"
+						% [mode, ", ".join(SimRunner.ACCEPT_MODES)])
+				get_tree().quit(1)
+				return
 	for i in all.size():
 		if all[i] == "--sim":
 			var n := 100

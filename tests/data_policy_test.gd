@@ -64,6 +64,7 @@ func _ready() -> void:
 	_t_blind_list_is_still_needed()
 	_t_face_keys_are_known_terms()
 	_t_relic_effects_are_read()
+	_t_score_lens_prices_every_face()
 	print("DATAPOLICY: %d tests, %d failures" % [tests, fails])
 	if fails == 0:
 		print("DATAPOLICY OK")
@@ -305,6 +306,66 @@ func _t_relic_effects_are_read() -> void:
 		_check(src.contains("\"%s\"" % eff),
 				"relic %s's effect \"%s\" is read by nothing under %s — the relic "
 				% [String(rid), eff, EFFECT_READERS] + "does nothing at all")
+
+
+# ============================================================ 6. the score lens has no silent zeros
+
+## `--accept=score` decides offers with `SimRunner._face_points`, which is a
+## second hand-written mirror of the face vocabulary and rots the same way
+## `POLICY_KEYS` does — except worse, because its failure is silent: a keyword
+## it has never heard of prices at zero, and a face carrying only that keyword
+## becomes one the lens will always refuse and never explain. That is the exact
+## shape of the bug this whole suite was written for, one tier over.
+##
+## So: every key on every face is either read by `_face_points` or declared in
+## `SimRunner.LENS_UNPRICED` with a reason, and every face the policy CAN play
+## prices above zero.
+func _t_score_lens_prices_every_face() -> void:
+	var src := FileAccess.get_file_as_string("res://scripts/core/sim_runner.gd")
+	var body := _function_body(src, "_face_points")
+	_check(body != "", "could not find _face_points' body in sim_runner.gd")
+	if body == "":
+		return
+	var priced := {}
+	for k in _keys_read_in(body):
+		priced[String(k)] = true
+	var structural := {}
+	for s in STRUCTURAL:
+		structural[String(s)] = true
+	var faces := _defs(GameData.faces)
+	var seen := {}
+	for fid in faces:
+		for key in faces[fid]:
+			var k2 := String(key)
+			seen[k2] = true
+			if structural.has(k2):
+				continue
+			_check(priced.has(k2) or SimRunner.LENS_UNPRICED.has(k2),
+					"face key \"%s\" (on %s) is read by neither SimRunner._face_points "
+					% [k2, String(fid)] + "nor declared in SimRunner.LENS_UNPRICED — "
+					+ "the score lens silently prices it at 0")
+	for u in SimRunner.LENS_UNPRICED:
+		var uk := String(u)
+		_check(seen.has(uk), "LENS_UNPRICED names \"%s\", which is on no face any "
+				% uk + "more — drop it")
+		_check(not priced.has(uk), "LENS_UNPRICED names \"%s\", but _face_points "
+				% uk + "DOES read it now — delete the exemption")
+		_check(String(SimRunner.LENS_UNPRICED[uk]).length() > 40,
+				"LENS_UNPRICED[%s] needs a real reason, not a shrug" % uk)
+	# and the other direction: a face the greedy policy can play has to be worth
+	# something to the lens, or the lens will refuse a face the sim would use
+	var zeros := []
+	for fid2 in faces:
+		if String(fid2) == "blank" or _covered_by(faces[fid2]).is_empty():
+			continue     # unplayable by construction — zero is the correct price
+		if SimRunner._face_points(String(fid2)) <= 0.0:
+			zeros.append(String(fid2))
+	for z in zeros:
+		_check(false, "%s (%s) is playable by _score_die but prices at 0 under the "
+				% [z, String(faces[z].get("zh", ""))]
+				+ "score lens, so --accept=score can never take it")
+	print("score lens: %d face keys, %d unpriced (declared), %d playable faces at 0"
+			% [seen.size(), SimRunner.LENS_UNPRICED.size(), zeros.size()])
 
 
 ## Every .gd file under `dir`, concatenated.

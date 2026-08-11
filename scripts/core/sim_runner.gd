@@ -300,8 +300,8 @@ static func print_matrix(n := 150, seeds := ACCEPT_SEEDS, team := [], level := 1
 		reports.append(r)
 		print_report(r)
 		print("")
-	print("=== TARGETS vs RESULT (%d seeds x %d runs, hero level %d, judged on median) ===" % [
-			seeds.size(), n, level])
+	print("=== TARGETS vs RESULT (%d seeds x %d runs, hero level %d, offers: %s, judged on median) ===" % [
+			seeds.size(), n, level, accept_mode])
 	var header := "%-20s" % "metric"
 	for sd2 in seeds:
 		header += "  %6d" % int(sd2)
@@ -412,6 +412,10 @@ static func print_level_compare(n := 150, levels := [1, 5, 8], seeds := ACCEPT_S
 	print("=== LEVEL SWEEP: is the unlock table sideways or upwards? ===")
 	print("%d seeds x %d runs per level, same seeds and same party at every level."
 			% [seeds.size(), n])
+	print("offer policy: %s%s" % [accept_mode,
+			"" if accept_mode == "rarity" else
+			"   (DIAGNOSTIC LENS — not the shipped gate; see the offer-policy "
+			+ "section of sim_runner.gd)"])
 	print("%-8s %10s %10s %12s %10s" % ["level", "ch1", "ch2", "full clear", "turns"])
 	for row2 in rows:
 		print("%-8d %9.1f%% %9.1f%% %11.1f%% %10.2f" % [int(row2.level),
@@ -480,14 +484,19 @@ static func print_unlock_usage(n := 150, level := 8, seeds := ACCEPT_SEEDS) -> v
 			var rl := int(rolled.get(String(fid3), 0))
 			rows.append({"id": String(fid3), "hero": String(hid), "rolled": rl,
 				"used": int(used.get(String(fid3), 0)),
+				"pts": _face_points(String(fid3)),
 				"rate": 100.0 * float(used.get(String(fid3), 0)) / maxf(float(rl), 1.0)})
 	rows.sort_custom(func(a, b): return int(a.used) > int(b.used))
 	print("")
-	print("=== UNLOCK-FACE USAGE, party at level %d (%d runs) ===" % [level, n * seeds.size()])
-	print("%-22s %-8s %8s %8s %8s" % ["face", "hero", "rolled", "used", "rate"])
+	print("=== UNLOCK-FACE USAGE, party at level %d (%d runs, offers: %s) ==="
+			% [level, n * seeds.size(), accept_mode])
+	# `pts` is the score lens's price for the face (`--accept=score`), printed
+	# under both policies on purpose: it is what makes a low usage rate readable
+	# as "the lens saw this coming" or "the lens was wrong about it too".
+	print("%-22s %-8s %8s %8s %8s %8s" % ["face", "hero", "rolled", "used", "rate", "pts"])
 	for row in rows:
-		print("%-22s %-8s %8d %8d %7.1f%%" % [String(row.id), String(row.hero),
-				int(row.rolled), int(row.used), float(row.rate)])
+		print("%-22s %-8s %8d %8d %7.1f%% %8.1f" % [String(row.id), String(row.hero),
+				int(row.rolled), int(row.used), float(row.rate), float(row.pts)])
 
 
 # ============================================================ zero-use audit
@@ -686,22 +695,15 @@ static func _do_battle(run: Dictionary, rng: RandomNumberGenerator, enemy_keys: 
 			seen.append(taken)
 			out["advanced"] = seen
 	RunState.post_battle_recovery(run)
-	# offers: greedy pick (upgrade rarity), else skip for gold
+	# offers: the player chooses which of a hero's 12 faces an offer replaces.
+	# Which offer is worth taking, and which face it displaces, is `accept_mode`
+	# — see the offer-policy section near the bottom of this file.
 	var offers := RunState.gen_offers(run, rng, kind, _unlocked_map(run))
-	# the player now chooses which of the hero's 12 faces is replaced: the sim
-	# swaps out that hero's weakest face when the offer beats it
-	var took := false
-	for offer in offers:
-		var hi := int(offer.hero)
-		var slot := _weakest_slot_of(run.team[hi])
-		var old_r := _rarity_rank(String(run.team[hi].faces[slot]))
-		var new_r := _rarity_rank(String(offer.face))
-		if new_r > old_r:
-			RunState.apply_face_swap(run, hi, slot, String(offer.face))
-			took = true
-			break
-	if not took:
+	var take := _offer_pick(run, offers)
+	if take.is_empty():
 		run.gold = int(run.gold) + int(GameData.balance.offer_skip_gold)
+	else:
+		RunState.apply_face_swap(run, int(take.hero), int(take.slot), String(take.face))
 	return {}
 
 
@@ -1851,6 +1853,218 @@ static func _gather_unlocks(bc: BattleCore, i: int, gain: int) -> bool:
 			if cost > pool and cost <= pool + gain:
 				return true
 	return false
+
+
+# ============================================================ offer policy
+##
+## HOW THE SIM DECIDES TO TAKE A FACE. Two modes, selected on the command line
+## with `--accept=<mode>`, which composes with every other flag:
+##   godot --headless --path . -- --accept=score --levels 150 1,5,8
+##
+##   · `rarity` (default) — the SHIPPED policy and the one every number in
+##     BALANCE.md was measured on: take the offer when its rarity letter beats
+##     the letter on the hero's weakest slot. Untouched by this section.
+##   · `score` — a DIAGNOSTIC LENS, the same tier of tool as `--commons` and
+##     `--levels`: take the offer when it is worth more to that hero than the
+##     worst of their twelve faces, judged by `_face_points` below.
+##
+## The lens exists to settle one question round 8 could only argue about. The
+## level sweep found level 8 clearing 4 points LESS often than level 1, and the
+## mechanism offered for it was that `rarity` cannot tell a face the policy can
+## play from one it cannot: U = R = 3, so every U-rarity unlock displaces a
+## shared-pool draw whether or not the greedy policy will ever spend it. If that
+## reading is right, an acceptance rule that prices the FACE rather than the
+## LETTER should make the level-8 deficit shrink or vanish. If it does not, the
+## deficit is a design fact and the unlock table is where to look.
+##
+## `score` is not a shipping proposal. The game's reward screen is a human
+## choosing, and `rarity` stays the gate every acceptance number is cut from.
+
+
+## What `--accept=` understands.
+const ACCEPT_MODES := ["rarity", "score"]
+
+## The active offer policy. Set once from the command line (see `main.gd`);
+## every batch in the process runs under it, and every report prints it.
+static var accept_mode := "rarity"
+
+
+## ---------------------------------------------------------------- the points
+##
+## One point is one point of HP: damage put on an enemy, or damage kept off the
+## party. Every constant below converts a face's printed number into that
+## currency, and all of them are coarse on the same argument `_rate_advanced`
+## makes about relics — the lens has to RANK an offer against twelve faces, not
+## price it to the decimal.
+##
+## These numbers were frozen before the sweep was run and not touched
+## afterwards. The whole experiment turns on this function, so tuning it until
+## the answer came out the shape I expected would have been the experiment
+## measuring me instead of the game.
+const PT_TICKS := 2.0      # a rider (poison/burn/charge) gets ~2 turns; the median battle is 4.3
+const PT_HEAL := 0.8       # a healed point only counts on a hero who is hurt
+const PT_ESSENCE := 1.5    # Essence buys Rituals and rerolls, and both buy points
+const PT_REROLL := 2.0     # one bad die turned into an average one
+const PT_WEAKEN := 2.0     # per point, for as long as the enemy keeps swinging
+const PT_EXPOSE := 3.0     # every attack on that enemy lands harder
+const PT_STUN := 4.0       # a cancelled enemy die is a whole attack that never happens
+const PT_TAUNT := 2.0
+const PT_PARTY := 3.0      # `team_*` lands on the reference party of three
+const PT_ACTION := 4.0     # what an average face on an average die is worth
+## Branches the policy can only take when some state is ALREADY standing —
+## `thorns_double` with no Thorns up, `atk_from_block` with no Block, 雙舞 with
+## nothing pinned. Worth something, but not on the turn you draw them.
+const PT_GUARDED := 0.35
+## Faces that pay NEXT turn: only if the fight lasts, and the greedy policy is
+## the last thing that will make sure it does.
+const PT_SETUP := 0.5
+
+## Face keys the lens deliberately puts no number on, and why. Same contract as
+## `POLICY_BLIND`: an entry here is a declared gap, not an oversight, and
+## `tests/data_policy_test.gd` fails on any face key that is in neither this
+## list nor `_face_points`. That check is the reason this list has to exist —
+## without it a new keyword would silently price at zero and the lens would
+## quietly start rejecting the faces that carry it.
+const LENS_UNPRICED := {
+	"combo": "+2 only when somebody already attacked this turn — a fact about "
+		+ "the party's turn order, not about the face.",
+	"echo": "lifts every face the party plays for a turn; pricing it needs the "
+		+ "other five dice, which an offer-time lens does not have.",
+	"growth": "the face grows over a run, so its worth depends on when it was "
+		+ "picked up — the lens is asked at exactly one moment and cannot see it.",
+	"lifesteal": "rides the attack number already priced; the HP back is real "
+		+ "but small next to the damage line.",
+	"lucky": "a reroll-shaped rider on the die, not points on the face.",
+	"lock_boost": "pays only through `_manage_locks`, whose decision to pin is "
+		+ "made in battle from the board, not from the face.",
+	"cleanse_self": "removes a debuff that may not be there. Priced at zero "
+		+ "rather than guessed, same as the other conditionals.",
+	"cleanse_target": "same as `cleanse_self`, one seat over: worth a lot on a "
+		+ "poisoned ally and nothing on a clean one, and the lens is asked before "
+		+ "the battle that would decide which.",
+	"resonate_req": "a GATE, not a payoff — it makes the face harder to spend, "
+		+ "and the matching `resonate` bonus is what carries the value.",
+	"wild": "`sp_chaos` only, which is already declared in POLICY_BLIND.",
+}
+
+
+## What is this face worth to the hero holding it, in points?
+##
+## `mod` is the permanent +N mark sitting on the slot, which rides the headline
+## number exactly as `_weakest_slot_of` treats it under the rarity policy.
+static func _face_points(fid: String, mod := 0) -> float:
+	var fd: Dictionary = GameData.faces.get(fid, {})
+	if fd.is_empty() or fid == "blank" or fd.get("blank", false):
+		return 0.0
+	# THE GATE, and the point of the whole lens: a face that matches no branch
+	# in `_score_die` for its own target type is one this policy will never
+	# spend, so its worth TO THIS POLICY is zero no matter what is printed on
+	# it. Asked the same way `tests/data_policy_test.gd` asks it, off the same
+	# table, so the two cannot drift apart.
+	if POLICY_BLIND.has(fid) or _policy_hits(fd).is_empty():
+		return 0.0
+	var pts := 0.0
+	# ---- offence
+	pts += float(fd.get("atk", 0)) * float(maxi(int(fd.get("hits", 1)), 1))
+	if fd.has("random_atk"):
+		var r: Array = fd.random_atk
+		pts += (float(r[0]) + float(r[1])) / 2.0
+	if fd.has("low_hp_atk"):
+		# 背水 replaces the printed number once you are at half HP. Half the
+		# gap: half a run is spent below that line, roughly.
+		pts += 0.5 * maxf(float(fd.low_hp_atk) - float(fd.get("atk", 0)), 0.0)
+	pts += PT_GUARDED * float(fd.get("atk_from_block", 0))
+	if fd.get("cleave", false) or fd.get("aoe", false):
+		pts *= 2.0     # the encounter tables run two to four enemies
+	if fd.get("pierce", false) or fd.get("all_pierce", false):
+		pts += 1.0     # roughly the Block an enemy is carrying when it matters
+	pts += PT_TICKS * float(fd.get("poison", 0))
+	pts += PT_TICKS * float(fd.get("burn", 0))
+	pts += PT_WEAKEN * float(fd.get("weaken", 0))
+	pts += PT_EXPOSE if fd.get("expose", false) else 0.0
+	pts += PT_STUN * float(fd.get("stun", 0))
+	pts += PT_STUN if fd.get("steal_die", false) else 0.0
+	# ---- defence
+	pts += float(fd.get("block", 0))
+	pts += PT_PARTY * float(fd.get("team_block", 0))
+	pts += float(fd.get("thorns", 0))
+	pts += PT_PARTY * float(fd.get("team_thorns", 0))
+	pts += PT_GUARDED * float(fd.get("thorns_double", 0))
+	pts += PT_GUARDED * PT_ACTION if fd.get("thorn_hold", false) else 0.0
+	pts += PT_GUARDED * float(fd.get("block_from_mana", 0))
+	pts += PT_TAUNT if fd.get("taunt", false) else 0.0
+	# ---- support
+	pts += PT_HEAL * float(fd.get("heal", 0))
+	pts += PT_HEAL * PT_PARTY * float(fd.get("team_heal", 0))
+	pts += PT_HEAL * PT_TICKS * float(fd.get("regen", 0))
+	pts += PT_HEAL * PT_TICKS * PT_PARTY * float(fd.get("team_regen", 0))
+	pts += PT_HEAL * float(fd.get("heal_on_hit", 0))
+	pts += PT_ESSENCE * float(fd.get("mana", 0))
+	pts += PT_REROLL * float(fd.get("rerolls", 0))
+	# ---- pays next turn
+	pts += PT_SETUP * PT_PARTY * float(fd.get("team_atk", 0))
+	pts += PT_SETUP * float(fd.get("buff_next_atk", 0))
+	# 孤注 boosts BOTH of the hero's dice next turn, and a hero spends one of
+	# them, so unlike the rest of this block it does not need the fight to go
+	# anywhere in particular — it pays on the very next turn. Full value.
+	pts += float(fd.get("next_dice_boost", 0))
+	pts += PT_SETUP * float(fd.get("self_atk_now", 0))
+	pts += PT_TICKS * float(fd.get("charge_up", 0))
+	pts += PT_GUARDED * float(fd.get("resonate", 0))
+	pts += PT_GUARDED * PT_ACTION if fd.get("twin_dance", false) else 0.0
+	# ---- what it costs to cast
+	pts -= PT_ESSENCE * float(fd.get("spell", 0))
+	# HP spent is priced at the same rate as HP healed, and for the same reason:
+	# a point off a hero is not worth a point of damage denied. The party has
+	# ~30 HP a head and only loses when everybody is down.
+	pts -= PT_HEAL * float(fd.get("pain", 0))
+	return maxf(pts + float(mod), 0.0)
+
+
+## Which keys in `POLICY_KEYS` this face matches for its own target type — the
+## same coverage question `tests/data_policy_test.gd` asks, asked here so the
+## lens and the test cannot disagree about what "playable" means.
+static func _policy_hits(fd: Dictionary) -> Array:
+	var kind := String(fd.get("target", "none"))
+	if not POLICY_KEYS.has(kind):
+		kind = "none"     # "self" and anything unrecognised, exactly as `legal_targets` does
+	var hits := []
+	for k in POLICY_KEYS[kind]:
+		if fd.has(k):
+			hits.append(String(k))
+	return hits
+
+
+## The slot the score lens would give up: the hero's cheapest face in points.
+static func _worst_slot_by_points(hero: Dictionary) -> int:
+	var best := 0
+	var best_pts := INF
+	for slot in GameData.SLOTS:
+		var p := _face_points(String(hero.faces[slot]), int(hero.face_mods[slot]))
+		if p < best_pts:
+			best_pts = p
+			best = slot
+	return best
+
+
+## The offer this party takes, as {hero, slot, face}, or {} to skip for gold.
+## Offers are considered in the order `gen_offers` produced them and the first
+## acceptable one is taken, under both policies.
+static func _offer_pick(run: Dictionary, offers: Array) -> Dictionary:
+	for offer in offers:
+		var hi := int(offer.hero)
+		var hero: Dictionary = run.team[hi]
+		var fid := String(offer.face)
+		if accept_mode == "score":
+			var slot := _worst_slot_by_points(hero)
+			if _face_points(fid) > _face_points(String(hero.faces[slot]),
+					int(hero.face_mods[slot])):
+				return {"hero": hi, "slot": slot, "face": fid}
+		else:
+			var slot2 := _weakest_slot_of(hero)
+			if _rarity_rank(fid) > _rarity_rank(String(hero.faces[slot2])):
+				return {"hero": hi, "slot": slot2, "face": fid}
+	return {}
 
 
 ## Writes a candidate into a bucket in place (rebinding the local would not

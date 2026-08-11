@@ -98,7 +98,12 @@ godot --headless --path . -- --sim 200      # 平衡模擬器
 godot --headless --path . -- --balance 150  # 驗收矩陣 + 零使用審計
 godot --headless --path . -- --levels 150 1,5,8   # 等級對照:解鎖面係橫向定強度?
 godot --headless --path . -- --commons 400 # 普通遺物影響力(排名一定要用 400)
+godot --headless --path . -- --accept=score --levels 150 1,5,8  # 收 offer 用評分而唔用稀有度(診斷鏡片)
 ```
+
+`--accept=` 係修飾符,唔係指令:可以配任何一個報告用。`rarity`(預設)就係出貨
+政策 —— BALANCE.md 入面每一個歷史數字都係喺佢上面量嘅;`score` 係診斷鏡片,
+比較「新面對該英雄現有 12 面嘅邊際評分」,用嚟拆開「政策玩唔起」同「面本身弱」。
 
 ## 呢個 repo 入面 / Repository layout
 
