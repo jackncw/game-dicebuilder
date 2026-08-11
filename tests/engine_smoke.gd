@@ -72,7 +72,12 @@ func _test_basic_battle() -> void:
 	var bc := BattleCore.new()
 	bc.setup(_team(), ["E01", "E01"], {"chapter": 1}, rng)
 	_check(bc.s.turn == 1, "turn starts at 1")
-	_check(bc.s.mana == 3, "Lily passive gives 3 mana, got %d" % bc.s.mana)
+	# 3 from the Owl's 古老守林者, plus U1's turn-start point for everybody.
+	# Written as the sum, not as "4": the day either rule moves, the expectation
+	# moves with it and the failure names which one changed.
+	_check(bc.s.mana == 3 + BattleCore.MANA_REGEN,
+			"Owl passive 3 + U1 regen gives %d mana, got %d"
+					% [3 + BattleCore.MANA_REGEN, bc.s.mana])
 	_check(bc.s.rerolls == 0, "base rerolls 0, got %d" % bc.s.rerolls)
 	for e in bc.s.enemies:
 		_check(e.rolls.size() == 1, "enemy rolled 1 die")

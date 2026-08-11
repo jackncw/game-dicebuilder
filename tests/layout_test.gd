@@ -24,6 +24,33 @@ func _check(cond: bool, msg: String) -> void:
 		print("  FAIL: " + msg)
 
 
+## The device geometries this asserts, as insets in CANVAS units.
+##
+## The two heights come from the real-phone report: 390x664 and 360x640 are what
+## is LEFT of a 390x844 / 360x800 phone once the browser's own chrome is off the
+## top and bottom. With `canvas_items` / `expand` stretch, 360x640 is exactly the
+## design aspect and lands on a 720x1280 canvas; 390x664 is relatively wider and
+## lands on 752x1280 — the same 1280 of height, which is why the CANVAS is the
+## same test in both cases and only the insets differ.
+##
+## "tab" is a normal browser tab: the browser's UI already covers the notch, so
+## `env(safe-area-inset-*)` is zero and the whole 1280 is the game's. "home
+## screen" is the same page added to the home screen, where the game owns the
+## full glass and the notch and the home indicator are its problem — 47 and 34
+## CSS px on the phones above, which at those scales is 94/68 and 91/66 canvas
+## units. That is the case that actually squeezes the layout, and the case the
+## player reported.
+const PROFILES := [
+	{"name": "tab", "top": 0.0, "bottom": 0.0},
+	{"name": "360x640 home screen", "top": 94.0, "bottom": 68.0},
+	{"name": "390x664 home screen", "top": 91.0, "bottom": 66.0},
+	# Deliberately past anything real, to prove the squeeze order rather than one
+	# device: the cast strip gives only after the enemy band is at its floor, and
+	# the top bar and the tray never give at all.
+	{"name": "absurd insets", "top": 180.0, "bottom": 150.0},
+]
+
+
 func _ready() -> void:
 	GameData.load_all()
 	Game.settings.lang_mode = "both"
@@ -35,6 +62,25 @@ func _ready() -> void:
 				2 if key == "B6" else 0)
 	# …and a plain four-enemy fight, the narrowest cards the row ever lays out
 	await _case("4 minions", ["E01", "E02", "E03", "E04"], 2)
+
+	# --- and now the same thing on a phone. The top bar going missing on a real
+	# --- device is what round 6 opened with; this is the assertion that says it
+	# --- is back, and stays back.
+	for p in PROFILES:
+		if float(p.top) <= 0.0 and float(p.bottom) <= 0.0:
+			continue
+		Safe.force_insets(float(p.top), 0.0, float(p.bottom), 0.0)
+		await _case("%s / B6" % p.name, ["B6"], 3, 2)
+		await _case("%s / 4 minions" % p.name, ["E01", "E02", "E03", "E04"], 2)
+	Safe.force_insets(-1.0, 0.0, 0.0, 0.0)
+
+	# A suite that asserted nothing used to print "0 tests, 0 failures" and then
+	# "LAYOUT OK" — which is exactly what happened when the battle screen failed
+	# to compile and every `_case` bailed before its first check. Green on zero
+	# work is the worst possible result: it is a broken build reported as a pass.
+	if tests < 100:
+		fails += 1
+		print("  FAIL: only %d assertions ran — the suite did not do its work" % tests)
 	print("LAYOUT: %d tests, %d failures" % [tests, fails])
 	if fails == 0:
 		print("LAYOUT OK")
@@ -125,8 +171,54 @@ func _case(label: String, enemies: Array, chapter: int, extra_summons := 0) -> v
 		var hit2 := hc.get_global_rect().intersection(cast)
 		_check(hit2.size.x <= 0.0 or hit2.size.y <= 0.0,
 				"%s: hero column %d overlaps the cast pad" % [label, i3])
-	print("  %-12s %d cards, tallest ends at %.0f (band %.0f, pad starts %.0f)"
-			% [label, n, _lowest_card(battle), band.end.y, cast.position.y])
+
+	# --- the safe area. This is the round-6 bug, asserted.
+	# `eff_*`, not `Safe.*`: on a device asking for more inset than the layout can
+	# pay, the screen clamps and says so, and this asserts against what it
+	# actually did rather than against what the device asked for.
+	var safe := Rect2(Safe.left, battle.eff_top, 720.0 - Safe.left - Safe.right,
+			1280.0 - battle.eff_top - battle.eff_bottom)
+	_check(battle.eff_top <= Safe.top + 0.5 and battle.eff_bottom <= Safe.bottom + 0.5,
+			"%s: honoured insets (%.0f/%.0f) exceed what the device asked for (%.0f/%.0f)"
+					% [label, battle.eff_top, battle.eff_bottom, Safe.top, Safe.bottom])
+	var topbar: Control = battle.top_turn.get_parent()
+	var tr := topbar.get_global_rect()
+	_check(tr.size.y > 8.0, "%s: the top bar has a rect at all" % label)
+	# `encloses` and not "the two overlap": HALF a turn counter is the same bug.
+	_check(safe.encloses(tr),
+			"%s: top bar %s is not fully inside the safe area %s" % [label, tr, safe])
+	# The Essence meter is the widest thing in that row and the one that would be
+	# clipped first if the row ever overflowed sideways.
+	if battle.essence_bar != null and battle.essence_bar.visible:
+		var er: Rect2 = battle.essence_bar.get_global_rect()
+		_check(safe.encloses(er),
+				"%s: Essence bar %s is not fully inside the safe area %s" % [label, er, safe])
+	# The tray SLAB runs to the bottom edge on purpose (no bare background under
+	# the home indicator); what must clear the inset is the buttons on it.
+	for b in [battle.btn_undo, battle.btn_reroll, battle.btn_end]:
+		var br: Rect2 = (b as Control).get_global_rect()
+		_check(safe.encloses(br),
+				"%s: action button %s is not fully inside the safe area %s"
+						% [label, br, safe])
+	for i4 in battle.hero_cards.size():
+		var hr: Rect2 = (battle.hero_cards[i4] as Control).get_global_rect()
+		_check(hr.end.y <= safe.end.y + 0.5,
+				"%s: hero column %d ends at %.1f, past the safe area's %.1f"
+						% [label, i4, hr.end.y, safe.end.y])
+	# and the give order: the cast strip only shrinks once the enemy band is at
+	# its floor, never before
+	var cast_h: float = battle.ZONE_CAST_BOTTOM - battle.ZONE_CAST_TOP
+	var band_h: float = battle.ZONE_ENEMY_BOTTOM - battle.ZONE_ENEMY_TOP
+	if cast_h < battle.CAST_H - 0.5:
+		_check(band_h <= battle.ENEMY_CHROME_H + battle.ENEMY_ART_MIN + 0.5,
+				"%s: cast strip squeezed to %.0f while the enemy band still had %.0f to give"
+						% [label, cast_h, band_h - battle.ENEMY_CHROME_H - battle.ENEMY_ART_MIN])
+	_check(cast_h >= battle.CAST_MIN_H - 0.5,
+			"%s: cast strip is %.0f tall, under the %.0f floor" % [label, cast_h, battle.CAST_MIN_H])
+
+	print("  %-26s %d cards, tallest ends at %.0f (band %.0f, pad %.0f-%.0f, safe %.0f-%.0f)"
+			% [label, n, _lowest_card(battle), band.end.y, cast.position.y, cast.end.y,
+			safe.position.y, safe.end.y])
 	holder.queue_free()
 	await get_tree().process_frame
 

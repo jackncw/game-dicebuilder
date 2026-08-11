@@ -16,7 +16,29 @@ extends Node
 
 const BASE_W := 720
 const BASE_H := 1280
-const RESOLUTIONS := [Vector2i(720, 1280), Vector2i(540, 960)]
+
+## The four targets, as PHYSICAL device pixels.
+##
+## The first two are the studio resolutions the art has always been reviewed at:
+## the design canvas itself, and the same 9:16 canvas scaled to a small phone.
+##
+## The last two are what a real phone browser actually hands the game, and they
+## arrived with the round-6 bug report. 390x844 and 360x800 are common portrait
+## phones; 664 and 640 are what is LEFT of them once the browser's own address
+## bar and gesture strip are off. Neither is 9:16, so `canvas_items` / `expand`
+## stretch does NOT simply scale the design canvas — it keeps the 1280 of height
+## and widens the canvas (390x664 comes out 752x1280), which is why these are
+## shot as their own geometry rather than as a scaled 720x1280.
+##
+## `inset` is the home-screen case: the same page with no browser chrome around
+## it, where the notch and the home indicator are the game's problem. In CSS
+## pixels; `_mount` converts.
+const RESOLUTIONS := [
+	{"px": Vector2i(720, 1280), "tag": "720", "inset": Vector2.ZERO},
+	{"px": Vector2i(540, 960), "tag": "540", "inset": Vector2.ZERO},
+	{"px": Vector2i(390, 664), "tag": "390x664", "inset": Vector2(47, 34)},
+	{"px": Vector2i(360, 640), "tag": "360x640", "inset": Vector2(47, 34)},
+]
 const TIMEOUT_S := 1500.0
 
 var out_dir := "res://art_iterations/iter_1/"
@@ -24,6 +46,9 @@ var only: Array = []
 var res_filter := 0
 var sub: SubViewport
 var scale_f := 1.0
+## The canvas the screen lays itself out on, in design units — the design rect
+## for a 9:16 target, wider than it for anything else.
+var canvas := Vector2(BASE_W, BASE_H)
 var res_tag := "720"
 var done := false
 var shot_count := 0
@@ -44,15 +69,29 @@ func _ready() -> void:
 	add_child(sub)
 
 	for r in RESOLUTIONS:
-		if res_filter > 0 and r.x != res_filter:
+		var px: Vector2i = r.px
+		if res_filter > 0 and px.x != res_filter:
 			continue
-		res_tag = str(r.x)
-		scale_f = float(r.x) / float(BASE_W)
-		sub.size = r
+		res_tag = String(r.tag)
+		# `canvas_items` / `expand`: the scale is the SMALLER of the two ratios, so
+		# the design rect is never cropped and the canvas grows in whichever axis
+		# the device is relatively longer. On 9:16 targets both ratios are equal
+		# and this is the old `r.x / BASE_W`.
+		scale_f = minf(float(px.x) / float(BASE_W), float(px.y) / float(BASE_H))
+		canvas = Vector2(px) / scale_f
+		Safe.force_canvas(canvas)
+		var ins: Vector2 = r.inset
+		if ins == Vector2.ZERO:
+			Safe.force_insets(-1.0, 0.0, 0.0, 0.0)
+		else:
+			Safe.force_insets(ins.x / scale_f, 0.0, ins.y / scale_f, 0.0)
+		sub.size = px
 		DirAccess.make_dir_recursive_absolute(
 				ProjectSettings.globalize_path(out_dir + res_tag + "/"))
 		await get_tree().process_frame
 		await _all_shots()
+	Safe.force_insets(-1.0, 0.0, 0.0, 0.0)
+	Safe.force_canvas(Vector2.ZERO)
 	done = true
 	print("GALLERY: DONE ", shot_count, " shots")
 	get_tree().quit()
@@ -451,7 +490,8 @@ func _mount(node: Control) -> void:
 		c.queue_free()
 	await get_tree().process_frame
 	var holder := Control.new()
-	holder.size = Vector2(BASE_W, BASE_H)
+	holder.size = canvas
+	holder.custom_minimum_size = canvas
 	holder.scale = Vector2(scale_f, scale_f)
 	node.set_anchors_preset(Control.PRESET_FULL_RECT)
 	holder.add_child(node)

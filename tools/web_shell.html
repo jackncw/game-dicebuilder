@@ -12,19 +12,49 @@
 	<style>
 html, body, #canvas { margin: 0; padding: 0; border: 0; }
 
+html, body { height: 100%; }
+
 body {
 	color: #2b2b2b;
 	background-color: #1b3019;
 	overflow: hidden;
 	touch-action: none;
 	/* the game is portrait 720x1280 and drives its own layout; the canvas fills
-	   the window and Godot's `expand` stretch does the rest */
+	   the VISUAL viewport (see the sizing code below) and Godot's `expand`
+	   stretch does the rest */
 	overscroll-behavior: none;
 	-webkit-tap-highlight-color: transparent;
+	position: fixed;
+	inset: 0;
 }
 
-#canvas { display: block; }
+/* Pinned to the visual viewport's top-left, sized in JS. `position: fixed`
+   rather than the default flow: on iOS the layout viewport is taller than the
+   visual one and a static canvas ends up partly under the toolbars. */
+#canvas {
+	display: block;
+	position: fixed;
+	top: 0;
+	left: 0;
+}
 #canvas:focus { outline: none; }
+
+/* The only way to read `env(safe-area-inset-*)` from script: apply them as
+   padding on a zero-size element and ask for the computed style. Numbers, not
+   layout — nothing is ever drawn here. */
+#safe-probe {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 0;
+	height: 0;
+	visibility: hidden;
+	pointer-events: none;
+	padding-top: env(safe-area-inset-top, 0px);
+	padding-right: env(safe-area-inset-right, 0px);
+	padding-bottom: env(safe-area-inset-bottom, 0px);
+	padding-left: env(safe-area-inset-left, 0px);
+}
 
 #status {
 	position: absolute; inset: 0;
@@ -123,6 +153,7 @@ $GODOT_HEAD_INCLUDE
 </head>
 <body>
 	<canvas id="canvas">Your browser does not support the canvas tag.</canvas>
+	<div id="safe-probe"></div>
 	<noscript>需要開啟 JavaScript 先玩得到。 This game needs JavaScript.</noscript>
 
 	<div id="status">
@@ -142,6 +173,82 @@ $GODOT_HEAD_INCLUDE
 	<script>
 const GODOT_CONFIG = $GODOT_CONFIG;
 const GODOT_THREADS_ENABLED = $GODOT_THREADS_ENABLED;
+
+/* ── the canvas is sized here, not by the engine ──────────────────────────
+ *
+ * The exporter's default is `canvasResizePolicy: 2`, which sets the canvas to
+ * `window.innerWidth x window.innerHeight`. On a phone browser that is the
+ * WRONG height twice over:
+ *
+ *   · `innerHeight` reports the LARGE viewport — the height the page gets once
+ *     the address bar has retracted — so before you scroll (and this game never
+ *     scrolls) the canvas is taller than the strip you can actually see. The
+ *     overflow goes off the bottom, the address bar covers the top, and the
+ *     game's top bar — turn counter, Essence meter, reroll count — is simply
+ *     not on screen. That is the bug this file exists to fix.
+ *   · it ignores `visualViewport` entirely, so nothing happens when the address
+ *     bar slides in or out mid-play.
+ *
+ * `visualViewport` is the API that answers "what is on the glass right now",
+ * and it fires `resize` for exactly the events that used to go unnoticed. So:
+ * policy 0 (the engine reads the canvas's own width/height and leaves them
+ * alone), and `fit()` below owns them.
+ *
+ * The safe-area insets are published rather than applied. Applying them here
+ * would mean insetting the canvas, i.e. two black bars — the notch strip is
+ * worth having the forest background run into. `SafeArea` (autoload `Safe`)
+ * picks these up and the SCREENS inset their own HUDs instead.
+ */
+GODOT_CONFIG['canvasResizePolicy'] = 0;
+
+(function () {
+	const canvas = document.getElementById('canvas');
+	const probe = document.getElementById('safe-probe');
+	const px = (v) => parseFloat(v) || 0;
+
+	function fit() {
+		const vv = window.visualViewport;
+		// `Math.round`, not `floor`: flooring both axes every address-bar frame
+		// makes the canvas jitter by a pixel, which on a stretched viewport is a
+		// visible shimmer along the whole UI.
+		const w = Math.round(vv ? vv.width : window.innerWidth);
+		const h = Math.round(vv ? vv.height : window.innerHeight);
+		if (w < 1 || h < 1) { return; }
+		const dpr = window.devicePixelRatio || 1;
+		const bw = Math.round(w * dpr);
+		const bh = Math.round(h * dpr);
+		if (canvas.style.width !== w + 'px') { canvas.style.width = w + 'px'; }
+		if (canvas.style.height !== h + 'px') { canvas.style.height = h + 'px'; }
+		// The engine watches these two attributes under policy 0 and re-reports
+		// the window size to Godot when they change; assigning an unchanged value
+		// still reallocates the drawing buffer, so both are guarded.
+		if (canvas.width !== bw) { canvas.width = bw; }
+		if (canvas.height !== bh) { canvas.height = bh; }
+		const cs = getComputedStyle(probe);
+		window.__dgViewport = {
+			w: w, h: h, dpr: dpr,
+			top: px(cs.paddingTop), right: px(cs.paddingRight),
+			bottom: px(cs.paddingBottom), left: px(cs.paddingLeft),
+		};
+	}
+
+	fit();
+	window.addEventListener('resize', fit);
+	window.addEventListener('orientationchange', fit);
+	if (window.visualViewport) {
+		// `scroll` as well as `resize`: on iOS the address bar collapsing is
+		// reported as a scroll of the visual viewport, not as a resize of it.
+		window.visualViewport.addEventListener('resize', fit);
+		window.visualViewport.addEventListener('scroll', fit);
+	}
+	// Rotating a phone lands the new metrics one frame after the event on every
+	// browser measured, so the handlers above are re-run on the next two frames.
+	window.addEventListener('orientationchange', function () {
+		requestAnimationFrame(fit);
+		requestAnimationFrame(function () { requestAnimationFrame(fit); });
+	});
+}());
+
 const engine = new Engine(GODOT_CONFIG);
 
 (function () {

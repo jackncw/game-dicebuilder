@@ -24,7 +24,7 @@ func _ready() -> void:
 	var title := UIKit.title(Data.t("ui_codex"), UIKit.F_H1)
 	title.anchor_left = 0.0
 	title.anchor_right = 1.0
-	title.offset_top = UIKit.S4
+	Safe.pin_top(title, UIKit.S4)
 	add_child(title)
 
 	var tabs := HBoxContainer.new()
@@ -32,8 +32,7 @@ func _ready() -> void:
 	tabs.add_theme_constant_override("separation", 14)
 	tabs.anchor_left = 0.0
 	tabs.anchor_right = 1.0
-	tabs.offset_top = 72
-	tabs.offset_bottom = 140
+	Safe.pin_band(tabs, 72, 140)
 	add_child(tabs)
 	for pair in [["chars", "ui_codex_chars"], ["mobs", "ui_codex_mobs"]]:
 		var key: String = pair[0]
@@ -47,10 +46,10 @@ func _ready() -> void:
 
 	scroll = ScrollContainer.new()
 	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scroll.offset_top = 150
+	Safe.pin_top(scroll, 150)
 	scroll.offset_left = UIKit.S4
 	scroll.offset_right = -UIKit.S4
-	scroll.offset_bottom = -128
+	Safe.pin_bottom(scroll, 128)
 	add_child(scroll)
 	body = VBoxContainer.new()
 	body.add_theme_constant_override("separation", UIKit.S3)

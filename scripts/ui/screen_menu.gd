@@ -5,7 +5,14 @@ extends Control
 ## party standing on the forest floor across the bottom — the screen has to
 ## carry the game's look before the player has seen a single battle.
 
-const GROUND := 1074.0
+## The forest floor the party idles on. A function rather than a constant since
+## round 6: everything below it — the pawns, the loose dice, the "flick the
+## dice" hint — hangs off this line, and on a phone with a home indicator the
+## whole tableau has to come up with it or the hint ends up under the hardware.
+const GROUND_BASE := 1074.0
+
+static func ground() -> float:
+	return GROUND_BASE - Safe.bottom
 
 
 func setup(_args: Dictionary) -> void:
@@ -13,7 +20,7 @@ func setup(_args: Dictionary) -> void:
 
 
 func _ready() -> void:
-	add_child(UIKit.background(1, 150.0, GROUND))
+	add_child(UIKit.background(1, 150.0, ground()))
 	# the menu is allowed to be a picture rather than a backdrop: light comes
 	# down through the canopy into the clearing the party is standing in
 	var shafts := Forest.LightShafts.new()
@@ -28,7 +35,7 @@ func _build_title() -> void:
 	var head := VBoxContainer.new()
 	head.anchor_left = 0.0
 	head.anchor_right = 1.0
-	head.offset_top = 150
+	Safe.pin_top(head, 150)
 	head.add_theme_constant_override("separation", UIKit.S2)
 	add_child(head)
 
@@ -80,12 +87,12 @@ func _build_party() -> void:
 		var sb := UIKit.flat_box(Color(0, 0, 0, 0.28), 999, 0, UIKit.OUTLINE, 0)
 		sb.set_border_width_all(0)
 		shadow.add_theme_stylebox_override("panel", sb)
-		shadow.position = Vector2(x - 50, GROUND + 4)
+		shadow.position = Vector2(x - 50, ground() + 4)
 		shadow.size = Vector2(100, 18)
 		shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		stage.add_child(shadow)
 		var pa := PawnArt.fitted(ids[i], Vector2(168, 168))
-		pa.position = Vector2(x, GROUND + 12)
+		pa.position = Vector2(x, ground() + 12)
 		stage.add_child(pa)
 
 	# A few dice scattered on the forest floor — the same 3D widget the battle
@@ -105,7 +112,7 @@ func _build_party() -> void:
 			[368.0, cast[5], 4, 0.05]]
 	for p in props:
 		var dv := Die3D.new(Vector2(96, 96))
-		dv.position = Vector2(float(p[0]) - 48.0, GROUND + 36.0)
+		dv.position = Vector2(float(p[0]) - 48.0, ground() + 36.0)
 		dv.rotation = float(p[3])
 		stage.add_child(dv)
 		dv.set_die(_hero_die_faces(String(p[1])), int(p[2]))
@@ -115,7 +122,7 @@ func _build_party() -> void:
 	var hint := UIKit.outlined(UIKit.text_block(
 			Data.bi("撥動骰子", "flick the dice"),
 			UIKit.F_CAPTION, UITheme.CREAM_DARK, 300.0), 3)
-	hint.position = Vector2(210, GROUND + 140.0)
+	hint.position = Vector2(210, ground() + 140.0)
 	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stage.add_child(hint)
 
@@ -135,7 +142,7 @@ func _build_buttons() -> void:
 	var center := Control.new()
 	center.anchor_left = 0.0
 	center.anchor_right = 1.0
-	center.offset_top = 452
+	Safe.pin_top(center, 452)
 	add_child(center)
 	var col := VBoxContainer.new()
 	col.anchor_left = 0.5

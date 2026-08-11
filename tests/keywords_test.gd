@@ -149,6 +149,11 @@ func _ready() -> void:
 	_t_passive_held_breath()
 	_t_passive_quilled_hide()
 	_t_passive_ancient_warden()
+	# round 6, task 3 — the Essence overhaul
+	_t_u1_regen()
+	_t_u2_essence_reroll()
+	_t_essence_faces()
+	_t_attuned_aim_charge()
 	_t_passive_call_and_answer()
 	_t_passive_cornered_fury()
 	print("KEYWORDS: %d tests, %d failures" % [tests, fails])
@@ -398,10 +403,12 @@ func _t_wild() -> void:
 func _t_mana_spell() -> void:
 	var bc := _mk(["OWL", "HARE", "BADGER", "HEDGE"], ["E01"])
 	_silence_enemies(bc)
-	_check(bc.s.mana == 3, "ancient warden start mana 3")
+	_check(bc.s.mana == 3 + BattleCore.MANA_REGEN, "ancient warden start mana %d, got %d"
+			% [3 + BattleCore.MANA_REGEN, bc.s.mana])
 	_face(bc, 0, "owl_gather2")
 	bc.use_face(0, 0)
-	_check(bc.s.mana == 5, "gather +2 → 5")
+	_check(bc.s.mana == 5 + BattleCore.MANA_REGEN, "gather +2 → %d, got %d"
+			% [5 + BattleCore.MANA_REGEN, bc.s.mana])
 	bc.s.mana = 1
 	_face(bc, 1, "owl_starfall")     # spell 3
 	var c := bc.can_use(1, 0)
@@ -669,13 +676,19 @@ func _t_reroll_sources() -> void:
 	# no base rerolls any more
 	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E01"])
 	_check(bc.s.rerolls == 0, "base rerolls are 0, got %d" % bc.s.rerolls)
-	# N01 森林徽章 (+1 per battle) and N11 幸運兔腳 (+2 on turn 1) stack to 3 on
-	# the first turn
-	var bc2 := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E01"], {"relics": ["N01", "N11"]})
-	_check(bc2.s.rerolls == 3, "N01+N11 give 3 rerolls on turn 1, got %d" % bc2.s.rerolls)
+	# N11 幸運兔腳 (+2 on turn 1) is the last flat reroll relic standing — round 6
+	# turned 森林徽章 and 節拍器 into the two Essence relics, because U2 made
+	# Essence itself the party's reroll economy.
+	var bc2 := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E01"], {"relics": ["N11"]})
+	_check(bc2.s.rerolls == 2, "N11 gives 2 rerolls on turn 1, got %d" % bc2.s.rerolls)
 	_silence_enemies(bc2)
 	bc2.end_turn()
-	_check(bc2.s.rerolls == 1, "turn 2 keeps only N01's +1, got %d" % bc2.s.rerolls)
+	_check(bc2.s.rerolls == 0, "turn 2 has none of them left, got %d" % bc2.s.rerolls)
+	# …and U2 is where a party gets one now
+	var bc2b := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E01"])
+	bc2b.s.mana = BattleCore.ESSENCE_REROLL_COST
+	_check(bc2b.buy_reroll() and bc2b.s.rerolls == 1,
+			"U2 is a reroll source, got %d" % bc2b.s.rerolls)
 	# the Insight face is still a source
 	var bc3 := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E01"])
 	_silence_enemies(bc3)
@@ -1162,9 +1175,145 @@ func _t_passive_quilled_hide() -> void:
 
 func _t_passive_ancient_warden() -> void:
 	var bc := _mk(["OWL", "HARE", "BADGER", "HEDGE"], ["E01"])
-	_check(bc.s.mana == 3, "owl opens the fight with 3 essence, got %d" % bc.s.mana)
+	_check(bc.s.mana == 3 + BattleCore.MANA_REGEN,
+			"owl opens the fight with 3 essence + U1, got %d" % bc.s.mana)
+	# U1 changed the second half of this: a party WITHOUT the Owl no longer
+	# opens on nothing. That is the point of the rule — the Owl's passive is now
+	# a head start on a resource everybody has, rather than the only tap.
 	var bc2 := _mk(["HARE", "BADGER", "HEDGE", "FOX"], ["E01"])
-	_check(bc2.s.mana == 0, "no owl, no free essence, got %d" % bc2.s.mana)
+	_check(bc2.s.mana == BattleCore.MANA_REGEN,
+			"no owl, just the U1 regen, got %d" % bc2.s.mana)
+	_check(bc.s.mana - bc2.s.mana == 3,
+			"the Owl is still worth exactly his 3-point head start, got %d"
+					% (bc.s.mana - bc2.s.mana))
+
+
+# ============================================================ round 6: Essence
+
+## U1 — the pool fills for everybody, every turn, with nobody's help.
+func _t_u1_regen() -> void:
+	var bc := _mk(["HARE", "BADGER", "HEDGE", "FOX"], ["E01"])
+	_check(bc.s.mana == BattleCore.MANA_REGEN,
+			"turn 1 opens on the regen alone, got %d" % bc.s.mana)
+	_silence_enemies(bc)
+	bc.end_turn()
+	_check(bc.s.mana == BattleCore.MANA_REGEN * 2,
+			"turn 2 adds another, got %d" % bc.s.mana)
+	# and it does not push past the ceiling
+	bc.s.mana = BattleCore.MANA_CAP
+	_silence_enemies(bc)
+	bc.end_turn()
+	_check(bc.s.mana == BattleCore.MANA_CAP,
+			"regen respects the cap, got %d" % bc.s.mana)
+
+
+## U2 — two Essence buys one reroll, once a turn.
+func _t_u2_essence_reroll() -> void:
+	var bc := _mk(["HARE", "BADGER", "HEDGE", "FOX"], ["E01"])
+	bc.s.mana = 5
+	var rr := int(bc.s.rerolls)
+	_check(bc.can_buy_reroll().ok, "the trade is offered with 5 Essence")
+	_check(bc.buy_reroll(), "the trade goes through")
+	_check(bc.s.mana == 5 - BattleCore.ESSENCE_REROLL_COST,
+			"it costs %d, got a pool of %d" % [BattleCore.ESSENCE_REROLL_COST, bc.s.mana])
+	_check(bc.s.rerolls == rr + 1, "it buys exactly one throw, got %d" % (bc.s.rerolls - rr))
+	# once a turn — even with plenty left
+	var c := bc.can_buy_reroll()
+	_check(not c.ok and c.err == "spent", "the second trade this turn is refused")
+	_check(not bc.buy_reroll(), "…and refusing it means refusing it")
+	# …and it comes back next turn
+	_silence_enemies(bc)
+	bc.end_turn()
+	_check(bc.can_buy_reroll().ok, "the trade is back next turn")
+	# not affordable is not offered
+	bc.s.mana = BattleCore.ESSENCE_REROLL_COST - 1
+	var c2 := bc.can_buy_reroll()
+	_check(not c2.ok and c2.err == "mana", "an empty pool cannot buy a throw")
+
+
+## The six new starting faces do what they say, and each hero has one.
+func _t_essence_faces() -> void:
+	# 靈甲: Block AND a point in the pool, off one die
+	var bc := _mk(["BADGER", "HARE", "HEDGE", "FOX"], ["E01"])
+	_silence_enemies(bc)
+	var m0 := int(bc.s.mana)
+	_face(bc, 0, "bdg_essenceguard")
+	_check(bc.use_face(0, 0).ok, "Essence Guard resolves")
+	_check(bc.s.heroes[0].block >= 3, "Essence Guard blocks, got %d" % bc.s.heroes[0].block)
+	_check(bc.s.mana == m0 + 1, "Essence Guard also fills the pool, got %d" % bc.s.mana)
+
+	# 以血引靈: 3 Essence bought with 2 HP
+	var bc2 := _mk(["BOAR", "HARE", "HEDGE", "FOX"], ["E01"])
+	_silence_enemies(bc2)
+	var hp := int(bc2.s.heroes[0].hp)
+	var m2 := int(bc2.s.mana)
+	_face(bc2, 0, "boar_bloodtithe")
+	_check(bc2.use_face(0, 0).ok, "Blood Tithe resolves")
+	_check(bc2.s.mana == m2 + 3, "Blood Tithe draws 3, got %d" % (bc2.s.mana - m2))
+	_check(bc2.s.heroes[0].hp == hp - 2, "Blood Tithe costs 2 HP, got %d" % (hp - bc2.s.heroes[0].hp))
+
+	# 靈棘綻放: a Ritual that pays the whole party
+	var bc3 := _mk(["HEDGE", "HARE", "BADGER", "FOX"], ["E01"])
+	_silence_enemies(bc3)
+	bc3.s.mana = 6
+	_face(bc3, 0, "hedge_essencebloom")
+	_check(bc3.use_face(0, 0).ok, "Essence Bloom resolves")
+	_check(bc3.s.mana == 4, "Essence Bloom costs 2, got a pool of %d" % bc3.s.mana)
+	for j in bc3.s.heroes.size():
+		_check(int(bc3.s.heroes[j].thorns) >= 2,
+				"Essence Bloom thorns hero %d, got %d" % [j, int(bc3.s.heroes[j].thorns)])
+		_check(int(bc3.s.heroes[j].block) >= 2,
+				"Essence Bloom blocks hero %d, got %d" % [j, int(bc3.s.heroes[j].block)])
+
+	# 星落: an area Ritual, and one nobody can cast on an empty pool
+	var bc4 := _mk(["OWL", "HARE", "BADGER", "HEDGE"], ["E01", "E02"])
+	_silence_enemies(bc4)
+	bc4.s.mana = 0
+	_face(bc4, 0, "owl_starshower")
+	_check(not bc4.can_use(0, 0).ok, "Starfall is unusable on an empty pool")
+	bc4.s.mana = 9
+	var before := [int(bc4.s.enemies[0].hp), int(bc4.s.enemies[1].hp)]
+	_check(bc4.use_face(0, 0).ok, "Starfall resolves")
+	_check(int(bc4.s.enemies[0].hp) < before[0] and int(bc4.s.enemies[1].hp) < before[1],
+			"Starfall hits every enemy")
+	_check(bc4.s.mana == 5, "Starfall costs 4, got a pool of %d" % bc4.s.mana)
+
+	# every hero owns at least one Essence face among their twelve starters —
+	# the round's stated goal, asserted rather than eyeballed
+	for hid in GameData.hero_ids():
+		var hd: Dictionary = GameData.heroes[hid]
+		var got := false
+		for fid in Array(hd.start) + Array(hd.start_b):
+			var f: Dictionary = GameData.faces[String(fid)]
+			if f.has("mana") or f.has("spell"):
+				got = true
+		_check(got, "%s starts with an Essence face" % hid)
+
+
+## 引靈瞄準: Essence is the headline, so the die's banked Charge lands on it.
+func _t_attuned_aim_charge() -> void:
+	var bc := _mk(["HARE", "BADGER", "HEDGE", "FOX"], ["E01"])
+	_silence_enemies(bc)
+	_face(bc, 0, "hare_attunedaim")
+	var m := int(bc.s.mana)
+	# cold: the printed 1
+	_check(bc.use_face(0, 0).ok, "Attuned Aim resolves cold")
+	_check(bc.s.mana == m + 1, "cold Attuned Aim draws 1, got %d" % (bc.s.mana - m))
+	# two turns in the lock: 1 + 2
+	var bc2 := _mk(["HARE", "BADGER", "HEDGE", "FOX"], ["E01"])
+	_silence_enemies(bc2)
+	_face(bc2, 0, "hare_attunedaim")
+	bc2.s.heroes[0].lock_turns[0] = 2
+	var m2 := int(bc2.s.mana)
+	_check(bc2.use_face(0, 0).ok, "Attuned Aim resolves charged")
+	_check(bc2.s.mana == m2 + 3,
+			"two layers of Charge make it 3, got %d" % (bc2.s.mana - m2))
+	# and the sentence agrees with the engine, which is what the cast strip shows
+	var bc3 := _mk(["HARE", "BADGER", "HEDGE", "FOX"], ["E01"])
+	_face(bc3, 0, "hare_attunedaim")
+	bc3.s.heroes[0].lock_turns[0] = 2
+	var live := bc3.live_face(0, bc3.hero_face(0, 0))
+	_check(int(live.mana) == 3, "the live face reports 3, got %d" % int(live.mana))
 
 
 func _t_passive_call_and_answer() -> void:

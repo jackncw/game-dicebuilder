@@ -34,11 +34,16 @@ No install; runs in a desktop or mobile browser. First load is about 17 MB over 
 
 - **擲骰,唔係抽牌。** 每個英雄有自己一副骰面。回合開始全隊擲骰,你決定邊粒骰
   打邊個目標。鎖骰、重擲、復原都喺同一個階段做,唔使分開兩步。
+- **骰下面寫住佢做乜。** 面名之下有一行速記(⚔4 ➤ = 攻 4 穿刺),而你一拎起
+  粒骰,中央嗰條帶就即刻讀出成句效果 —— 數值係計晒當前修正之後嗰個。長按
+  仍然係最終解釋層。
+- **靈息係全隊嘅。** 每回合開始全隊 +1;可以餵靈術面,亦可以隨時用 2 點換一次
+  重擲(每回合一次)。六個角色各有一個按自己定位嘅靈息面。
 - **骰面就係你副牌。** 戰鬥之後執新骰面、換走舊嘅,或者用骰之泉重鑄。組合係
   由骰面砌返出嚟嘅,唔係由角色等級。
 - **三章,一隻怪打三次。** 同一隻小怪喺第 1、2、3 章分別係 T1/T2/T3 —— 越後
   面越腐化:體型大一級、眼著得更亮、裂紋整條發光、常駐黑霧。
-- **6 隻英雄、10 隻小怪、6 個 Boss、150 個骰面、21 件遺物、12 個事件。**
+- **6 隻英雄、10 隻小怪、6 個 Boss、160 個骰面、20 件遺物、12 個事件。**
 
 Roll, don't draw: each hero owns a die, the whole party rolls at the start of a
 turn, and you decide which face goes where. Locking, rerolling and undo all
@@ -65,8 +70,13 @@ godot --path .                      # 直接行 / just run it
 ### 測試 / Tests
 
 ```bash
-bash tools/test_all.sh              # 13 個套件,headless
+bash tools/test_all.sh              # 15 個套件,headless
+bash tools/web_test.sh              # 瀏覽器版面迴歸(要 node + Chromium)
 ```
+
+`test_all.sh` 淨係要 Godot,兩分鐘跑完。`web_test.sh` 要出一次 web export、
+裝 Playwright 同 Chromium,喺真瀏覽器度用真機高度(390×664 / 360×640)
+開住戰鬥畫面,assert 頂欄完整喺可視區入面 —— 係出貨前跑嗰個,唔係每次改嘢跑嗰個。
 
 ### 出 web build / Building the web export
 
@@ -84,7 +94,8 @@ COOP/COEP response headers,GitHub Pages 根本唔俾你設 header。
 python tools/enemy_cutout.py        # 由參考圖切 17 隻敵人 sprite
 python tools/font_build.py          # 砌返隻字體(要上網)
 bash tools/gallery.sh <name>        # 全遊戲截圖(要真視窗)
-godot --headless --path . -- --sim 200   # 平衡模擬器
+godot --headless --path . -- --sim 200      # 平衡模擬器
+godot --headless --path . -- --balance 150  # 驗收矩陣 + 零使用審計
 ```
 
 ## 呢個 repo 入面 / Repository layout
@@ -96,7 +107,8 @@ godot --headless --path . -- --sim 200   # 平衡模擬器
 | `data/*.json` | 骰面、英雄、敵人、遺物、事件、雙語文案 |
 | `assets/enemies/` | `tools/enemy_cutout.py` 切出嚟嘅 sprite + 發光遮罩 |
 | `tools/` | pipeline、截圖工具、測試 runner |
-| `tests/` | 13 個 headless 套件 |
+| `tests/` | 15 個 headless 套件 |
+| `web/` | Playwright 版面迴歸(瀏覽器,唔喺 `test_all.sh` 入面) |
 | `docs/` | **web build 本身**(Pages 服務呢個資料夾)+ 設計文件 |
 | `DECISIONS.md` | 規格冇寫、由實作決定咗嘅嘢,連理由 |
 | `BALANCE.md` | 平衡迭代記錄 |
@@ -109,6 +121,10 @@ godot --headless --path . -- --sim 200   # 平衡模擬器
   清網站資料,存檔就冇咗。已驗證 refresh 之後 meta 同 run 存檔都仲喺度。
 - **音效係即時合成嘅**,部分瀏覽器要你先撳一下畫面先會出聲(autoplay 政策)。
 - 非多線程 build,理由見上面。
+- **canvas 跟 `visualViewport` 走。** 手機瀏覽器嘅 `window.innerHeight` 報嘅係
+  地址欄縮埋之後嘅高度,所以引擎預設嘅 canvas 尺寸會高過你實際睇到嗰條 ——
+  頂欄就係咁唔見咗。而家 shell 自己量 `visualViewport` 同 `env(safe-area-inset-*)`,
+  遊戲再將 HUD 縮入安全區。詳情見 DECISIONS.md 第六輪。
 
 ## 授權 / Licence
 

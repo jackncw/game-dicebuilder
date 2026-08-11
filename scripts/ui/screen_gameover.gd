@@ -26,7 +26,7 @@ func _ready() -> void:
 	var vb := VBoxContainer.new()
 	vb.anchor_left = 0.0
 	vb.anchor_right = 1.0
-	vb.offset_top = 380
+	Safe.pin_top(vb, 380)
 	vb.add_theme_constant_override("separation", UIKit.S5)
 	add_child(vb)
 	vb.add_child(UIKit.outlined(UIKit.text_block(Data.t("ui_defeat"),

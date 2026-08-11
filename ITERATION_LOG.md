@@ -259,3 +259,54 @@ debug contact sheet 落 `qa/cutout_contact.png` / `qa/head_contact.png`。
 | 圖鑑 | ✅ 最大嘅一個框,細節全出 |
 | offer 頭像 | ✅ 面部填滿圓框,認人零難度 |
 | 戰鬥英雄卡 | ⚠ 武器同物種輪廓清楚(弓/斧/琥珀杖/圓盾都認得出),但**五官喺呢個尺寸係臨界** —— 四個英雄要塞入 540px,單張只得約 55px 高。建議 Jack 喺真機睇一次再決定要唔要改成用頭像 |
+
+---
+
+## Iteration R6 — 骰面資訊(第六輪任務2)
+
+工具:`bash tools/gallery.sh r6a --only battle`(而家四個解像度:720 / 540 /
+390×664 / 360×640,後兩個係真機可視高度,連瀏海 inset)
+
+### 起點:P1 — 骰面唔開 tooltip 就讀唔到
+骰上得 glyph + 數字、骰下得一個名。「翻湧 / Surge」對記得嗰個面嘅人有用,對
+第一次見嘅人完全冇資訊 —— 讀自己一手八粒骰嘅唯一方法係逐粒長按半秒。
+
+### 第 1 輪 — 加速記 pip + 施放帶效果句
+
+| 做咗 | 檔案 |
+|---|---|
+| `Shorthand`:主效果 + 代價 + 修飾,最多 3 個 glyph+數字 pip | `scripts/ui/shorthand.gd` (new) |
+| `BattleCore.live_face()`:折算晒弱化/蓄力/呼應/被動/遺物之後嘅面 | `scripts/core/battle_core.gd` |
+| 骰下第二行 = pip 串;施放帶 = 完整雙語效果句 | `scripts/ui/screen_battle.gd` |
+| 敵人意圖 chip 改用同一套 pip 語法 | 同上 |
+
+**自評:P1 未清。** 施放帶**完全空白** —— 文字係啱嘅、句子係啱嘅,但個 Label
+高度得 1px。成因:`clip_text = true` 令 Label 嘅最小高度報 1,而 PanelContainer
+只會俾細路仔佢嘅最小尺寸。改成真嘅 fit(`_cast_font_for()` 用
+`get_multiline_string_size` 逐級試),同時施放帶 62 → 78px(錢由敵人區出)。
+
+### 第 2 輪 — 施放帶活返
+✅ 施放帶讀到:「貫矢 Pierce Arrow — 對目標造成 5 點傷害(無視格擋)。/
+Deal 5 damage to the target (ignores Block).」而且個 5 係**計晒屏息被動之後**
+嘅實際值,唔係 faces.json 入面嗰個 2。
+
+**自評:540 之下 P2。** pip 讀到數字同顏色(紅=攻、藍=擋、綠=療、紫=資源),
+但 glyph 形狀喺 11px 之下糊咗,pip 同英雄卡底色差得太少。
+
+### 第 3 輪 — pip 加鑲邊、放大
+| 改動 | 理由 |
+|---|---|
+| pip 加 1px 真色鑲邊 | 冇鑲邊喺深色英雄卡上面糊成一撻;`UIKit.chip` 嘅 2px 會食咗 76px 入面嘅 4px |
+| 字級 `F_CAPTION` → `F_BODY_SM` | `_fit` 會等比縮,而**大部分面得 1-2 個 pip**。為常見情況揀大字、罕見情況先縮 |
+
+**自評:P1 清零。**
+- 唔開 tooltip 睇到效果 ✅(⚔5 ➤ / 🛡3 棘1 / ✚2 / 🌿+1)
+- 540 之下讀到 ✅
+- 施放帶即時效果句,數值計晒修正 ✅
+- 敵人意圖同玩家骰面講同一種語言 ✅
+- 長按 glossary 照舊係最終解釋層 ✅
+
+### 順手量到嘅
+- 四個動作掣喺 F_H2 之下加埋 749px > 720px canvas(新增咗靈息重擲掣),
+  「結束回合」掛咗出右邊 → 降到 F_BODY,540 之下仍有 16.5 物理像素。
+- `layout_test` 由 90 個 assertion 升到 372 個(加咗四個裝置幾何)。

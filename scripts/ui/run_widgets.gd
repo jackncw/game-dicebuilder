@@ -18,7 +18,7 @@ static func topbar() -> Control:
 	var bar := HBoxContainer.new()
 	bar.anchor_left = 0.0
 	bar.anchor_right = 1.0
-	bar.offset_top = UIKit.S3
+	Safe.pin_top(bar, UIKit.S3)
 	bar.offset_left = UIKit.S4
 	bar.offset_right = -UIKit.S4
 	bar.add_theme_constant_override("separation", UIKit.S3)

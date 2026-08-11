@@ -16,6 +16,11 @@ static func simulate_run(team_ids: Array, seed_v: int, meta_levels := {}, stop_a
 	GameData.load_all()
 	var run := RunState.new_run(team_ids, seed_v, meta_levels)
 	var rng := RunState.rng_of(run)
+	# `--commons`: hand the party this relic from the first fight, so the number
+	# that comes back is the relic's and not the drop table's
+	var forced_common := String(opts.get("force_common", ""))
+	if forced_common != "":
+		_add_relic(run, forced_common)
 	var out := {
 		"win": false, "died_chapter": 0, "died_at": "", "battles": 0,
 		"turns_total": 0, "dmg_taken": 0, "nodes": 0,
@@ -53,17 +58,20 @@ static func simulate_run(team_ids: Array, seed_v: int, meta_levels := {}, stop_a
 		if battle_res.get("defeat", false):
 			out.died_chapter = int(run.chapter)
 			out.died_at = node_type
+			out["relics"] = run.relics.duplicate()
 			return out
 		if node_type == "boss":
 			out.chapters_cleared = int(run.chapter)
 			if int(run.chapter) >= stop_after_chapter:
 				out.win = true
+				out["relics"] = run.relics.duplicate()
 				return out
 			run.chapter = int(run.chapter) + 1
 			out.chapter_reached = int(run.chapter)
 			run.map = RunState.gen_map(int(run.chapter), rng)
 			run.row = -1
 			run.col = -1
+	out["relics"] = run.relics.duplicate()
 	return out
 
 
@@ -76,6 +84,7 @@ static func batch(n: int, base_seed := 20260805, team := [], opts := {}) -> Dict
 		"battles": 0, "turns": 0, "dmg": 0,
 		"deaths": {},     # "ch<n>:<node type>" → count
 		"advanced": {},   # relic id → {picks, wins} for the pick-rate report
+		"relic_runs": {}, # relic id → runs that ended holding it (zero-use audit)
 	}
 	for i in n:
 		var res := simulate_run(team, base_seed + i * 7919, {}, 3, opts)
@@ -91,6 +100,11 @@ static func batch(n: int, base_seed := 20260805, team := [], opts := {}) -> Dict
 		if not res.win:
 			var key := "ch%d:%s" % [int(res.died_chapter), String(res.died_at)]
 			r.deaths[key] = int(r.deaths.get(key, 0)) + 1
+		# every relic the run was still carrying when it ended — a relic that
+		# turns up in no run at all is a drop-table bug, not a weak relic
+		for held_v in res.get("relics", []):
+			var held := String(held_v)
+			r.relic_runs[held] = int(r.relic_runs.get(held, 0)) + 1
 		# an Advanced relic is only ever picked once per boss, so a run's list is
 		# the set of build axes it actually committed to
 		for rid_v in res.get("advanced", []):
@@ -226,6 +240,11 @@ const ACCEPT_SEEDS := [20260805, 987654, 424242]
 ## edge has not actually decided anything — rerun at n=300.
 const BAND_EDGE_MARGIN := 3
 
+## The run size at which this harness has spent everything it can: three seed
+## sets of 300 is 900 runs, and the seed-to-seed spread stops shrinking there.
+## An edge reading at this size is a fact about the build, not about the sample.
+const ACCEPT_N_FULL := 300
+
 ## Target bands, in the order they are printed.
 const TARGET_BANDS := [
 	{"label": "ch1 clear", "key": "ch1", "lo": 85, "hi": 92},
@@ -248,11 +267,21 @@ static func _median(vals: Array) -> float:
 ## The acceptance run: three independent seed sets, `n` runs each, printed side
 ## by side against the spec targets, judged on the MEDIAN. This is what
 ## BALANCE.md's table is cut from.
+##
+## The zero-use audit at the bottom is not optional and not a separate command,
+## because the one time it mattered it was found by accident: 豎棘 reported
+## 0/3491 uses and it took a person noticing to tell "the policy has no branch
+## for this face" apart from "this face is bad". Anything the harness never
+## plays is a number BALANCE.md is quoting without evidence, so the report now
+## says so itself.
 ##   godot --headless --path . -- --balance [n]
 static func print_matrix(n := 150, seeds := ACCEPT_SEEDS, team := []) -> Array:
 	if team.is_empty():
 		team = GameData.starter_hero_ids()
 	var reports := []
+	# the audit rides along on the acceptance runs rather than costing its own
+	# batch — these are the very runs the shipped numbers come from
+	face_tel_begin()
 	for sd in seeds:
 		var r := batch(n, int(sd), team)
 		reports.append(r)
@@ -284,8 +313,14 @@ static func print_matrix(n := 150, seeds := ACCEPT_SEEDS, team := []) -> Array:
 			verdict = "in band"
 			var edge: float = minf(med - float(band.lo), float(band.hi) - med)
 			if edge <= float(BAND_EDGE_MARGIN):
-				verdict += " (edge, %.1fpt — rerun at n=300)" % edge
-				needs_rerun = true
+				# At n=300 the advice to "rerun at n=300" is the report arguing
+				# with itself. Past that size the edge is not a sampling problem
+				# you can spend your way out of — it is where the number lives.
+				if n >= ACCEPT_N_FULL:
+					verdict += " (edge, %.1fpt — at the resolution floor)" % edge
+				else:
+					verdict += " (edge, %.1fpt — rerun at n=%d)" % [edge, ACCEPT_N_FULL]
+					needs_rerun = true
 		print("%s  %6.1f%%  %s" % [line, med, verdict])
 	var turns_line := "%-20s" % "avg turns 4-6"
 	var turn_vals := []
@@ -299,7 +334,8 @@ static func print_matrix(n := 150, seeds := ACCEPT_SEEDS, team := []) -> Array:
 	if needs_rerun:
 		print("")
 		print("!! at least one median sits within %dpt of a band edge — that is "
-				% BAND_EDGE_MARGIN + "inside this harness's noise. Rerun: --balance 300")
+				% BAND_EDGE_MARGIN + "inside this harness's noise. Rerun: --balance %d"
+				% ACCEPT_N_FULL)
 	# and the Advanced tier, pooled across both seed sets
 	var pooled := {"advanced": {}}
 	for rep3 in reports:
@@ -311,7 +347,134 @@ static func print_matrix(n := 150, seeds := ACCEPT_SEEDS, team := []) -> Array:
 	print("")
 	print("=== ADVANCED RELICS, all seed sets pooled ===")
 	print_advanced(pooled)
+	var face_t: Dictionary = face_tel.duplicate(true)
+	face_tel_end()
+	print_zero_use_audit(reports, face_t, n * seeds.size(), team)
 	return reports
+
+
+# ============================================================ zero-use audit
+##
+## What the harness NEVER played. Two readings, because a zero means two very
+## different things depending on which column it sits in:
+##
+##   · a face that was rolled and never spent is either a bad face or a hole in
+##     `_score_die` — the policy cannot pick up what it has no branch for, and
+##     that failure looks exactly like a dead design;
+##   · a face that was never even ROLLED never reached a die: it is out of the
+##     drop pools this party can draw from, which is a data question, not a
+##     design one;
+##   · a relic held by no run is the same drop-table question, one tier up.
+##
+## Nothing here fails the build. It is a list of things that have to be
+## EXPLAINED in BALANCE.md — the standing rule since round 6 is that an unused
+## thing counts as understood only once somebody has written down which of the
+## three it is. `tests/data_policy_test.gd` is the half of this that CAN fail:
+## it checks statically that every face kind has a policy branch at all.
+
+## At or below this share of its rolls actually being spent, a face is reported.
+const AUDIT_DEAD_PCT := 0.5
+
+
+static func print_zero_use_audit(reports: Array, face_t: Dictionary, runs: int,
+		team := []) -> void:
+	GameData.load_all()
+	print("")
+	print("=== ZERO-USE AUDIT (%d runs) — anything the harness never played ===" % runs)
+	print("threshold: a face spent on %.1f%% or fewer of the turns it was rolled;" % AUDIT_DEAD_PCT)
+	print("           a relic carried by %.1f%% or fewer of the runs." % AUDIT_DEAD_PCT)
+	print("Every line below needs a written explanation in BALANCE.md before the")
+	print("numbers in this report count as read — see round 6's 豎棘 (0/3491, a")
+	print("missing policy branch rather than a dead face).")
+	# --- faces: fold the per-hero/per-slot telemetry down to one row per face id
+	var rolled := {}
+	var used := {}
+	for k in face_t.get("rolled", {}):
+		var fid := String(k).split("|")[2]
+		rolled[fid] = int(rolled.get(fid, 0)) + int(face_t.rolled[k])
+	for k2 in face_t.get("used", {}):
+		var fid2 := String(k2).split("|")[2]
+		used[fid2] = int(used.get(fid2, 0)) + int(face_t.used[k2])
+	var dead := []
+	var never := []
+	var face_ids: Array = GameData.faces.keys()
+	face_ids.sort()
+	for fid_v in face_ids:
+		var fid3 := String(fid_v)
+		# `_comment` is a String sitting next to the real entries in the JSON
+		if fid3 == "blank" or not (GameData.faces[fid3] is Dictionary):
+			continue   # the cursed-slot placeholder; it is not a face you play
+		var rl := int(rolled.get(fid3, 0))
+		if rl == 0:
+			never.append(fid3)
+			continue
+		var us := int(used.get(fid3, 0))
+		var rate := 100.0 * float(us) / float(rl)
+		if rate <= AUDIT_DEAD_PCT:
+			dead.append({"id": fid3, "rolled": rl, "used": us, "rate": rate})
+	print("")
+	print("--- faces rolled but (near enough) never spent: %d ---" % dead.size())
+	if dead.is_empty():
+		print("  (none)")
+	for row in dead:
+		var f: Dictionary = GameData.faces.get(String(row.id), {})
+		print("  %-22s %-10s rolled %6d  used %5d  %5.2f%%" % [String(row.id),
+				String(f.get("zh", "")), int(row.rolled), int(row.used), float(row.rate)])
+	# Never-rolled faces split in two, because only one half is a question.
+	# A face belonging to a hero who was not in the party could not possibly be
+	# rolled — listing those individually would bury the ones that matter under
+	# forty expected zeros. In scope: the shared pool, and the party's own
+	# heroes' faces.
+	var in_scope := []
+	var off_party := {}
+	for fid4 in never:
+		var owner := String(GameData.faces[fid4].get("hero", ""))
+		if owner != "" and owner not in team:
+			off_party[owner] = int(off_party.get(owner, 0)) + 1
+		else:
+			in_scope.append(fid4)
+	print("")
+	print("--- faces never rolled at all, party %s: %d in scope ---"
+			% ["+".join(PackedStringArray(team)), in_scope.size()])
+	if in_scope.is_empty():
+		print("  (none — every shared-pool and party face reached a die)")
+	for fid5 in in_scope:
+		var f2: Dictionary = GameData.faces[fid5]
+		print("  %-22s %-10s %-6s owner %s" % [fid5, String(f2.get("zh", "")),
+				String(f2.get("rarity", "")), String(f2.get("hero", "(shared)"))])
+	if not off_party.is_empty():
+		var owners: Array = off_party.keys()
+		owners.sort()
+		var parts := []
+		for ow in owners:
+			parts.append("%s %d" % [String(ow), int(off_party[ow])])
+		print("  (plus %s faces belonging to heroes outside this party — expected)"
+				% ", ".join(PackedStringArray(parts)))
+	# --- relics
+	var held := {}
+	for rep in reports:
+		for rid in rep.get("relic_runs", {}):
+			held[rid] = int(held.get(rid, 0)) + int(rep.relic_runs[rid])
+	print("")
+	print("--- relics, share of runs that ended holding one ---")
+	print("%-5s %-12s %8s %8s" % ["id", "name", "runs", "share"])
+	var rids: Array = GameData.relics.keys()
+	rids.sort()
+	var cold := []
+	for rid2_v in rids:
+		var rid2 := String(rid2_v)
+		if not (GameData.relics[rid2] is Dictionary):
+			continue
+		var h := int(held.get(rid2, 0))
+		var share := 100.0 * float(h) / maxf(float(runs), 1.0)
+		print("%-5s %-12s %8d %7.2f%%" % [rid2,
+				String(GameData.relics[rid2].get("zh", "")), h, share])
+		if share <= AUDIT_DEAD_PCT:
+			cold.append(rid2)
+	if cold.is_empty():
+		print("  → every relic reached at least one party. No entries to explain.")
+	else:
+		print("  → EXPLAIN: %s" % ", ".join(PackedStringArray(cold)))
 
 
 # ============================================================ battle
@@ -420,6 +583,10 @@ static func _add_relic(run: Dictionary, rid: String) -> void:
 ## kill > disable big threat (stun/weaken) > damage > block vs expected dmg
 ## > heal low allies.
 static func play_battle(bc: BattleCore, max_turns := 60) -> void:
+	if ess_tel.get("on", false):
+		# the opening pool (Owl passive, 靈息水晶, U1's first tick) is income
+		ess_tel.last = 0
+		_ess_sample(bc)
 	while not bc.s.over and bc.s.turn <= max_turns:
 		_maybe_potion(bc)   # offensive potions before acting
 		var guard := 0
@@ -432,18 +599,316 @@ static func play_battle(bc: BattleCore, max_turns := 60) -> void:
 			# turn. Insight faces and the Lucky keyword hand rerolls out in the
 			# middle of a turn and sim v1 simply banked and wasted them, which
 			# undervalued both of those keywords in every v1 number.
+			_maybe_buy_reroll(bc)
 			_spend_rerolls(bc)
 			var best := _best_action(bc)
 			if best.is_empty():
 				break
 			_charge_note_use(bc, best)
+			_face_note_use(bc, best)
+			_ess_note_use(bc, best)
 			var res: Dictionary = bc.use_face(int(best.hero), int(best.die), best.params)
 			if not res.get("ok", false):
 				break
+			_ess_sample(bc)
 		_maybe_potion(bc)   # emergency heals after acting
 		if not bc.s.over:
+			_ess_note_turn_end(bc)
 			bc.end_turn()
+			# after the boundary, so the turn-start regeneration and 靈息迴環 are
+			# booked as income rather than appearing from nowhere
+			_ess_sample(bc)
 	_charge_note_battle_end(bc)
+	_face_note_rolls(bc)
+
+
+# ============================================================ Essence economy
+##
+## Round 6's stated goal for Essence was "easier to come by, useful to more of
+## the cast, and present". The first two are win-rate questions the balance
+## matrix already answers. PRESENCE is not — a resource can be perfectly
+## balanced and still be something the player never thinks about — so it gets
+## its own measurement, and this is it:
+##
+##   · income and spend per turn, which is the size of the economy;
+##   · the share of turns in which a Ritual actually goes off, which is whether
+##     the pool is being SPENT rather than accumulated;
+##   · how often the U2 trade is taken, which is whether Essence has a floor of
+##     usefulness for a party holding no Rituals at all;
+##   · per-hero Essence-face usage, which is whether the new faces are being
+##     played or are simply sitting on the dice.
+##
+## Off unless `ess_tel_begin()` has been called, so the acceptance matrix pays
+## nothing for it.
+static var ess_tel := {}
+
+
+static func ess_tel_begin() -> void:
+	ess_tel = {
+		"on": true, "last": 0, "turns": 0, "income": 0, "spend": 0,
+		"cast_turns": 0, "casts": 0, "buys": 0, "turn_had_cast": false,
+		"by_face": {},        # "HERO|face_id" → uses
+		"capped": 0,          # turns that ended with the pool full
+	}
+
+
+static func ess_tel_end() -> void:
+	ess_tel = {}
+
+
+## Book the pool's movement since the last look. Every path that can change
+## Essence runs through one of the two call sites (an action, or the turn
+## boundary), so income and spend are measured rather than predicted.
+static func _ess_sample(bc: BattleCore) -> void:
+	if not ess_tel.get("on", false):
+		return
+	var now := int(bc.s.mana)
+	var d := now - int(ess_tel.last)
+	if d > 0:
+		ess_tel.income += d
+	elif d < 0:
+		ess_tel.spend += -d
+	ess_tel.last = now
+
+
+static func _ess_note(kind: String) -> void:
+	if not ess_tel.get("on", false):
+		return
+	if kind == "buy":
+		ess_tel.buys += 1
+
+
+static func _ess_note_use(bc: BattleCore, best: Dictionary) -> void:
+	if not ess_tel.get("on", false):
+		return
+	var i := int(best.hero)
+	var fd := bc.die_face(i, int(best.die))
+	if fd.is_empty() or not (fd.has("mana") or fd.has("spell")):
+		return
+	var k := "%s|%s" % [String(bc.s.heroes[i].id), String(fd.get("id", "?"))]
+	ess_tel.by_face[k] = int(ess_tel.by_face.get(k, 0)) + 1
+	if fd.has("spell"):
+		ess_tel.casts += 1
+		ess_tel.turn_had_cast = true
+
+
+static func _ess_note_turn_end(bc: BattleCore = null) -> void:
+	if not ess_tel.get("on", false):
+		return
+	ess_tel.turns += 1
+	# A turn that ends with the pool full is a turn whose regeneration was
+	# thrown away. It is the honest counterweight to U1: income that cannot land
+	# is not income, and if this number is large the answer is more to SPEND
+	# Essence on, not more Essence.
+	if bc != null and int(bc.s.mana) >= BattleCore.MANA_CAP:
+		ess_tel.capped += 1
+	if bool(ess_tel.turn_had_cast):
+		ess_tel.cast_turns += 1
+	ess_tel.turn_had_cast = false
+
+
+## The Essence economy report.
+##   godot --headless --path . -- --essence [n]
+static func print_essence_report(n := 150, seed_v := 20260805) -> Dictionary:
+	GameData.load_all()
+	ess_tel_begin()
+	# the reference party, then one solo party per hero — the starters alone
+	# would never show what Fox or Boar do with the resource
+	batch(n, seed_v, GameData.starter_hero_ids())
+	for h in GameData.hero_ids():
+		batch(maxi(n / 3, 20), seed_v, [String(h), String(h), String(h), String(h)])
+	var t: Dictionary = ess_tel.duplicate(true)
+	ess_tel_end()
+	var turns := maxi(int(t.turns), 1)
+	print("=== ESSENCE ECONOMY (%d reference runs + %d solo runs per hero) ==="
+			% [n, maxi(n / 3, 20)])
+	print("turns played          : %d" % turns)
+	print("income  / turn        : %.2f" % (float(t.income) / turns))
+	print("spend   / turn        : %.2f" % (float(t.spend) / turns))
+	print("net     / turn        : %+.2f   (positive = the pool is filling faster than it drains)"
+			% ((float(t.income) - float(t.spend)) / turns))
+	print("turns with a Ritual   : %d%%  (%d of %d)" % [
+			int(round(100.0 * float(t.cast_turns) / turns)), int(t.cast_turns), turns])
+	print("Rituals cast          : %d  (%.2f per turn)" % [int(t.casts),
+			float(t.casts) / turns])
+	print("U2 trades taken       : %d  (%.1f%% of turns)" % [int(t.buys),
+			100.0 * float(t.buys) / turns])
+	print("turns ending at cap   : %d%%  — income thrown away above %d"
+			% [int(round(100.0 * float(t.capped) / turns)), BattleCore.MANA_CAP])
+	print("")
+	print("--- Essence faces played, per hero ---")
+	var per_hero := {}
+	for k in t.by_face:
+		var hero_id := String(k).split("|")[0]
+		per_hero[hero_id] = int(per_hero.get(hero_id, 0)) + int(t.by_face[k])
+	var hids: Array = GameData.hero_ids()
+	for h2 in hids:
+		print("  %-8s %d" % [String(h2), int(per_hero.get(String(h2), 0))])
+	print("")
+	print("%-8s %-22s %8s" % ["hero", "face", "uses"])
+	var keys: Array = t.by_face.keys()
+	keys.sort()
+	for k2 in keys:
+		var parts: PackedStringArray = String(k2).split("|")
+		print("%-8s %-22s %8d" % [parts[0], parts[1], int(t.by_face[k2])])
+	return t
+
+
+# ============================================================ face-usage telemetry
+##
+## One question, asked because round 6 has to answer it with data rather than
+## taste: WHICH starting face does each hero give up to make room for their new
+## Essence face?
+##
+## "Least used" is not "rolled least" — every face on a die is rolled equally
+## often. It is "rolled and then not spent": a face the greedy policy keeps
+## passing over in favour of the hero's other die is a face that is not earning
+## its slot. So both numbers are collected and the rate is what decides.
+##
+## Off unless `face_tel_begin()` has been called.
+static var face_tel := {}
+
+
+static func face_tel_begin() -> void:
+	face_tel = {"on": true, "rolled": {}, "used": {}}
+
+
+static func face_tel_end() -> void:
+	face_tel = {}
+
+
+static func _face_key(hero_id: String, face_id: String, slot: int) -> String:
+	return "%s|%d|%s" % [hero_id, slot, face_id]
+
+
+static func _face_note_use(bc: BattleCore, best: Dictionary) -> void:
+	if not face_tel.get("on", false):
+		return
+	var i := int(best.hero)
+	var d := int(best.die)
+	var slot := int(bc.s.heroes[i].rolled[d])
+	if slot < 0:
+		return
+	var k := _face_key(String(bc.s.heroes[i].id),
+			String(bc.s.heroes[i].faces[slot]), slot)
+	face_tel.used[k] = int(face_tel.used.get(k, 0)) + 1
+
+
+## Every roll the battle made, read off the event log after the fact — cheaper
+## than a hook, and the log is already there.
+static func _face_note_rolls(bc: BattleCore) -> void:
+	if not face_tel.get("on", false):
+		return
+	for ev in bc.events:
+		if String(ev.get("t", "")) != "roll":
+			continue
+		var i := int(ev.hero)
+		var slot := int(ev.face)
+		if i < 0 or i >= bc.s.heroes.size() or slot < 0:
+			continue
+		var k := _face_key(String(bc.s.heroes[i].id),
+				String(bc.s.heroes[i].faces[slot]), slot)
+		face_tel.rolled[k] = int(face_tel.rolled.get(k, 0)) + 1
+
+
+## Per-hero starting-face usage.
+##   godot --headless --path . -- --faces [n]
+static func print_face_report(n := 120, seed_v := 20260805) -> Dictionary:
+	GameData.load_all()
+	face_tel_begin()
+	# every hero has to actually play, so this is six solo parties rather than
+	# the reference four — the starters would never exercise Fox or Boar
+	for h in GameData.hero_ids():
+		batch(n, seed_v, [String(h), String(h), String(h), String(h)])
+	var t: Dictionary = face_tel.duplicate(true)
+	face_tel_end()
+	print("=== STARTING-FACE USAGE (%d runs per hero, solo parties) ===" % n)
+	print("%-8s %-4s %-22s %8s %8s %7s" % ["hero", "slot", "face", "rolled", "used", "rate"])
+	var worst := {}
+	var keys: Array = t.rolled.keys()
+	keys.sort()
+	for k in keys:
+		var parts: PackedStringArray = String(k).split("|")
+		var hero_id := String(parts[0])
+		var slot := int(parts[1])
+		var fid := String(parts[2])
+		# only the twelve STARTING slots are candidates; a face picked up mid-run
+		# is not one this round is allowed to take away
+		var hd: Dictionary = GameData.heroes.get(hero_id, {})
+		var starts: Array = Array(hd.get("start", [])) + Array(hd.get("start_b", []))
+		if slot >= starts.size() or String(starts[slot]) != fid:
+			continue
+		var rolled := int(t.rolled[k])
+		var used := int(t.used.get(k, 0))
+		var rate := 100.0 * float(used) / maxf(float(rolled), 1.0)
+		print("%-8s %-4d %-22s %8d %8d %6.1f%%" % [hero_id, slot, fid, rolled, used, rate])
+		var row: Dictionary = worst.get(hero_id, {"rate": 999.0})
+		if rate < float(row.rate):
+			worst[hero_id] = {"rate": rate, "slot": slot, "face": fid,
+				"rolled": rolled, "used": used}
+	print("")
+	print("--- least-used starting face per hero (the round-6 replacement target) ---")
+	var hids: Array = worst.keys()
+	hids.sort()
+	for h2 in hids:
+		var w: Dictionary = worst[h2]
+		print("  %-8s slot %-3d %-22s %d/%d used = %.1f%%" % [h2, int(w.slot),
+				String(w.face), int(w.used), int(w.rolled), float(w.rate)])
+	return worst
+
+
+# ============================================================ common-relic impact
+##
+## The Advanced tier has a pick rate because the player CHOOSES one at each of
+## the first two bosses. Commons have none — they fall out of elites, chests,
+## events and the shop, from a flat pool — so "pick rate" is not a number that
+## exists for them and asking for one would just measure the RNG.
+##
+## What does exist is impact: hand the party this relic for the whole run and
+## see what the win rate does. That difference, against a baseline with nothing
+## forced, is what round 6 uses to decide which two commons are doing the least.
+##   godot --headless --path . -- --commons [n]
+## How far a batch got, averaged: 0 to 3 chapters.
+##
+## Win rate alone cannot rank fourteen relics. It is one binary per run, so at
+## n=120 its standard error is about 4.5 points and every relic in the middle of
+## the table sits inside ±9 of every other — the first pass of this report had
+## three relics tied at "-8.3", which is not a ranking, it is noise wearing a
+## number. Chapters cleared is the same runs scored 0-3 instead of 0-1: it moves
+## when a relic gets you further without getting you all the way, which is most
+## of what a common relic does, and its variance per run is correspondingly
+## smaller. Win rate stays in the table as the sanity column.
+static func _progress(r: Dictionary, n: int) -> float:
+	return float(int(r.ch1) + int(r.ch2) + int(r.wins)) / float(n)
+
+
+static func print_common_impact(n := 400, seed_v := 20260805) -> Array:
+	GameData.load_all()
+	var team := GameData.starter_hero_ids()
+	var base := batch(n, seed_v, team)
+	var base_win := 100.0 * float(base.wins) / float(n)
+	var base_prog := _progress(base, n)
+	print("=== COMMON RELIC IMPACT, forced for the whole run (%d runs each) ===" % n)
+	print("Seed-paired: the baseline and every forced batch play the SAME %d maps," % n)
+	print("so a difference is the relic rather than the run of the cards.")
+	print("baseline (nothing forced): chapters %.3f  win %.1f%%" % [base_prog, base_win])
+	print("%-5s %-10s %9s %8s %8s" % ["id", "name", "chapters", "Δchap", "win"])
+	var rows := []
+	for rid in GameData.relics_of_rarity("common"):
+		var r := batch(n, seed_v, team, {"force_common": String(rid)})
+		var win := 100.0 * float(r.wins) / float(n)
+		var prog := _progress(r, n)
+		rows.append({"id": String(rid), "win": win, "prog": prog,
+			"delta": prog - base_prog})
+		print("%-5s %-10s %9.3f %+8.3f %7.1f%%" % [String(rid),
+				String(GameData.relics[rid].zh), prog, prog - base_prog, win])
+	rows.sort_custom(func(a, b): return float(a.delta) < float(b.delta))
+	print("")
+	print("--- weakest first (Δ chapters cleared vs the same maps without it) ---")
+	for row in rows:
+		print("  %-5s %-10s %+.3f   (win %.1f%%)" % [String(row.id),
+				String(GameData.relics[row.id].zh), float(row.delta), float(row.win)])
+	return rows
 
 
 # ============================================================ 蓄力 telemetry
@@ -773,6 +1238,70 @@ static func _reserved(bc: BattleCore, i: int, d: int) -> bool:
 	return false
 
 
+## How much Essence the policy insists on leaving in the pool when it buys a
+## reroll. Set to the most expensive Ritual the party is actually holding, so
+## the trade never cannibalises a cast the party could make this turn — spending
+## 2 to fix a bad die and thereby failing to afford a 4-cost Starfall is a bad
+## trade that a naive "buy whenever you can afford it" policy makes constantly.
+## How much Essence the pool is about to gain, for the "am I wasting it?" test.
+## `MANA_REGEN` alone rather than every source (the Owl's passive is a battle-
+## start one-off, 森之心 and 靈息迴環 are relics): the point is only to notice
+## that the pool is at or one step from the ceiling.
+const MANA_REGEN_HINT := BattleCore.MANA_REGEN
+
+
+static func _essence_reserve(bc: BattleCore) -> int:
+	var most := 0
+	for i in bc.s.heroes.size():
+		for d in BattleCore.DICE:
+			var c := bc.can_use(i, d)
+			if c.ok and c.face.has("spell"):
+				most = maxi(most, bc.spell_cost(c.face))
+	return most
+
+
+## U2, as the policy sees it: buy the throw only when the dice on the table are
+## genuinely bad AND the Essence is not already promised to something better.
+##
+## The bar is the same one `_spend_rerolls` uses — two or more heroes holding
+## nothing worth playing — because the trade is only worth making for the same
+## reason a free reroll is. Buying speculatively would flatter U2 in every
+## number this harness produces.
+static func _maybe_buy_reroll(bc: BattleCore) -> void:
+	if not bc.can_buy_reroll().ok:
+		return
+	if int(bc.s.mana) - BattleCore.ESSENCE_REROLL_COST < _essence_reserve(bc):
+		return
+	# already holding a throw? spend that one first — it is free
+	if bc.s.rerolls > 0 or bc.rerolls_unlimited():
+		return
+	# At the ceiling the next point of regeneration is thrown away, so the trade
+	# costs literally nothing and the bar below does not apply. This branch is
+	# not a flourish: the first cut of this policy took the trade on 1.0% of
+	# turns while ENDING 12% of them with a full pool, which is a harness that
+	# systematically under-plays the resource the round exists to add — and
+	# therefore under-states how strong the party is when the bands are judged.
+	var wasting: bool = int(bc.s.mana) + MANA_REGEN_HINT > BattleCore.MANA_CAP
+	if wasting:
+		if bc.buy_reroll():
+			_ess_note("buy")
+		return
+	var weak := 0
+	for i in bc.s.heroes.size():
+		var h: Dictionary = bc.s.heroes[i]
+		if h.down or h.stolen or h.used:
+			continue
+		var best := 0
+		for d in BattleCore.DICE:
+			if int(h.rolled[d]) >= 0 and not _reserved(bc, i, d):
+				best = maxi(best, _die_score(bc, i, d))
+		if best < 2:
+			weak += 1
+	if weak >= 2:
+		if bc.buy_reroll():
+			_ess_note("buy")
+
+
 ## With no base rerolls the reroll button is a scarce relic/potion resource:
 ## only spend it on heroes whose BOTH dice are weak, since the hero will
 ## already pick the better of the two.
@@ -845,7 +1374,7 @@ static func _die_score(bc: BattleCore, i: int, d: int) -> int:
 	if fd.has("stun") or fd.has("weaken"):
 		return 2
 	if fd.has("block") or fd.has("team_block") or fd.has("taunt") \
-			or fd.has("block_from_mana"):
+			or fd.has("block_from_mana") or fd.has("thorns") or fd.has("team_thorns"):
 		return 2
 	# the turn-shaping faces: 戰吼 / 暴走 / 鷹眼 / 雙舞 / 孤注 / 豎刺 / 堅守
 	if fd.has("team_atk") or fd.has("self_atk_now") or fd.get("all_pierce", false) \
@@ -934,6 +1463,50 @@ static func _best_action(bc: BattleCore) -> Dictionary:
 	return {}
 
 
+## What `_score_die` branches on, per target type, declared so a test can check
+## it. `tests/data_policy_test.gd` reads BOTH this table and the source of
+## `_score_die` below, and goes red when they disagree or when a face in
+## data/faces.json matches nothing in its own target's row.
+##
+## The point is the failure mode this harness has now hit twice: a face the
+## policy has no branch for is never played, reports 0 uses, and reads exactly
+## like a face nobody wants (round 6: 豎棘 0/3491; round 7: 靜滯場, and 竊骰
+## which could not even be resolved). Both were fixed rather than declared. What
+## is left is `POLICY_BLIND`, which must carry a reason.
+##
+## Target types are `legal_targets`' types, not the face's `target` string:
+## "self" and "none" faces both arrive as "none".
+const POLICY_KEYS := {
+	"enemy": ["atk", "random_atk", "atk_from_block", "weaken", "expose", "poison"],
+	"enemy_die": ["stun", "steal_die"],
+	"ally": ["heal", "regen"],
+	"none": ["block", "team_block", "taunt", "block_from_mana", "thorns",
+		"thorns_double", "thorn_hold", "atk", "poison", "burn", "weaken",
+		"expose", "all_pierce", "team_atk", "self_atk_now", "twin_dance",
+		"next_dice_boost", "mana", "rerolls", "team_heal", "team_thorns",
+		"team_regen", "buff_next_atk"],
+	"wild": [],
+}
+
+## Keys `_score_die` reads to QUALIFY a branch it is already in, rather than to
+## open one: `aoe` picks the sweeping-burn case apart from the single-target
+## one, `pain` is what stops 以血引靈 being cast on a hero who cannot pay. A
+## face carrying only these is still unplayable, so they are declared here and
+## not in `POLICY_KEYS`.
+const POLICY_QUALIFIERS := ["aoe", "pain"]
+
+## Faces the policy deliberately cannot play, and why. Anything in here is a
+## declared blind spot: the numbers in BALANCE.md do not include it, and saying
+## so is the whole point of the entry.
+const POLICY_BLIND := {
+	"sp_chaos": "混沌 copies another die on the table. Choosing WHICH die is a "
+		+ "whole second policy — the copy inherits none of the original's "
+		+ "position bonuses, so the sim would have to re-score every other die "
+		+ "in the party from the copier's seat. Declared rather than guessed: a "
+		+ "bad copy policy would understate the face just as badly as no policy.",
+}
+
+
 ## Buckets one die into the greedy priority lists. Dictionaries are passed by
 ## reference, so a candidate written here survives the call.
 static func _score_die(bc: BattleCore, i: int, d: int, fd: Dictionary, lt: Dictionary,
@@ -976,6 +1549,19 @@ static func _score_die(bc: BattleCore, i: int, d: int, fd: Dictionary, lt: Dicti
 							var second := _biggest_die(bc, lt.indices, pick.ref)
 							params["die2"] = second.ref if not second.is_empty() else pick.ref
 						_pick(disable, i, d, params)
+			elif fd.get("steal_die", false) and disable.is_empty():
+				# 竊骰 cancels the die AND fires it back, so it is strictly better
+				# than stunning the same die and gets no size bar. Boss
+				# announcements (`die < 0`) are stunnable but not stealable —
+				# `_do_die_theft` rejects them — so they are filtered out here
+				# rather than handed over to fail at resolve time.
+				var stealable := []
+				for ref_v in lt.indices:
+					if int(ref_v.die) >= 0:
+						stealable.append(ref_v)
+				var take := _biggest_die(bc, stealable)
+				if not take.is_empty():
+					_pick(disable, i, d, {"die": take.ref})
 		"ally":
 			if fd.has("heal"):
 				var worst := -1
@@ -1003,6 +1589,23 @@ static func _score_die(bc: BattleCore, i: int, d: int, fd: Dictionary, lt: Dicti
 					or fd.has("block_from_mana"):
 				if block.is_empty() and _expected_damage(bc) > _team_block(bc):
 					_pick(block, i, d, {})
+			elif fd.has("thorns"):
+				# `thorns` only, not `team_thorns`: the team version already had a
+				# home further down this chain, and moving it would change how the
+				# policy plays faces this round is not otherwise touching.
+				#
+				# Thorns is defence that answers back, so it is priced the way
+				# Block is: worth a die when the enemy line threatens more than
+				# the party can already absorb.
+				#
+				# This branch did not exist until round 6, and its absence was
+				# not harmless — 豎棘 (`thorns` alone, no Block on it) matched no
+				# case at all, so the policy could never pick it up and the face
+				# reported 0 uses out of 3,509 rolls. A measurement bug that
+				# reads exactly like a dead face, which matters because round 6
+				# picks the face each hero gives up FROM THESE NUMBERS.
+				if block.is_empty() and _expected_damage(bc) > _team_block(bc):
+					_pick(block, i, d, {})
 			elif fd.has("thorns_double") or fd.get("thorn_hold", false):
 				# both are multipliers on Thorns already standing; with none up
 				# they do nothing at all, so they wait
@@ -1011,6 +1614,14 @@ static func _score_die(bc: BattleCore, i: int, d: int, fd: Dictionary, lt: Dicti
 			elif fd.has("atk") or fd.has("poison") or (fd.has("burn") and fd.get("aoe", false)):
 				if damage.is_empty():
 					_pick(damage, i, d, {})
+			elif fd.has("weaken") or fd.get("expose", false):
+				# 靜滯場: a sweeping debuff needs no target, so it arrives here
+				# rather than in the "enemy" branch — and until round 7 nothing
+				# caught it, which made an R-rarity shared-pool face unplayable
+				# to the policy and invisible in every number this harness
+				# produced. Same failure as 豎棘 in round 6, one target type over.
+				if disable.is_empty():
+					_pick(disable, i, d, {})
 			elif fd.get("all_pierce", false) or fd.has("team_atk") or fd.has("self_atk_now"):
 				# these pay only if somebody is left to swing afterwards
 				if other.is_empty() and _party_can_still_act(bc, i):
@@ -1024,7 +1635,21 @@ static func _score_die(bc: BattleCore, i: int, d: int, fd: Dictionary, lt: Dicti
 				# 孤注 pays next turn and costs HP now: only while comfortable
 				if other.is_empty() and bc.s.heroes[i].hp * 2 > bc.s.heroes[i].max_hp:
 					_pick(other, i, d, {})
-			elif fd.has("mana") or fd.has("rerolls") or fd.has("team_heal") \
+			elif fd.has("mana"):
+				var h5: Dictionary = bc.s.heroes[i]
+				if fd.has("pain") and h5.hp * 2 <= h5.max_hp:
+					# 以血引靈 buys Essence with HP. Not with the last of it.
+					pass
+				elif block.is_empty() and _gather_unlocks(bc, i, int(fd.mana)):
+					# Somebody else is holding a Ritual this gather would pay for
+					# THIS turn. That is a real play and it used to sit in the
+					# bottom bucket with the do-nothing faces, which is why the
+					# pre-round-6 numbers had the party gathering only when it had
+					# nothing else at all to do.
+					_pick(block, i, d, {})
+				elif other.is_empty():
+					_pick(other, i, d, {})
+			elif fd.has("rerolls") or fd.has("team_heal") \
 					or fd.has("team_thorns") or fd.has("team_regen") or fd.has("buff_next_atk"):
 				if fd.has("team_heal"):
 					var hurt2 := false
@@ -1037,6 +1662,30 @@ static func _score_die(bc: BattleCore, i: int, d: int, fd: Dictionary, lt: Dicti
 					_pick(other, i, d, {})
 		"wild":
 			pass   # simple policy skips wilds
+
+
+## Would `gain` points of Essence turn somebody ELSE's unaffordable Ritual into
+## one they can cast this turn?
+##
+## Somebody else, and still able to act: gathering to afford a face on a hero who
+## has already spent their turn buys nothing until next turn, and gathering with
+## one die to afford the Ritual on your OWN other die is impossible — a hero acts
+## once (the Twin Moon Seal aside, which this deliberately does not chase).
+static func _gather_unlocks(bc: BattleCore, i: int, gain: int) -> bool:
+	if gain <= 0:
+		return false
+	var pool := int(bc.s.mana)
+	for j in bc.s.heroes.size():
+		if j == i or not bc.hero_can_act(j):
+			continue
+		for d in BattleCore.DICE:
+			var fd := bc.die_face(j, d)
+			if fd.is_empty() or not fd.has("spell"):
+				continue
+			var cost := bc.spell_cost(fd)
+			if cost > pool and cost <= pool + gain:
+				return true
+	return false
 
 
 ## Writes a candidate into a bucket in place (rebinding the local would not

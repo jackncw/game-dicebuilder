@@ -49,7 +49,7 @@ const KEYS := ["atk", "block", "heal", "mana", "poison", "burn", "stun", "weaken
 	# has to be recognisable in the 26px row along the top of the battle screen.
 	"r_sigil", "r_whetstone", "r_crest", "r_acorn", "r_crystal", "r_honey",
 	"r_spring", "r_coin", "r_vial", "r_tinderbox", "r_foot", "r_metronome",
-	"r_kit", "r_spyglass",
+	"r_kit", "r_spyglass", "r_rod", "r_loop",
 	"r_twinmoon", "r_crown", "r_chalice", "r_bone", "r_heart", "r_drum"]
 
 
@@ -124,6 +124,8 @@ static func draw_glyph(ci: CanvasItem, key: String, rect: Rect2, tint: Color,
 		"r_tinderbox": _r_tinderbox(ci, c, u, tint, ink)
 		"r_foot": _r_foot(ci, c, u, tint, ink)
 		"r_metronome": _r_metronome(ci, c, u, tint, ink)
+		"r_rod": _r_rod(ci, c, u, tint, ink)
+		"r_loop": _r_loop(ci, c, u, tint, ink)
 		"r_kit": _r_kit(ci, c, u, tint, ink)
 		"r_spyglass": _r_spyglass(ci, c, u, tint, ink)
 		"r_twinmoon": _r_twinmoon(ci, c, u, tint, ink)
@@ -537,6 +539,35 @@ static func _r_sigil(ci: CanvasItem, c: Vector2, u: float, t: Color, k: Color) -
 	_disc(ci, c, u, [0, 0], 14.0, t, k, 2.6)
 	_poly(ci, c, u, [[0, 10], [-8, 0], [-3, -11], [7, -3], [6, 6]], k, Color(0, 0, 0, 0))
 	_line(ci, c, u, [0, 11], [2, -6], t, 1.8)
+
+
+## N01 導靈杖 — a staff with a bound crystal at its head, throwing a spark.
+##
+## Deliberately staff-shaped rather than badge-shaped: it replaced 森林徽章,
+## whose glyph was a round badge, and two relics that read alike in the 26px
+## strip along the top of the battle screen would be worse than either.
+##
+## Every structural shape is drawn in `t` with a `k` outline, never in `k`
+## alone. `t` is the LIGHT colour and the disc behind a relic glyph is dark, so
+## an ink-only stroke is invisible — which is exactly how the first cut of this
+## shipped a rod with no rod in it.
+static func _r_rod(ci: CanvasItem, c: Vector2, u: float, t: Color, k: Color) -> void:
+	_poly(ci, c, u, [[-11, 12], [-7, 16], [6, -3], [2, -7]], t, k, 1.8)
+	_poly(ci, c, u, [[2, -9], [9, -15], [13, -7], [6, -1]], t, k, 2.2)
+	_line(ci, c, u, [4, -6], [10, -10], k, 1.6)
+	_line(ci, c, u, [11, -17], [13, -13], t, 2.0)
+	_line(ci, c, u, [16, -13], [12, -11], t, 2.0)
+
+
+## N12 靈息迴環 — a closed loop with a drop caught in it: what the pool pays
+## back when you leave it standing.
+static func _r_loop(ci: CanvasItem, c: Vector2, u: float, t: Color, k: Color) -> void:
+	# `draw_arc` measures from +X and runs clockwise on screen (Y is down), so
+	# the gap has to be centred on -PI/2 to sit at the TOP, where the head is
+	_ring(ci, c, u, [0, 0], 12.0, t, 3.6, -PI * 0.5 + 0.62, -PI * 0.5 + TAU - 0.62)
+	# the open end, arrowed, so it reads as a cycle rather than as a letter
+	_poly(ci, c, u, [[-1, -17], [7, -11], [-2, -6]], t, k, 1.6)
+	_poly(ci, c, u, [[0, -3], [5, 3], [0, 9], [-5, 3]], t, k, 2.0)
 
 
 ## N02 磨刀石 — a canted block with a blade skimming its top edge.

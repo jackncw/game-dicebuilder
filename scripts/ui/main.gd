@@ -52,6 +52,34 @@ func _ready() -> void:
 			SimRunner.print_charge_report(gn, gh)
 			get_tree().quit()
 			return
+		if all[i] == "--faces":
+			# which starting face is each hero not using? (round 6, task 3)
+			var fn := 120
+			if i + 1 < all.size() and all[i + 1].is_valid_int():
+				fn = int(all[i + 1])
+			print("starting-face usage: 6 heroes x %d runs…" % fn)
+			SimRunner.print_face_report(fn)
+			get_tree().quit()
+			return
+		if all[i] == "--essence":
+			# the Essence economy report — the evidence for round 6's
+			# "make the resource present" goal (task 3)
+			var en := 150
+			if i + 1 < all.size() and all[i + 1].is_valid_int():
+				en = int(all[i + 1])
+			print("essence economy: %d reference runs + solo runs per hero…" % en)
+			SimRunner.print_essence_report(en)
+			get_tree().quit()
+			return
+		if all[i] == "--commons":
+			# which common relics are doing the least? (round 6, task 3)
+			var cmn := 120
+			if i + 1 < all.size() and all[i + 1].is_valid_int():
+				cmn = int(all[i + 1])
+			print("common relic impact: %d runs each…" % cmn)
+			SimRunner.print_common_impact(cmn)
+			get_tree().quit()
+			return
 		if all[i] == "--balance":
 			# the acceptance matrix: three seed sets against the spec targets,
 			# judged on the median
@@ -63,7 +91,29 @@ func _ready() -> void:
 			get_tree().quit()
 			return
 	Game.screen_change_requested.connect(_on_goto)
+	Safe.apply_url_insets()
+	var boot := Safe.boot_override()
+	if boot != "":
+		_boot_direct(boot)
+		return
 	Game.goto("menu")
+
+
+## `--boot battle` / `?boot=battle`: open one screen with a canned setup instead
+## of the menu. The web layout regression has to photograph the battle HUD, and
+## clicking a whole run together through a canvas with no DOM in it would be
+## testing the click path rather than the layout.
+func _boot_direct(screen: String) -> void:
+	GameData.load_all()
+	match screen:
+		"battle":
+			var team := []
+			for id in GameData.starter_hero_ids():
+				team.append(GameData.new_hero(String(id)))
+			Game.goto("battle", {"team": team, "enemies": ["E01", "E02", "E03"],
+				"opts": {"chapter": 1}, "battle_seed": 91117})
+		_:
+			Game.goto(screen)
 
 
 func _on_goto(screen: String, args: Dictionary) -> void:

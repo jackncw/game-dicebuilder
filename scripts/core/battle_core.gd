@@ -6,6 +6,36 @@ extends RefCounted
 ## Dictionaries/Arrays so snapshots (undo) are a deep duplicate away.
 
 const MANA_CAP := 10
+
+## ── U1: natural regeneration ────────────────────────────────────────
+## The party draws this much Essence at the start of every turn, unconditionally
+## and for everybody.
+##
+## Before round 6 Essence was the Owl's private resource: the only reliable
+## source was his Gather faces, so a party without him watched a meter that
+## could not move and every Ritual face in the shared pool was a face they could
+## not use. Making the pool fill on its own is what turns Essence from one
+## character's mechanic into a currency the whole cast can be built around — the
+## Badger's Essence Guard is worth putting on a die precisely because there is
+## always something in the pool to have spent it on.
+##
+## It also, deliberately, feeds the Owl. See `WARDEN_OVERFLOW`.
+const MANA_REGEN := 1
+
+## ── U2: Essence into rerolls ────────────────────────────────────────
+## Any time in your own phase, once a turn, trade Essence for a reroll.
+##
+## This is the floor under the whole resource: it means Essence is NEVER dead.
+## A party with no Ritual faces at all still has somewhere to put it, so the
+## regeneration above is a real gain for everyone rather than a number that
+## accumulates in the corner of the screen. Once a turn, because unlimited
+## conversion at a fixed rate is just a longer turn.
+const ESSENCE_REROLL_COST := 2
+
+## 靈息迴環 pays out only if this much is still in the pool at end of turn. Set
+## above `MANA_REGEN + 1` so the relic rewards actually HOLDING Essence rather
+## than paying out every turn for doing nothing.
+const ESSENCE_LOOP_FLOOR := 3
 const CARRY_BLOCK_CAP := 10   # 棘甲 / quilled_hide
 const DICE := 2          # dice per hero (A / B)
 const FACES := 6         # faces per die
@@ -38,6 +68,9 @@ func setup(team: Array, enemy_keys: Array, opts: Dictionary, p_rng: RandomNumber
 		"is_boss": false,
 		"is_elite": bool(opts.get("elite", false)),
 		"mana": 0,
+		"essence_reroll_used": false,   # U2, once a turn
+		"spell_cast_this_turn": false,  # 導靈杖, once a TURN (see `_start_turn`)
+		"essence_loop_due": 0,          # 靈息迴環, paid at next turn start
 		"rerolls": 0,
 		"reroll_carry": 0,
 		"relics": opts.get("relics", []).duplicate(),
@@ -118,11 +151,39 @@ func _has_passive(h: Dictionary, key: String) -> bool:
 	return String(h.get("passive", "")) == key
 
 
+## One global multiplier on every minion and boss HP pool.
+##
+## The bluntest knife in the drawer, and round 6 is exactly what it is for. U1
+## and U2 made the party materially stronger on purpose — Essence regenerates
+## for everybody and converts into rerolls in a game whose base reroll count is
+## zero — and the acceptance bands did not move. Something had to absorb that,
+## and the choice was between quietly clawing back the rules the round was
+## commissioned to add, or letting the forest hit back harder. This is the
+## second one: one number, applied identically everywhere, easy to read off
+## BALANCE.md and easy to move again.
+##
+## It is deliberately NOT a damage multiplier. More enemy HP lengthens fights
+## (avg turns had fallen to 4.09, the floor of the 4-6 band); more enemy damage
+## would shorten them and kill parties faster, which is a different game.
+## Per chapter, because one number could not do the job. At a flat 1.10 the
+## first two chapters landed exactly where they should (87% / 67%) and the full
+## clear fell to 28% — chapter 3 compounds, since its minions are already tier 3
+## and its boss is the longest fight in the game, so the same multiplier costs
+## far more there than it does in chapter 1. Splitting the dial is what the
+## round-5 notes asked for in so many words: "a lever that is strong early and
+## does not scale late". This is that lever, pointed the other way.
+static func _world_hp(chapter: int) -> float:
+	var m = GameData.balance.get("enemy_hp_mult", 1.0)
+	if m is Dictionary:
+		return float(m.get(str(clampi(chapter, 1, 3)), 1.0))
+	return float(m)
+
+
 func _make_enemy(key: String, opts: Dictionary) -> Dictionary:
 	var def: Dictionary = GameData.enemies[key]
 	var tier: int = clampi(int(opts.get("chapter", 1)), 1, 3)
 	var ti := tier - 1
-	var hp := int(def.hp[ti])
+	var hp := int(round(def.hp[ti] * _world_hp(tier)))
 	var affix: String = opts.get("affix", "") if opts.get("elite", false) else ""
 	if affix != "":
 		hp = int(floor(hp * float(GameData.balance.elite_hp_mult)))
@@ -178,7 +239,8 @@ func _make_boss(key: String) -> Dictionary:
 	var e := {
 		"key": key, "boss_key": key, "kind": "boss", "tier": int(def.chapter),
 		"zh": def.zh, "en": def.en,
-		"hp": int(def.hp), "max_hp": int(def.hp), "block": 0,
+		"hp": int(round(def.hp * _world_hp(int(def.chapter)))),
+		"max_hp": int(round(def.hp * _world_hp(int(def.chapter)))), "block": 0,
 		"dice": int(def.dice),
 		"faces": faces,
 		"rolls": [],
@@ -245,16 +307,33 @@ func _start_turn() -> void:
 	_snapshots.clear()
 	# rerolls
 	var r := int(GameData.balance.base_rerolls)
+	# `reroll_plus` and `reroll_carry` (below) have no relic behind them since
+	# round 6 — 森林徽章 and 節拍器 became the two Essence relics, because U2
+	# turned Essence itself into the party's reroll economy and made a flat
+	# "+1 throw a battle" the most redundant thing in the common pool. The two
+	# effect keys stay wired: they cost nothing, and they are how a future relic
+	# or event would grant a throw again.
 	r += _relic("reroll_plus")
 	if s.turn == 1:
 		r += _relic("first_turn_rerolls")
 	r += int(s.reroll_carry)
 	s.reroll_carry = 0
 	s.rerolls = r
+	# U1: the grove breathes. Everybody, every turn, no condition.
+	s.mana = mini(s.mana + MANA_REGEN, MANA_CAP)
 	# A05 森之心: the forest keeps feeding you
 	var heart := _relic("forest_heart")
 	if heart > 0:
 		s.mana = mini(s.mana + heart, MANA_CAP)
+	# 靈息迴環: a pool you did not spend down pays a dividend
+	if int(s.get("essence_loop_due", 0)) > 0:
+		s.mana = mini(s.mana + int(s.essence_loop_due), MANA_CAP)
+	s["essence_loop_due"] = 0
+	s.essence_reroll_used = false
+	# 導靈杖's discount is a per-TURN allowance, so it re-arms here rather than
+	# once a battle. It sits next to the U2 reset because they are the same kind
+	# of thing: a once-a-turn allowance the player is meant to plan around.
+	s["spell_cast_this_turn"] = false
 	# hero turn-start upkeep
 	for h in s.heroes:
 		# Which dice survive into this turn has to be decided BEFORE `used_dice`
@@ -396,6 +475,30 @@ func can_reroll() -> bool:
 	return not s.over and (s.rerolls > 0 or rerolls_unlimited())
 
 
+## U2: is the Essence-for-a-reroll trade available right now?
+func can_buy_reroll() -> Dictionary:
+	if s.over:
+		return {"ok": false, "err": "over"}
+	if bool(s.get("essence_reroll_used", false)):
+		return {"ok": false, "err": "spent"}
+	if int(s.mana) < ESSENCE_REROLL_COST:
+		return {"ok": false, "err": "mana"}
+	return {"ok": true}
+
+
+## Take it. Buying does NOT reroll — it buys the throw, and the player still
+## decides which dice to pin before spending it. Separating the two is what
+## makes the trade a decision rather than a button that scrambles the table.
+func buy_reroll() -> bool:
+	if not can_buy_reroll().ok:
+		return false
+	s.mana -= ESSENCE_REROLL_COST
+	s.rerolls += 1
+	s.essence_reroll_used = true
+	_ev({"t": "buy_reroll", "cost": ESSENCE_REROLL_COST})
+	return true
+
+
 func reroll() -> bool:
 	if not can_reroll():
 		return false
@@ -534,7 +637,7 @@ func resonate_would_match(i: int, fd: Dictionary) -> bool:
 
 
 ## Essence overflow threshold for 古老守林者.
-const WARDEN_OVERFLOW := 6
+const WARDEN_OVERFLOW := 7
 
 
 ## Passive bonuses that lift every kind of value a face can carry, not just
@@ -632,6 +735,72 @@ func _pain_value(fd: Dictionary) -> int:
 	return p
 
 
+## The face as it will ACTUALLY resolve for hero i, right now.
+##
+## `hero_face()` merges the data file with the run's permanent marks; this goes
+## the rest of the way and folds in everything situational — Weaken, Charge
+## banked in the lock, a met 呼應, passives, relics, 迴響, the die boosts. What
+## comes back is a face dict of the same shape whose numbers are the numbers the
+## engine is about to use.
+##
+## This exists so the UI never has to reimplement a rule to display it. The
+## effect sentence in the cast strip and the shorthand pips under a die both take
+## one of these and print `fd.atk` verbatim, which means a number on screen is
+## wrong only if the engine is wrong.
+##
+## The three "up to N" faces keep their printed ceiling in `<key>_cap` and put
+## what you would get right now in the key itself, because "≤6" and "4" are
+## different pieces of information and the player wants the second one.
+func live_face(i: int, fd: Dictionary) -> Dictionary:
+	var out := fd.duplicate(true)
+	if fd.get("blank", false):
+		return out
+	var h: Dictionary = s.heroes[i]
+	if fd.has("atk"):
+		out["atk"] = attack_value(i, fd)
+	if fd.has("random_atk"):
+		var r: Array = fd.random_atk
+		out["random_atk"] = [attack_value(i, fd, int(r[0])), attack_value(i, fd, int(r[1]))]
+	if fd.has("atk_from_block"):
+		out["atk_from_block_cap"] = int(fd.atk_from_block)
+		out["atk_from_block"] = attack_value(i, fd,
+				mini(int(h.block), int(fd.atk_from_block)))
+	if fd.has("block"):
+		out["block"] = _block_value(i, fd)
+	if fd.has("block_from_mana"):
+		out["block_from_mana_cap"] = int(fd.block_from_mana)
+		out["block_from_mana"] = mini(int(s.mana), int(fd.block_from_mana))
+	if fd.has("team_block"):
+		out["team_block"] = maxi(int(fd.team_block) + _relic("block_plus")
+				- int(h.weaken), 0) + s.echo_bonus
+	if fd.has("thorns_double"):
+		out["thorns_double_cap"] = int(fd.thorns_double)
+		out["thorns_double"] = mini(int(h.thorns), int(fd.thorns_double))
+	if fd.has("heal"):
+		out["heal"] = _heal_value(i, fd)
+	if fd.has("team_heal"):
+		out["team_heal"] = _heal_value(i, fd, "team_heal")
+	if fd.has("poison"):
+		out["poison"] = int(fd.poison) + _relic("poison_plus")
+	if fd.has("burn"):
+		out["burn"] = int(fd.burn) + _relic("burn_plus")
+	if fd.has("mana") and not _is_attack_face(fd) and not fd.has("block") 			and not fd.has("heal"):
+		out["mana"] = maxi(int(fd.mana) + face_bonus(i, fd), 0)
+	if fd.has("spell"):
+		out["spell"] = spell_cost(fd)
+	if fd.has("pain"):
+		out["pain"] = _pain_value(fd)
+	return out
+
+
+## Same, for whichever face is showing on hero i's die d ({} if there is none).
+func live_die_face(i: int, d: int) -> Dictionary:
+	var fd := die_face(i, d)
+	if fd.is_empty():
+		return fd
+	return live_face(i, fd)
+
+
 # ============================================================ usability / targets
 
 ## Can hero i act with die d this turn? A hero acts at most once per turn: the
@@ -674,6 +843,13 @@ func spell_cost(fd: Dictionary) -> int:
 	var c := int(fd.spell)
 	if _relic("forest_heart") > 0:
 		c = maxi(c - 1, 1)
+	# 導靈杖 Channeling Rod: the first Ritual of each TURN, not of each battle.
+	# Queried rather than applied at payment time on purpose: `can_use` and the
+	# UI both read this, so the discounted price is the price the player is
+	# shown and the price the affordability check uses. Nothing can be greyed
+	# out at a cost it will not actually charge.
+	if not bool(s.get("spell_cast_this_turn", false)) and _relic("channeling_rod") > 0:
+		c = maxi(c - _relic("channeling_rod"), 1)
 	return c
 
 
@@ -823,6 +999,7 @@ func use_face(i: int, d: int, params := {}) -> Dictionary:
 		s.twin_hero = i
 	if fd.has("spell"):
 		s.mana -= spell_cost(fd)
+		s["spell_cast_this_turn"] = true
 	# pain first (can down the user; effects still resolve)
 	var pain := _pain_value(fd)
 	if pain > 0:
@@ -957,7 +1134,16 @@ func _resolve_player_face(i: int, fd: Dictionary, params: Dictionary) -> Diction
 	if fd.get("taunt", false):
 		h.taunt = true
 	if fd.has("mana"):
-		s.mana = mini(s.mana + int(fd.mana), MANA_CAP)
+		var gain := int(fd.mana)
+		# Same "headline number only" rule Block and Heal follow: when Essence is
+		# what the face is FOR, it takes the die's positional bonus — the Charge
+		# banked in the lock, a met 呼應, a 換位 boost. That is what makes 引靈瞄準
+		# ("Essence +1, and +1 more per Charge layer") a rule rather than a
+		# special case: it is `mana: 1, charge_up: 1`, and this line is the whole
+		# of its implementation.
+		if not _is_attack_face(fd) and not fd.has("block") and not fd.has("heal"):
+			gain += face_bonus(i, fd)
+		s.mana = mini(s.mana + maxi(gain, 0), MANA_CAP)
 	if fd.has("rerolls"):
 		s.rerolls += int(fd.rerolls)
 	if fd.has("buff_next_atk"):
@@ -1100,7 +1286,10 @@ func _kill_enemy(j: int) -> void:
 	if e.kind == "boss" and e.get("boss_key", "") == "B3" and e.phase == 1:
 		# Sir Croak dismounts
 		e.phase = 2
-		e.hp = int(GameData.bosses.B3.phase2_hp)
+		# through the world multiplier, like every other pool in the game — B3's
+		# second phase is a fresh HP bar, and a fresh bar that skipped the dial
+		# would make him the one boss the difficulty setting does not touch
+		e.hp = int(round(GameData.bosses.B3.phase2_hp * _world_hp(int(GameData.bosses.B3.chapter))))
 		e.max_hp = e.hp
 		e.dice = int(GameData.bosses.B3.phase2_dice)
 		var faces := []
@@ -1722,6 +1911,12 @@ func _end_of_turn_settlement() -> void:
 		e.counter = 0
 		for r in e.rolls:
 			r.done = true
+	# 靈息迴環 Essence Loop: end the turn with a pool still standing and the
+	# grove pays interest. Banked here and spent in `_start_turn`, so it reads as
+	# "next turn" to the player rather than as a silent top-up now.
+	var loop := _relic("essence_loop")
+	if loop > 0 and int(s.mana) >= ESSENCE_LOOP_FLOOR:
+		s["essence_loop_due"] = loop
 	# reroll carry (Metronome)
 	var carry := _relic("reroll_carry")
 	if carry > 0:

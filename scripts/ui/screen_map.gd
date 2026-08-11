@@ -77,8 +77,16 @@ func _ready() -> void:
 	tray.get_child(0).add_child(row)
 
 
+## Where row `r` of the map sits. The nine rows are spread across whatever
+## vertical band is left between the run top bar and the footer, so a phone that
+## eats 94px of notch compresses the climb instead of pushing the boss clearing
+## up underneath the status bar. With no insets this is the 1130 → 154 ladder
+## the map has always had, step 122, to the pixel.
 static func node_pos(r: int, x: float) -> Vector2:
-	return Vector2(60.0 + x * 600.0, 1130.0 - r * 122.0)
+	var bottom := 1280.0 - Safe.bottom - 150.0
+	var top := Safe.top + 154.0
+	var step := (bottom - top) / 8.0
+	return Vector2(60.0 + x * 600.0, bottom - r * step)
 
 
 func _make_node_btn(node: Dictionary, avail: bool, current: bool, past: bool) -> Button:

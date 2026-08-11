@@ -118,6 +118,12 @@ static func hue(key: String) -> Color:
 static func _is_on(fd: Dictionary, key: String) -> bool:
 	if not fd.has(key):
 		return false
+	# A live "up to N" face can legitimately resolve to zero right now (Essence
+	# Guard with an empty pool). The face is still that face — dropping it here
+	# would make the headline fall through to whatever it carries second, and a
+	# die would change what it claims to be depending on the pool.
+	if fd.has(key + "_cap"):
+		return true
 	var v = fd[key]
 	if v is bool:
 		return v
@@ -190,6 +196,12 @@ static func main_number(fd: Dictionary) -> String:
 	if k in ["atk", "atk_from_block"] and int(fd.get("hits", 1)) > 1:
 		return "%d×%d" % [v, int(fd.hits)]
 	if k in CAP_KEYS:
+		# A LIVE face (see `BattleCore.live_face`) has already worked out what the
+		# ceiling comes to right now and parked the ceiling itself in `<k>_cap`.
+		# "4" is what the player is about to get; "≤6" is trivia they can read on
+		# the long-press card.
+		if fd.has(k + "_cap"):
+			return str(v)
 		return "≤%d" % v
 	if k in ["mana", "rerolls", "buff_next_atk", "echo", "team_atk",
 			"self_atk_now", "next_dice_boost"]:
@@ -225,15 +237,37 @@ static func effect_sentence(fd: Dictionary) -> String:
 		else:
 			zh.append("對%s造成 %d 點傷害" % [who_zh, int(fd.atk)])
 			en.append("Deal %d damage to %s" % [int(fd.atk), who_en])
-	elif _is_on(fd, "atk_from_block"):
-		zh.append("對%s造成等同你當前格擋的傷害(上限 %d)" % [who_zh, int(fd.atk_from_block)])
-		en.append("Deal damage to %s equal to your current Block, up to %d" % [who_en, int(fd.atk_from_block)])
-	if _is_on(fd, "block_from_mana"):
-		zh.append("獲得等同隊伍靈息的格擋(上限 %d)" % int(fd.block_from_mana))
-		en.append("gain Block equal to the party's Essence, up to %d" % int(fd.block_from_mana))
-	if _is_on(fd, "thorns_double"):
-		zh.append("當前荊棘層數翻倍(最多 +%d)" % int(fd.thorns_double))
-		en.append("double your current Thorns, adding at most %d" % int(fd.thorns_double))
+	elif _is_on(fd, "atk_from_block") or fd.has("atk_from_block_cap"):
+		# On a LIVE face the key holds what it comes to right now and `_cap` the
+		# printed ceiling, so the sentence can lead with the real number and keep
+		# the rule as a parenthetical. Off a live face there is no "right now" to
+		# report and it stays the rule alone.
+		if fd.has("atk_from_block_cap"):
+			zh.append("對%s造成 %d 點傷害(等同你當前格擋,上限 %d)"
+					% [who_zh, int(fd.atk_from_block), int(fd.atk_from_block_cap)])
+			en.append("Deal %d damage to %s (your current Block, capped at %d)"
+					% [int(fd.atk_from_block), who_en, int(fd.atk_from_block_cap)])
+		else:
+			zh.append("對%s造成等同你當前格擋的傷害(上限 %d)" % [who_zh, int(fd.atk_from_block)])
+			en.append("Deal damage to %s equal to your current Block, up to %d" % [who_en, int(fd.atk_from_block)])
+	if _is_on(fd, "block_from_mana") or fd.has("block_from_mana_cap"):
+		if fd.has("block_from_mana_cap"):
+			zh.append("獲得 %d 點格擋(等同隊伍靈息,上限 %d)"
+					% [int(fd.block_from_mana), int(fd.block_from_mana_cap)])
+			en.append("gain %d Block (the party's Essence, capped at %d)"
+					% [int(fd.block_from_mana), int(fd.block_from_mana_cap)])
+		else:
+			zh.append("獲得等同隊伍靈息的格擋(上限 %d)" % int(fd.block_from_mana))
+			en.append("gain Block equal to the party's Essence, up to %d" % int(fd.block_from_mana))
+	if _is_on(fd, "thorns_double") or fd.has("thorns_double_cap"):
+		if fd.has("thorns_double_cap"):
+			zh.append("荊棘 +%d(當前層數翻倍,最多 +%d)"
+					% [int(fd.thorns_double), int(fd.thorns_double_cap)])
+			en.append("gain Thorns %d (double what you have, adding at most %d)"
+					% [int(fd.thorns_double), int(fd.thorns_double_cap)])
+		else:
+			zh.append("當前荊棘層數翻倍(最多 +%d)" % int(fd.thorns_double))
+			en.append("double your current Thorns, adding at most %d" % int(fd.thorns_double))
 	if _is_on(fd, "team_atk"):
 		zh.append("本回合全隊攻擊面 +%d" % int(fd.team_atk))
 		en.append("every hero's attack faces get +%d this turn" % int(fd.team_atk))

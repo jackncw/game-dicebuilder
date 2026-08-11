@@ -17,7 +17,7 @@ func _build() -> void:
 	var vb := VBoxContainer.new()
 	vb.anchor_left = 0.0
 	vb.anchor_right = 1.0
-	vb.offset_top = UIKit.S6
+	Safe.pin_top(vb, UIKit.S6)
 	vb.offset_left = UIKit.S5
 	vb.offset_right = -UIKit.S5
 	vb.add_theme_constant_override("separation", UIKit.S5)

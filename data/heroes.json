@@ -1,261 +1,261 @@
 {
-  "_comment": "The six militia of the Grove (2026-08-06 character overhaul). `order` drives every list in the UI — nothing enumerates hero ids by hand any more. `passive` is the key BattleCore switches on; the id itself is never tested. Six XP-pool unlocks per hero, one per level 2-7.",
-
-  "BADGER": {
-    "order": 1,
-    "zh": "獾斧衛士",
-    "en": "Badger Vanguard",
-    "short": "Badger",
-    "hp": 26,
-    "passive": "old_sergeant",
-    "passive_zh": "老班長:所有攻擊面 +1,而且每回合開始時獲得 2 點格擋",
-    "passive_en": "Old Sergeant: all his attack faces get +1, and he gains 2 Block at the start of every turn",
-    "lore_zh": "森林義勇軍的老班長。一把舊斧,一身舊甲,沒有花巧——但每一下都砍在該砍的地方。",
-    "lore_en": "The militia's old sergeant. A worn axe, worn leathers, no tricks—but every swing lands where it should.",
-    "start": [
-      "bdg_chop2",
-      "bdg_chop3",
-      "bdg_chop3",
-      "bdg_heavy4",
-      "bdg_guard2",
-      "bdg_chopguard"
-    ],
-    "start_b": [
-      "bdgb_guard3",
-      "bdgb_guard3",
-      "bdg_chop2",
-      "bdgb_bandage",
-      "bdg_chopguard",
-      "bdgb_guard4"
-    ],
-    "die_a_zh": "戰斧骰",
-    "die_a_en": "War Axe Die",
-    "die_b_zh": "行囊骰",
-    "die_b_en": "Satchel Die",
-    "unlocks": {
-      "2": "bdg_heavy5",
-      "3": "bdg_chop3guard3",
-      "4": "bdg_heal3",
-      "5": "bdg_smash6",
-      "6": "bdg_guard4thorn",
-      "7": "bdg_warcry"
-    },
-    "color": "#a87c4a",
-    "starter": true
+ "_comment": "The six militia of the Grove (2026-08-06 character overhaul). `order` drives every list in the UI — nothing enumerates hero ids by hand any more. `passive` is the key BattleCore switches on; the id itself is never tested. Six XP-pool unlocks per hero, one per level 2-7.",
+ "BADGER": {
+  "order": 1,
+  "zh": "獾斧衛士",
+  "en": "Badger Vanguard",
+  "short": "Badger",
+  "hp": 26,
+  "passive": "old_sergeant",
+  "passive_zh": "老班長:所有攻擊面 +1,而且每回合開始時獲得 2 點格擋",
+  "passive_en": "Old Sergeant: all his attack faces get +1, and he gains 2 Block at the start of every turn",
+  "lore_zh": "森林義勇軍的老班長。一把舊斧,一身舊甲,沒有花巧——但每一下都砍在該砍的地方。",
+  "lore_en": "The militia's old sergeant. A worn axe, worn leathers, no tricks—but every swing lands where it should.",
+  "start": [
+   "bdg_chop2",
+   "bdg_chop3",
+   "bdg_chop3",
+   "bdg_heavy4",
+   "bdg_guard2",
+   "bdg_chopguard"
+  ],
+  "start_b": [
+   "bdgb_guard3",
+   "bdgb_guard3",
+   "bdg_chop2",
+   "bdgb_bandage",
+   "bdg_chopguard",
+   "bdg_essenceguard"
+  ],
+  "die_a_zh": "戰斧骰",
+  "die_a_en": "War Axe Die",
+  "die_b_zh": "行囊骰",
+  "die_b_en": "Satchel Die",
+  "unlocks": {
+   "2": "bdg_heavy5",
+   "3": "bdg_chop3guard3",
+   "4": "bdg_infusedsmash",
+   "5": "bdg_heal3",
+   "6": "bdg_smash6",
+   "7": "bdg_guard4thorn",
+   "8": "bdg_warcry"
   },
-
-  "HARE": {
-    "order": 2,
-    "zh": "野兔神射手",
-    "en": "Hare Marksman",
-    "short": "Hare",
-    "hp": 23,
-    "passive": "held_breath",
-    "passive_zh": "屏息:他所有帶「穿透」的攻擊面 +2",
-    "passive_en": "Held Breath: every attack face of his that has Pierce gets +2",
-    "lore_zh": "疤面的冷靜射手。他的箭會等——等到最該離弦的一刻。",
-    "lore_en": "A scarred, unhurried archer. His arrows wait—for the one moment worth loosing.",
-    "start": [
-      "hare_quick2",
-      "hare_quick3",
-      "hare_quick3",
-      "hare_pierce2",
-      "hare_aim4",
-      "hare_guard2"
-    ],
-    "start_b": [
-      "hareb_pierce1",
-      "hare_quick2",
-      "hare_guard2",
-      "hareb_resupply",
-      "hareb_aim3",
-      "hareb_roll"
-    ],
-    "die_a_zh": "長弓骰",
-    "die_a_en": "Longbow Die",
-    "die_b_zh": "箭袋骰",
-    "die_b_en": "Quiver Die",
-    "unlocks": {
-      "2": "hare_pierce3",
-      "3": "hare_guard3",
-      "4": "hare_volley",
-      "5": "hare_snipe6",
-      "6": "hare_hawkeye",
-      "7": "hare_deadly7"
-    },
-    "color": "#6aa84f",
-    "starter": true
+  "color": "#a87c4a",
+  "starter": true
+ },
+ "HARE": {
+  "order": 2,
+  "zh": "野兔神射手",
+  "en": "Hare Marksman",
+  "short": "Hare",
+  "hp": 23,
+  "passive": "held_breath",
+  "passive_zh": "屏息:他所有帶「穿透」的攻擊面 +2",
+  "passive_en": "Held Breath: every attack face of his that has Pierce gets +2",
+  "lore_zh": "疤面的冷靜射手。他的箭會等——等到最該離弦的一刻。",
+  "lore_en": "A scarred, unhurried archer. His arrows wait—for the one moment worth loosing.",
+  "start": [
+   "hare_quick2",
+   "hare_quick3",
+   "hare_quick3",
+   "hare_pierce2",
+   "hare_aim4",
+   "hare_guard2"
+  ],
+  "start_b": [
+   "hareb_pierce1",
+   "hare_quick2",
+   "hare_essencearrow",
+   "hareb_resupply",
+   "hareb_aim3",
+   "hareb_roll"
+  ],
+  "die_a_zh": "長弓骰",
+  "die_a_en": "Longbow Die",
+  "die_b_zh": "箭袋骰",
+  "die_b_en": "Quiver Die",
+  "unlocks": {
+   "2": "hare_pierce3",
+   "3": "hare_attunedaim",
+   "4": "hare_guard3",
+   "5": "hare_volley",
+   "6": "hare_snipe6",
+   "7": "hare_hawkeye",
+   "8": "hare_deadly7"
   },
-
-  "HEDGE": {
-    "order": 3,
-    "zh": "刺蝟盾衛",
-    "en": "Hedgehog Bulwark",
-    "short": "Hedge",
-    "hp": 29,
-    "passive": "quilled_hide",
-    "passive_zh": "棘甲:未消耗的格擋保留到下回合(上限 10)",
-    "passive_en": "Quilled Hide: unspent Block carries over to the next turn (max 10)",
-    "lore_zh": "一面圓木盾,一身尖刺。撞上來的,自己受著。",
-    "lore_en": "One oaken shield, a thousand quills. Whatever crashes in, keeps the pain.",
-    "start": [
-      "hedge_guard3",
-      "hedge_guard4",
-      "hedge_guardthorn",
-      "hedge_thorns2",
-      "hedge_hammer2",
-      "hedge_hold"
-    ],
-    "start_b": [
-      "hedge_hammer2",
-      "hedgeb_hammer3",
-      "hedgeb_guard2",
-      "hedge_thorns2",
-      "hedgeb_hammerthorn",
-      "hedge_guard3"
-    ],
-    "die_a_zh": "圓盾骰",
-    "die_a_en": "Oak Shield Die",
-    "die_b_zh": "短錘骰",
-    "die_b_en": "Mace Die",
-    "unlocks": {
-      "2": "hedge_guard5",
-      "3": "hedge_thorns3",
-      "4": "hedge_recoil4",
-      "5": "hedge_guard4thorn2",
-      "6": "hedge_bristle",
-      "7": "hedge_shieldbash"
-    },
-    "color": "#7f94a8",
-    "starter": true
+  "color": "#6aa84f",
+  "starter": true
+ },
+ "HEDGE": {
+  "order": 3,
+  "zh": "刺蝟盾衛",
+  "en": "Hedgehog Bulwark",
+  "short": "Hedge",
+  "hp": 29,
+  "passive": "quilled_hide",
+  "passive_zh": "棘甲:未消耗的格擋保留到下回合(上限 10)",
+  "passive_en": "Quilled Hide: unspent Block carries over to the next turn (max 10)",
+  "lore_zh": "一面圓木盾,一身尖刺。撞上來的,自己受著。",
+  "lore_en": "One oaken shield, a thousand quills. Whatever crashes in, keeps the pain.",
+  "start": [
+   "hedge_guard3",
+   "hedge_guard4",
+   "hedge_guardthorn",
+   "hedge_thorns2",
+   "hedge_hammer2",
+   "hedge_hold"
+  ],
+  "start_b": [
+   "hedge_hammer2",
+   "hedgeb_hammer3",
+   "hedgeb_guard2",
+   "hedge_thorns2",
+   "hedgeb_hammerthorn",
+   "hedge_quilldraw"
+  ],
+  "die_a_zh": "圓盾骰",
+  "die_a_en": "Oak Shield Die",
+  "die_b_zh": "短錘骰",
+  "die_b_en": "Mace Die",
+  "unlocks": {
+   "2": "hedge_guard5",
+   "3": "hedge_thorns3",
+   "4": "hedge_recoil4",
+   "5": "hedge_essencebloom",
+   "6": "hedge_guard4thorn2",
+   "7": "hedge_bristle",
+   "8": "hedge_shieldbash"
   },
-
-  "OWL": {
-    "order": 4,
-    "zh": "梟賢者",
-    "en": "Owl Sage",
-    "short": "Owl",
-    "hp": 20,
-    "passive": "ancient_warden",
-    "passive_zh": "古老守林者:每場戰鬥開始時隊伍獲得 3 點靈息;隊伍靈息在 6 點或以上時,他所有骰面數值 +2",
-    "passive_en": "Ancient Warden: the party draws 3 Essence at the start of each battle, and while the pool is at 6 or more all his face values get +2",
-    "lore_zh": "古老的守林者,琥珀晶石聽他號令。風暴在他掌中醞釀,只等靈息滿溢。",
-    "lore_en": "An ancient warden; the amber crystal answers him. Storms brew in his grasp, waiting for essence to overflow.",
-    "start": [
-      "owl_bolt2",
-      "owl_bolt2",
-      "owl_gather2",
-      "owl_gatherbolt",
-      "owl_starfall",
-      "owl_wardshield"
-    ],
-    "start_b": [
-      "owlb_gather1",
-      "owl_gather2",
-      "owlb_guard2",
-      "owlb_moonheal",
-      "owlb_bolt3",
-      "owlb_wisdom"
-    ],
-    "die_a_zh": "法杖骰",
-    "die_a_en": "Staff Die",
-    "die_b_zh": "圖騰骰",
-    "die_b_en": "Totem Die",
-    "unlocks": {
-      "2": "owl_gather3",
-      "3": "owl_bolt4",
-      "4": "owl_meditate",
-      "5": "owl_greatheal",
-      "6": "owl_essenceward",
-      "7": "owl_meteor"
-    },
-    "color": "#e0a33c",
-    "starter": true
+  "color": "#7f94a8",
+  "starter": true
+ },
+ "OWL": {
+  "order": 4,
+  "zh": "梟賢者",
+  "en": "Owl Sage",
+  "short": "Owl",
+  "hp": 20,
+  "passive": "ancient_warden",
+  "passive_zh": "古老守林者:每場戰鬥開始時隊伍獲得 3 點靈息;隊伍靈息在 6 點或以上時,他所有骰面數值 +2",
+  "passive_en": "Ancient Warden: the party draws 3 Essence at the start of each battle, and while the pool is at 6 or more all his face values get +2",
+  "lore_zh": "古老的守林者,琥珀晶石聽他號令。風暴在他掌中醞釀,只等靈息滿溢。",
+  "lore_en": "An ancient warden; the amber crystal answers him. Storms brew in his grasp, waiting for essence to overflow.",
+  "start": [
+   "owl_bolt2",
+   "owl_bolt2",
+   "owl_gather2",
+   "owl_gatherbolt",
+   "owl_starfall",
+   "owl_wardshield"
+  ],
+  "start_b": [
+   "owlb_gather1",
+   "owl_gather2",
+   "owlb_guard2",
+   "owlb_moonheal",
+   "owlb_bolt3",
+   "owlb_wisdom"
+  ],
+  "die_a_zh": "法杖骰",
+  "die_a_en": "Staff Die",
+  "die_b_zh": "圖騰骰",
+  "die_b_en": "Totem Die",
+  "unlocks": {
+   "2": "owl_gather3",
+   "3": "owl_bolt4",
+   "4": "owl_meditate",
+   "5": "owl_greatheal",
+   "6": "owl_essenceward",
+   "7": "owl_starshower",
+   "8": "owl_meteor"
   },
-
-  "FOX": {
-    "order": 5,
-    "zh": "狐影雙刃",
-    "en": "Fox Duelist",
-    "short": "Fox",
-    "hp": 22,
-    "passive": "call_and_answer",
-    "passive_zh": "一唱一和:他的「呼應」條件成立時,加成額外再 +1",
-    "passive_en": "Call and Answer: when one of his Echo conditions is met, the bonus is 1 higher still",
-    "lore_zh": "左手誘敵,右手收帳。兩把彎刃永遠一唱一和。",
-    "lore_en": "One blade to bait, one to bill. His curved knives always answer each other.",
-    "start": [
-      "fox_stab2",
-      "fox_stab3",
-      "fox_stab1x2",
-      "fox_echo3",
-      "fox_guard2",
-      "fox_shift"
-    ],
-    "start_b": [
-      "fox_stab2",
-      "fox_stab1x2",
-      "foxb_echo2",
-      "fox_stab3",
-      "fox_guard2",
-      "foxb_dash"
-    ],
-    "die_a_zh": "左刃骰",
-    "die_a_en": "Left Blade Die",
-    "die_b_zh": "右刃骰",
-    "die_b_en": "Right Blade Die",
-    "unlocks": {
-      "2": "fox_stab2x2",
-      "3": "fox_guard3",
-      "4": "fox_echo4",
-      "5": "fox_shadow3",
-      "6": "fox_twindance",
-      "7": "fox_phantom"
-    },
-    "color": "#e2703a",
-    "starter": false
+  "color": "#e0a33c",
+  "starter": true
+ },
+ "FOX": {
+  "order": 5,
+  "zh": "狐影雙刃",
+  "en": "Fox Duelist",
+  "short": "Fox",
+  "hp": 22,
+  "passive": "call_and_answer",
+  "passive_zh": "一唱一和:他的「呼應」條件成立時,加成額外再 +1",
+  "passive_en": "Call and Answer: when one of his Echo conditions is met, the bonus is 1 higher still",
+  "lore_zh": "左手誘敵,右手收帳。兩把彎刃永遠一唱一和。",
+  "lore_en": "One blade to bait, one to bill. His curved knives always answer each other.",
+  "start": [
+   "fox_stab2",
+   "fox_stab3",
+   "fox_stab1x2",
+   "fox_echo3",
+   "fox_guard2",
+   "fox_shift"
+  ],
+  "start_b": [
+   "fox_stab2",
+   "fox_stab1x2",
+   "foxb_echo2",
+   "fox_stab3",
+   "fox_siphonstep",
+   "foxb_dash"
+  ],
+  "die_a_zh": "左刃骰",
+  "die_a_en": "Left Blade Die",
+  "die_b_zh": "右刃骰",
+  "die_b_en": "Right Blade Die",
+  "unlocks": {
+   "2": "fox_stab2x2",
+   "3": "fox_guard3",
+   "4": "fox_echo4",
+   "5": "fox_essencewaltz",
+   "6": "fox_shadow3",
+   "7": "fox_twindance",
+   "8": "fox_phantom"
   },
-
-  "BOAR": {
-    "order": 6,
-    "zh": "蠻豬破軍",
-    "en": "Boar Berserker",
-    "short": "Boar",
-    "hp": 24,
-    "passive": "cornered_fury",
-    "passive_zh": "背水之勢:HP 在 50% 或以下時,所有攻擊面 +2",
-    "passive_en": "Cornered Fury: while at 50% HP or less, all attack faces get +2",
-    "lore_zh": "巨鎚落下時他從不計算代價——反正埋單的通常是對面。",
-    "lore_en": "He never counts the cost when the great hammer falls—the bill usually lands on the other side.",
-    "start": [
-      "boar_smash4",
-      "boar_smash4",
-      "boar_crush6",
-      "boar_wild3",
-      "boar_guard2",
-      "boar_rampage"
-    ],
-    "start_b": [
-      "boar_wild3",
-      "boarb_smash5",
-      "boarb_guard3",
-      "boarb_bloodhit3",
-      "boarb_wild2",
-      "boarb_allin"
-    ],
-    "die_a_zh": "石鎚骰",
-    "die_a_en": "Stone Maul Die",
-    "die_b_zh": "蠻勇骰",
-    "die_b_en": "Fury Die",
-    "unlocks": {
-      "2": "boar_smash6",
-      "3": "boar_ironhide",
-      "4": "boar_bloodhit5",
-      "5": "boar_lastditch",
-      "6": "boar_avalanche8",
-      "7": "boar_finale10"
-    },
-    "color": "#a83b52",
-    "starter": false
-  }
+  "color": "#e2703a",
+  "starter": false
+ },
+ "BOAR": {
+  "order": 6,
+  "zh": "蠻豬破軍",
+  "en": "Boar Berserker",
+  "short": "Boar",
+  "hp": 24,
+  "passive": "cornered_fury",
+  "passive_zh": "背水之勢:HP 在 50% 或以下時,所有攻擊面 +2",
+  "passive_en": "Cornered Fury: while at 50% HP or less, all attack faces get +2",
+  "lore_zh": "巨鎚落下時他從不計算代價——反正埋單的通常是對面。",
+  "lore_en": "He never counts the cost when the great hammer falls—the bill usually lands on the other side.",
+  "start": [
+   "boar_smash4",
+   "boar_smash4",
+   "boar_crush6",
+   "boar_wild3",
+   "boar_guard2",
+   "boar_bloodtithe"
+  ],
+  "start_b": [
+   "boar_wild3",
+   "boarb_smash5",
+   "boarb_guard3",
+   "boarb_bloodhit3",
+   "boarb_wild2",
+   "boarb_allin"
+  ],
+  "die_a_zh": "石鎚骰",
+  "die_a_en": "Stone Maul Die",
+  "die_b_zh": "蠻勇骰",
+  "die_b_en": "Fury Die",
+  "unlocks": {
+   "2": "boar_smash6",
+   "3": "boar_ironhide",
+   "4": "boar_bloodhit5",
+   "5": "boar_bloodsurge",
+   "6": "boar_lastditch",
+   "7": "boar_avalanche8",
+   "8": "boar_finale10"
+  },
+  "color": "#a83b52",
+  "starter": false
+ }
 }

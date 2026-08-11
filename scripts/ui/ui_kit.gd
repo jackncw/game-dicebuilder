@@ -353,7 +353,15 @@ static func background(chapter: int, canopy := 118.0, horizon := 0.0,
 
 ## Bottom-pinned tray: the same slab the battle screen puts its controls on.
 ## Returns the tray; add rows to `tray.get_child(0)` (a VBoxContainer).
+##
+## The slab runs to the physical bottom edge and its CONTENTS clear the home
+## indicator — see `Safe.pin_footer`. Nine screens hang their controls off this
+## one helper, which is why the phone fix for all of them is three lines here.
 static func footer(chapter: int, height := 130.0) -> PanelContainer:
+	return Safe.pin_footer(_footer_slab(chapter, height), height)
+
+
+static func _footer_slab(chapter: int, height: float) -> PanelContainer:
 	var tray := PanelContainer.new()
 	var box := flat_box(UITheme.surface_deep(chapter), 0, 0, UITheme.OUTLINE, UITheme.S3)
 	box.set_border_width_all(0)

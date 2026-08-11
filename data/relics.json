@@ -1,25 +1,203 @@
 {
-  "_comment": "20 relics in two tiers. rarity 'common' — from elites, events V04/V11, the shop (130g) and chests. rarity 'advanced' — ONLY from the chapter 1 and 2 boss 2-pick; each one is meant to define a build axis. `effect` is the key BattleCore / RunState switch on; `value` is its single number.",
-
-  "N01": {"zh": "森林徽章", "en": "Grove Sigil", "rarity": "common", "glyph": "r_sigil", "desc_zh": "每場戰鬥重擲 +1", "desc_en": "+1 reroll each battle", "effect": "reroll_plus", "value": 1},
-  "N02": {"zh": "磨刀石", "en": "Whetstone", "rarity": "common", "glyph": "r_whetstone", "desc_zh": "所有攻擊面 +1", "desc_en": "All attack faces +1", "effect": "atk_plus", "value": 1},
-  "N03": {"zh": "盾徽", "en": "Shield Crest", "rarity": "common", "glyph": "r_crest", "desc_zh": "所有格擋面 +1", "desc_en": "All block faces +1", "effect": "block_plus", "value": 1},
-  "N04": {"zh": "橡果護符", "en": "Acorn Charm", "rarity": "common", "glyph": "r_acorn", "desc_zh": "全隊最大 HP +6", "desc_en": "Whole party max HP +6", "effect": "team_maxhp", "value": 6},
-  "N05": {"zh": "靈息水晶", "en": "Essence Crystal", "rarity": "common", "glyph": "r_crystal", "desc_zh": "每場戰鬥開始時 +2 靈息", "desc_en": "+2 Essence at the start of each battle", "effect": "battle_start_mana", "value": 2},
-  "N06": {"zh": "蜜糖罐", "en": "Honey Jar", "rarity": "common", "glyph": "r_honey", "desc_zh": "休息的回復量改為 45%", "desc_en": "Resting heals 45% instead", "effect": "rest_heal_pct", "value": 45},
-  "N07": {"zh": "聖泉水", "en": "Spring Water", "rarity": "common", "glyph": "r_spring", "desc_zh": "戰後回復改為 30%", "desc_en": "Post-battle recovery becomes 30%", "effect": "post_battle_heal_pct", "value": 30},
-  "N08": {"zh": "銅錢", "en": "Old Coin", "rarity": "common", "glyph": "r_coin", "desc_zh": "戰鬥金幣 +25%", "desc_en": "+25% gold from battles", "effect": "gold_pct", "value": 25},
-  "N09": {"zh": "毒瓶", "en": "Venom Vial", "rarity": "common", "glyph": "r_vial", "desc_zh": "你施加的中毒 +1", "desc_en": "Poison you inflict +1", "effect": "poison_plus", "value": 1},
-  "N10": {"zh": "火絨盒", "en": "Tinderbox", "rarity": "common", "glyph": "r_tinderbox", "desc_zh": "你施加的灼燒 +1", "desc_en": "Burn you inflict +1", "effect": "burn_plus", "value": 1},
-  "N11": {"zh": "幸運兔腳", "en": "Lucky Foot", "rarity": "common", "glyph": "r_foot", "desc_zh": "每場戰鬥第 1 回合重擲 +2", "desc_en": "+2 rerolls on turn 1 of each battle", "effect": "first_turn_rerolls", "value": 2},
-  "N12": {"zh": "節拍器", "en": "Metronome", "rarity": "common", "glyph": "r_metronome", "desc_zh": "未使用的重擲保留到下回合(最多存 3 次)", "desc_en": "Unused rerolls carry over to next turn (up to 3 stored)", "effect": "reroll_carry", "value": 3},
-  "N13": {"zh": "骰匠工具", "en": "Dicewright Kit", "rarity": "common", "glyph": "r_kit", "desc_zh": "鍛造費用減半", "desc_en": "Forging costs half", "effect": "forge_half", "value": 1},
-  "N14": {"zh": "望遠鏡", "en": "Spyglass", "rarity": "common", "glyph": "r_spyglass", "desc_zh": "地圖上可預覽戰鬥節點的敵人組合", "desc_en": "Preview the enemy line-up on battle nodes from the map", "effect": "preview_battles", "value": 1},
-
-  "A01": {"zh": "雙月徽記", "en": "Twin Moon Seal", "rarity": "advanced", "glyph": "r_twinmoon", "desc_zh": "每回合可指定一位英雄使用他的兩顆骰子,該英雄不受「用一鎖一」限制", "desc_en": "Each turn one hero of your choice may spend BOTH of their dice — they ignore the one-action-a-turn rule", "effect": "twin_dice", "value": 1},
-  "A02": {"zh": "荊棘王冠", "en": "Bramble Crown", "rarity": "advanced", "glyph": "r_crown", "desc_zh": "全隊開戰時獲得荊棘 2,而且你的荊棘在回合結束時不會消退", "desc_en": "The party starts every battle with Thorns 2, and your Thorns no longer decay at end of turn", "effect": "thorn_crown", "value": 2},
-  "A03": {"zh": "血之聖杯", "en": "Crimson Chalice", "rarity": "advanced", "glyph": "r_chalice", "desc_zh": "你的吸血由 50% 提升至 100%,而且所有自損 -1(最低 0)", "desc_en": "Your Lifesteal heals 100% instead of 50%, and every Pain cost is reduced by 1 (minimum 0)", "effect": "chalice", "value": 1},
-  "A04": {"zh": "賭徒之骨", "en": "Gambler's Bone", "rarity": "advanced", "glyph": "r_bone", "desc_zh": "重擲次數無限,但每次重擲全隊各受 1 點傷害(無視格擋)", "desc_en": "Rerolls are unlimited, but each one deals 1 damage to every hero, ignoring Block", "effect": "gamblers_bone", "value": 1},
-  "A05": {"zh": "森之心", "en": "Heart of the Forest", "rarity": "advanced", "glyph": "r_heart", "desc_zh": "靈術消耗 -1(最低 1),而且每回合開始時 +1 靈息", "desc_en": "Ritual costs are reduced by 1 (minimum 1), and you gain +1 Essence at the start of every turn", "effect": "forest_heart", "value": 1},
-  "A06": {"zh": "獸王戰鼓", "en": "Warlord's Drum", "rarity": "advanced", "glyph": "r_drum", "desc_zh": "你每次攻擊之後,本回合隊伍的下一次攻擊 +1(回合內可疊加)", "desc_en": "After each of your attacks, your party's next attack this turn gets +1 — it stacks within the turn", "effect": "warlord_drum", "value": 1}
+ "_comment": "20 relics in two tiers. rarity 'common' — from elites, events V04/V11, the shop (130g) and chests. rarity 'advanced' — ONLY from the chapter 1 and 2 boss 2-pick; each one is meant to define a build axis. `effect` is the key BattleCore / RunState switch on; `value` is its single number.",
+ "N01": {
+  "zh": "導靈杖",
+  "en": "Channeling Rod",
+  "rarity": "common",
+  "glyph": "r_rod",
+  "desc_zh": "每回合你施放的第一個靈術,費用 -1(最低 1)",
+  "desc_en": "The first Ritual you cast each turn costs 1 less (minimum 1)",
+  "effect": "channeling_rod",
+  "value": 1
+ },
+ "N02": {
+  "zh": "磨刀石",
+  "en": "Whetstone",
+  "rarity": "common",
+  "glyph": "r_whetstone",
+  "desc_zh": "所有攻擊面 +1",
+  "desc_en": "All attack faces +1",
+  "effect": "atk_plus",
+  "value": 1
+ },
+ "N03": {
+  "zh": "盾徽",
+  "en": "Shield Crest",
+  "rarity": "common",
+  "glyph": "r_crest",
+  "desc_zh": "所有格擋面 +1",
+  "desc_en": "All block faces +1",
+  "effect": "block_plus",
+  "value": 1
+ },
+ "N04": {
+  "zh": "橡果護符",
+  "en": "Acorn Charm",
+  "rarity": "common",
+  "glyph": "r_acorn",
+  "desc_zh": "全隊最大 HP +6",
+  "desc_en": "Whole party max HP +6",
+  "effect": "team_maxhp",
+  "value": 6
+ },
+ "N05": {
+  "zh": "靈息水晶",
+  "en": "Essence Crystal",
+  "rarity": "common",
+  "glyph": "r_crystal",
+  "desc_zh": "每場戰鬥開始時 +2 靈息",
+  "desc_en": "+2 Essence at the start of each battle",
+  "effect": "battle_start_mana",
+  "value": 2
+ },
+ "N06": {
+  "zh": "蜜糖罐",
+  "en": "Honey Jar",
+  "rarity": "common",
+  "glyph": "r_honey",
+  "desc_zh": "休息的回復量改為 45%",
+  "desc_en": "Resting heals 45% instead",
+  "effect": "rest_heal_pct",
+  "value": 45
+ },
+ "N07": {
+  "zh": "聖泉水",
+  "en": "Spring Water",
+  "rarity": "common",
+  "glyph": "r_spring",
+  "desc_zh": "戰後回復改為 30%",
+  "desc_en": "Post-battle recovery becomes 30%",
+  "effect": "post_battle_heal_pct",
+  "value": 30
+ },
+ "N08": {
+  "zh": "銅錢",
+  "en": "Old Coin",
+  "rarity": "common",
+  "glyph": "r_coin",
+  "desc_zh": "戰鬥金幣 +25%",
+  "desc_en": "+25% gold from battles",
+  "effect": "gold_pct",
+  "value": 25
+ },
+ "N09": {
+  "zh": "毒瓶",
+  "en": "Venom Vial",
+  "rarity": "common",
+  "glyph": "r_vial",
+  "desc_zh": "你施加的中毒 +1",
+  "desc_en": "Poison you inflict +1",
+  "effect": "poison_plus",
+  "value": 1
+ },
+ "N10": {
+  "zh": "火絨盒",
+  "en": "Tinderbox",
+  "rarity": "common",
+  "glyph": "r_tinderbox",
+  "desc_zh": "你施加的灼燒 +1",
+  "desc_en": "Burn you inflict +1",
+  "effect": "burn_plus",
+  "value": 1
+ },
+ "N11": {
+  "zh": "幸運兔腳",
+  "en": "Lucky Foot",
+  "rarity": "common",
+  "glyph": "r_foot",
+  "desc_zh": "每場戰鬥第 1 回合重擲 +2",
+  "desc_en": "+2 rerolls on turn 1 of each battle",
+  "effect": "first_turn_rerolls",
+  "value": 2
+ },
+ "N12": {
+  "zh": "靈息迴環",
+  "en": "Essence Loop",
+  "rarity": "common",
+  "glyph": "r_loop",
+  "desc_zh": "回合結束時剩餘靈息 3 點或以上,下回合開始額外 +1 靈息",
+  "desc_en": "End a turn with 3 or more Essence still in the pool and you gain +1 extra Essence at the start of the next turn",
+  "effect": "essence_loop",
+  "value": 1
+ },
+ "N13": {
+  "zh": "骰匠工具",
+  "en": "Dicewright Kit",
+  "rarity": "common",
+  "glyph": "r_kit",
+  "desc_zh": "鍛造費用減半",
+  "desc_en": "Forging costs half",
+  "effect": "forge_half",
+  "value": 1
+ },
+ "N14": {
+  "zh": "望遠鏡",
+  "en": "Spyglass",
+  "rarity": "common",
+  "glyph": "r_spyglass",
+  "desc_zh": "地圖上可預覽戰鬥節點的敵人組合",
+  "desc_en": "Preview the enemy line-up on battle nodes from the map",
+  "effect": "preview_battles",
+  "value": 1
+ },
+ "A01": {
+  "zh": "雙月徽記",
+  "en": "Twin Moon Seal",
+  "rarity": "advanced",
+  "glyph": "r_twinmoon",
+  "desc_zh": "每回合可指定一位英雄使用他的兩顆骰子,該英雄不受「用一鎖一」限制",
+  "desc_en": "Each turn one hero of your choice may spend BOTH of their dice — they ignore the one-action-a-turn rule",
+  "effect": "twin_dice",
+  "value": 1
+ },
+ "A02": {
+  "zh": "荊棘王冠",
+  "en": "Bramble Crown",
+  "rarity": "advanced",
+  "glyph": "r_crown",
+  "desc_zh": "全隊開戰時獲得荊棘 2,而且你的荊棘在回合結束時不會消退",
+  "desc_en": "The party starts every battle with Thorns 2, and your Thorns no longer decay at end of turn",
+  "effect": "thorn_crown",
+  "value": 2
+ },
+ "A03": {
+  "zh": "血之聖杯",
+  "en": "Crimson Chalice",
+  "rarity": "advanced",
+  "glyph": "r_chalice",
+  "desc_zh": "你的吸血由 50% 提升至 100%,而且所有自損 -1(最低 0)",
+  "desc_en": "Your Lifesteal heals 100% instead of 50%, and every Pain cost is reduced by 1 (minimum 0)",
+  "effect": "chalice",
+  "value": 1
+ },
+ "A04": {
+  "zh": "賭徒之骨",
+  "en": "Gambler's Bone",
+  "rarity": "advanced",
+  "glyph": "r_bone",
+  "desc_zh": "重擲次數無限,但每次重擲全隊各受 1 點傷害(無視格擋)",
+  "desc_en": "Rerolls are unlimited, but each one deals 1 damage to every hero, ignoring Block",
+  "effect": "gamblers_bone",
+  "value": 1
+ },
+ "A05": {
+  "zh": "森之心",
+  "en": "Heart of the Forest",
+  "rarity": "advanced",
+  "glyph": "r_heart",
+  "desc_zh": "靈術消耗 -1(最低 1),而且每回合開始時 +1 靈息",
+  "desc_en": "Ritual costs are reduced by 1 (minimum 1), and you gain +1 Essence at the start of every turn",
+  "effect": "forest_heart",
+  "value": 1
+ },
+ "A06": {
+  "zh": "獸王戰鼓",
+  "en": "Warlord's Drum",
+  "rarity": "advanced",
+  "glyph": "r_drum",
+  "desc_zh": "你每次攻擊之後,本回合隊伍的下一次攻擊 +1(回合內可疊加)",
+  "desc_en": "After each of your attacks, your party's next attack this turn gets +1 — it stacks within the turn",
+  "effect": "warlord_drum",
+  "value": 1
+ }
 }

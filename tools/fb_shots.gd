@@ -12,9 +12,22 @@ extends Node
 const BASE_W := 720
 const BASE_H := 1280
 
+## The same four targets `gallery_export.gd` shoots, and for the same reason:
+## the last two are what a phone browser really hands the game once its own
+## chrome is off, and they are not 9:16, so they are their own geometry rather
+## than a scaled design canvas. `inset` is the home-screen case, in CSS pixels.
+const TARGETS := [
+	{"px": Vector2i(720, 1280), "tag": "", "inset": Vector2.ZERO},
+	{"px": Vector2i(390, 664), "tag": "_390x664", "inset": Vector2(47, 34)},
+	{"px": Vector2i(360, 640), "tag": "_360x640", "inset": Vector2(47, 34)},
+]
+
 var out_dir := "res://final/fb/"
 var sub: SubViewport
 var shot_count := 0
+var canvas := Vector2(BASE_W, BASE_H)
+var scale_f := 1.0
+var tag := ""
 
 
 func _ready() -> void:
@@ -28,16 +41,30 @@ func _ready() -> void:
 
 	sub = SubViewport.new()
 	sub.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	sub.size = Vector2i(BASE_W, BASE_H)
 	add_child(sub)
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(out_dir))
 	Game.settings.lang_mode = "both"
 	_prepare_run()
 	await get_tree().process_frame
 
-	await _menu_shots()
-	await _offer_shots()
-	await _detail_shots()
+	for t in TARGETS:
+		var px: Vector2i = t.px
+		tag = String(t.tag)
+		scale_f = minf(float(px.x) / float(BASE_W), float(px.y) / float(BASE_H))
+		canvas = Vector2(px) / scale_f
+		sub.size = px
+		Safe.force_canvas(canvas)
+		var ins: Vector2 = t.inset
+		if ins == Vector2.ZERO:
+			Safe.force_insets(-1.0, 0.0, 0.0, 0.0)
+		else:
+			Safe.force_insets(ins.x / scale_f, 0.0, ins.y / scale_f, 0.0)
+		await get_tree().process_frame
+		await _menu_shots()
+		await _offer_shots()
+		await _detail_shots()
+	Safe.force_insets(-1.0, 0.0, 0.0, 0.0)
+	Safe.force_canvas(Vector2.ZERO)
 
 	print("FB SHOTS: DONE ", shot_count)
 	get_tree().quit()
@@ -205,7 +232,9 @@ func _mount(node: Control) -> void:
 		c.queue_free()
 	await get_tree().process_frame
 	var holder := Control.new()
-	holder.size = Vector2(BASE_W, BASE_H)
+	holder.size = canvas
+	holder.custom_minimum_size = canvas
+	holder.scale = Vector2(scale_f, scale_f)
 	node.set_anchors_preset(Control.PRESET_FULL_RECT)
 	holder.add_child(node)
 	sub.add_child(holder)
@@ -216,7 +245,7 @@ func _mount(node: Control) -> void:
 func _grab(name: String) -> void:
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
-	var path := ProjectSettings.globalize_path(out_dir) + name + ".png"
+	var path := ProjectSettings.globalize_path(out_dir) + name + tag + ".png"
 	sub.get_texture().get_image().save_png(path)
 	shot_count += 1
 	print("SHOT ", name)

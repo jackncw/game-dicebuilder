@@ -32,11 +32,14 @@ var relic_row: VBoxContainer
 var enemy_row: HBoxContainer
 var hero_row: HBoxContainer
 var cast_zone: Control
+var tray_panel: PanelContainer
+var arena_bg: Control
 var cast_panel: PanelContainer
 var cast_label: Label
 var cast_btn: Button
 var btn_undo: Button
 var btn_reroll: Button
+var btn_buy_reroll: Button
 var btn_end: Button
 var overlay: Control = null
 var float_layer: Control
@@ -69,9 +72,9 @@ const DRAG_ARM := 56.0
 ## How much a hovered drop target swells to say "it lands here".
 const HOVER_SCALE := 1.035
 
-## Vertical bands of the 720x1280 battle canvas. Everything anchors to one of
-## these, so there is no unclaimed slack: enemies own the top, the party owns
-## the bottom half, and the action tray is pinned to the very bottom edge.
+## Vertical bands of the battle canvas. Everything anchors to one of these, so
+## there is no unclaimed slack: enemies own the top, the party owns the bottom
+## half, and the action tray is pinned to the very bottom edge.
 ##
 ## The bands are also a contract. The cast pad is its own full-width strip
 ## between the enemy band and the party, and NOTHING from the enemy band is
@@ -80,16 +83,63 @@ const HOVER_SCALE := 1.035
 ## band it was anchored in. `_enemy_art_budget()` is what enforces it now, and
 ## `tests/layout_test.gd` asserts the two rects never intersect for any of the
 ## six bosses or a four-enemy line-up.
-const ZONE_TOPBAR := 10.0
-const ZONE_RELICS := 46.0
-const ZONE_ENEMY_TOP := 96.0
-const ZONE_ENEMY_BOTTOM := 570.0
-const ZONE_HORIZON := 576.0
-const ZONE_CAST_TOP := 584.0
-const ZONE_CAST_BOTTOM := 646.0
-const ZONE_HERO_TOP := 654.0
-const ZONE_HERO_BOTTOM := 1014.0
+##
+## These were constants until round 6, when the game went on a real phone and
+## the top bar turned out to be underneath the address bar. Two things changed:
+## the canvas is now sized to the VISUAL viewport (`tools/web_shell.html`), and
+## the bands are solved against `Safe`'s insets instead of against a hardcoded
+## 1280. On a 720x1280 canvas with no insets `_solve_zones()` reproduces the old
+## numbers exactly, so nothing about the desktop build moved.
+var ZONE_TOPBAR := 10.0
+var ZONE_RELICS := 46.0
+var ZONE_ENEMY_TOP := 96.0
+var ZONE_ENEMY_BOTTOM := 570.0
+var ZONE_HORIZON := 576.0
+var ZONE_CAST_TOP := 584.0
+var ZONE_CAST_BOTTOM := 646.0
+var ZONE_HERO_TOP := 654.0
+var ZONE_HERO_BOTTOM := 1014.0
 const TRAY_H := 244.0
+
+## The fixed parts of the stack, measured off the shipping 720x1280 layout.
+const HEAD_H := 96.0        # top bar + relic strip, above the enemy row
+const HERO_BAND_H := 360.0  # the four hero columns
+const TRAY_GAP := 22.0      # between the hero columns and the action tray
+## 78, up from the 62 it was through round 5. The strip stopped being a label
+## and became the game's running commentary — a whole bilingual effect sentence,
+## which in the worst case (an attack that also poisons, pierces and costs
+## Essence) is one Chinese line and two wrapped English ones. It is paid for out
+## of the enemy band, so a boss is drawn 177px tall instead of 193; that is a
+## real cost and it buys the player being able to read their own hand without
+## long-pressing eight dice.
+##
+## CAST_MIN_H is unchanged on purpose: the inset budget in `_solve_zones` is
+## solved against the FLOOR, so growing the resting height costs nothing on a
+## phone with a deep notch — it just means the strip has further to give.
+const CAST_H := 78.0        # the ✦ 施放 strip at rest
+const CAST_MIN_H := 44.0    # …and as far as it may be squeezed
+const GAP_HORIZON := 6.0
+const GAP_CAST := 8.0
+const GAP_HERO := 8.0
+
+## How short the enemy band may get before the squeeze moves on to the cast
+## strip. `ENEMY_CHROME_H` of it is name, HP, statuses and intents — none of
+## which shrink — so this leaves the creature 96px, which is where a minion
+## stops reading as a distinct animal at 540 wide.
+const ENEMY_ART_MIN := 96.0
+
+## …and the point past which there is no layout at all. The chrome does not
+## shrink, so a card is never shorter than `ENEMY_CHROME_H` plus this, and a band
+## shorter than that means enemy cards reaching into the cast pad — the exact
+## overlap `tests/layout_test.gd` was written to prevent. This is a hard floor,
+## not a comfort one: `ENEMY_ART_MIN` decides when the CAST STRIP starts giving,
+## this decides when the INSETS stop being honoured.
+const ENEMY_ART_HARD_MIN := 48.0
+
+## The insets actually applied, which is `Safe`'s pair except on a device that
+## demands more than the layout can pay (see `_solve_zones`).
+var eff_top := 0.0
+var eff_bottom := 0.0
 ## Numbers land on the pawn, not on the name plate at the top of the column.
 const HERO_FLOAT_DROP := 96.0
 
@@ -129,7 +179,12 @@ func _ready() -> void:
 	bc = BattleCore.new()
 	bc.setup(args.team, args.enemies, args.get("opts", {}), rng)
 	_record_encounter()
+	_solve_zones()
 	_build_static()
+	# A phone's address bar slides in and out mid-play, and rotating the device
+	# changes the canvas outright. Both arrive as one of these two.
+	Safe.changed.connect(_on_viewport_changed)
+	get_viewport().size_changed.connect(_on_viewport_changed)
 	_refresh()
 	_animate_roll()
 	if args.get("tutorial", false):
@@ -150,7 +205,8 @@ func _record_encounter() -> void:
 
 func _build_static() -> void:
 	var chapter := int(args.get("opts", {}).get("chapter", 1))
-	add_child(_build_arena_bg(chapter))
+	arena_bg = _build_arena_bg(chapter)
+	add_child(arena_bg)
 
 	var top := HBoxContainer.new()
 	top.anchor_left = 0.0
@@ -217,12 +273,24 @@ func _build_static() -> void:
 	cast_zone.offset_bottom = ZONE_CAST_BOTTOM
 	cast_zone.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cast_panel = UIKit.panel(UITheme.surface_deep(chapter), UIKit.R_LG, UIKit.B_STRONG)
+	# tighter than the house 10px: every pixel of padding is a pixel the
+	# sentence cannot use, and the strip is already borrowing from the arena
+	cast_panel.get_theme_stylebox("panel").set_content_margin_all(CAST_PAD)
 	cast_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	cast_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# One label doing two jobs: the drop-zone prompt when nothing is picked up,
+	# and the full effect sentence for whatever die is. Autowrap and a small
+	# size floor are what let a two-line bilingual sentence live in a 62px strip.
 	cast_label = UIKit.label("✦ " + Data.t("ui_cast_zone"), UIKit.F_H2, UIKit.CREAM)
 	cast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	cast_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	cast_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# NOT `clip_text`. A Label with `clip_text` reports a minimum height of one
+	# pixel, and a PanelContainer hands its child exactly its minimum — which is
+	# how the first cut of this shipped an empty strip with the right text in it.
+	# The fit is done properly instead, in `_cast_font_for()`.
 	cast_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cast_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	cast_panel.add_child(cast_label)
 	cast_zone.add_child(cast_panel)
 	# tap path: with a no-target face selected the pad becomes a button, so the
@@ -251,6 +319,7 @@ func _build_static() -> void:
 	# --- action tray, pinned to the bottom edge so the screen has no tail of
 	# --- empty background under the controls
 	var tray := PanelContainer.new()
+	tray_panel = tray
 	var tray_box := UIKit.flat_box(UITheme.surface_deep(chapter), 0, 0, UIKit.OUTLINE, UIKit.S3)
 	tray_box.set_border_width_all(0)
 	tray_box.border_width_top = UIKit.B_STRONG
@@ -279,13 +348,21 @@ func _build_static() -> void:
 	actions.alignment = BoxContainer.ALIGNMENT_CENTER
 	actions.add_theme_constant_override("separation", UIKit.S3)
 	tray_v.add_child(actions)
-	btn_undo = UIKit.button(Data.t("ui_undo"), UIKit.CREAM_DARK, UIKit.F_H2, Vector2(176, 78))
+	# F_BODY, not the F_H2 these wore through round 5. The row gained a fourth
+	# control (the Essence-for-a-reroll trade) and a Button is never narrower
+	# than its own text, so at heading size the bilingual labels added up to
+	# 749px on a 720px canvas and "結束回合 End Turn" hung off the right edge.
+	# One step down the type scale buys 90px and costs nothing legible — 22pt is
+	# 16.5 physical pixels even on the 540 build.
+	btn_undo = UIKit.button(Data.t("ui_undo"), UIKit.CREAM_DARK, UIKit.F_BODY, Vector2(140, 78))
 	btn_undo.pressed.connect(_on_undo)
 	actions.add_child(btn_undo)
-	btn_reroll = UIKit.button("", UIKit.YELLOW.lightened(0.3), UIKit.F_H2, Vector2(200, 78))
+	btn_reroll = UIKit.button("", UIKit.YELLOW.lightened(0.3), UIKit.F_BODY, Vector2(168, 78))
 	btn_reroll.pressed.connect(_on_reroll)
 	actions.add_child(btn_reroll)
-	btn_end = UIKit.button(Data.t("ui_end_turn"), UIKit.RED.lightened(0.35), UIKit.F_H2, Vector2(216, 78))
+	btn_buy_reroll = _build_buy_reroll()
+	actions.add_child(btn_buy_reroll)
+	btn_end = UIKit.button(Data.t("ui_end_turn"), UIKit.RED.lightened(0.35), UIKit.F_BODY, Vector2(176, 78))
 	btn_end.pressed.connect(_on_end_turn)
 	actions.add_child(btn_end)
 
@@ -298,6 +375,155 @@ func _build_static() -> void:
 	drag_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
 	drag_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(drag_layer)
+
+	_apply_zones()
+
+
+# ============================================================ vertical bands
+
+## Solve the vertical bands for the canvas we actually have and the insets the
+## device actually imposes.
+##
+## The rule, in priority order:
+##   · The TOP BAR — turn, Essence, rerolls — is below the top inset. It is the
+##     one thing the player has to be able to see at all times and it is the one
+##     thing that was missing on a real phone, so it is solved first and never
+##     gives anything back.
+##   · The ACTION TRAY and the HERO COLUMNS are above the bottom inset, at full
+##     size. They are what you touch; a squeezed thumb target is a mis-play.
+##   · The ENEMY BAND is the slack. It gets whatever is left, and
+##     `_enemy_art_budget()` already turns a smaller band into smaller creatures
+##     rather than into a card that reaches somewhere it shouldn't.
+##   · Only once the enemy band is down to chrome + `ENEMY_ART_MIN` does the
+##     CAST STRIP start giving, and only as far as `CAST_MIN_H`.
+##
+## Solved from the two edges inward rather than tabulated, so a phone whose
+## insets nobody has seen yet still lands somewhere sane.
+func _solve_zones() -> void:
+	var h := Safe.canvas_size().y
+	# everything under the enemy band, before the cast strip is priced
+	var below := TRAY_H + TRAY_GAP + HERO_BAND_H + GAP_HERO + GAP_CAST + GAP_HORIZON
+	# What is left for insets once every band is at its own floor. On the design
+	# canvas this comes to 163 units, and the deepest real phone geometry the
+	# game has to survive — a 360x640 visible strip on a device with a 47px notch
+	# and a 34px home indicator, which scales to 94 + 68 — is 162. One unit of
+	# margin is uncomfortably little, and it is the true number rather than a
+	# padded one: this is what the 720x1280 design costs on today's phones.
+	#
+	# Past the budget the insets are CLAMPED, bottom first. That trades a home
+	# indicator sitting over the tray's lower margin for an arena that still
+	# obeys its own contract; the alternative is enemy cards growing through the
+	# cast pad, which is the bug `tests/layout_test.gd` exists to prevent. No
+	# shipping phone gets near it — it would have to claim a quarter of the glass.
+	var budget := maxf(h - HEAD_H - below - CAST_MIN_H
+			- (ENEMY_CHROME_H + ENEMY_ART_HARD_MIN), 0.0)
+	var top_in := Safe.top
+	var bot_in := Safe.bottom
+	if top_in + bot_in > budget:
+		top_in = minf(top_in, budget)
+		bot_in = maxf(budget - top_in, 0.0)
+	eff_top = top_in
+	eff_bottom = bot_in
+	var cast_h := CAST_H
+	var band := h - top_in - bot_in - HEAD_H - below - cast_h
+	if band < ENEMY_CHROME_H + ENEMY_ART_MIN:
+		# the enemy band has run out; take the difference off the cast strip, but
+		# no further than CAST_MIN_H — below that it stops reading as a drop zone
+		var want := (ENEMY_CHROME_H + ENEMY_ART_MIN) - band
+		var give := minf(want, CAST_H - CAST_MIN_H)
+		cast_h -= give
+		band += give
+	ZONE_TOPBAR = top_in + 10.0
+	ZONE_RELICS = top_in + 46.0
+	ZONE_ENEMY_TOP = top_in + HEAD_H
+	# The band is allowed to come out negative on a canvas that is absurdly short
+	# (a desktop window dragged to a sliver). Clamping it to zero keeps the bands
+	# ordered so the layout degrades into overlap-free nonsense instead of
+	# inside-out nonsense.
+	ZONE_ENEMY_BOTTOM = ZONE_ENEMY_TOP + maxf(band, 0.0)
+	ZONE_HORIZON = ZONE_ENEMY_BOTTOM + GAP_HORIZON
+	ZONE_CAST_TOP = ZONE_HORIZON + GAP_CAST
+	ZONE_CAST_BOTTOM = ZONE_CAST_TOP + cast_h
+	ZONE_HERO_TOP = ZONE_CAST_BOTTOM + GAP_HERO
+	ZONE_HERO_BOTTOM = ZONE_HERO_TOP + HERO_BAND_H
+
+
+## Push the solved bands onto the already-built tree. Called once at build time
+## and again whenever the address bar moves or the phone is rotated.
+func _apply_zones() -> void:
+	var h := Safe.canvas_size().y
+	if top_turn != null and top_turn.get_parent() != null:
+		var top: Control = top_turn.get_parent()
+		top.offset_top = ZONE_TOPBAR
+		top.offset_left = Safe.left + UIKit.S4
+		top.offset_right = -(Safe.right + UIKit.S4)
+	if relic_scroll != null:
+		relic_scroll.offset_top = ZONE_RELICS
+		relic_scroll.offset_bottom = ZONE_ENEMY_TOP - 6.0
+		relic_scroll.offset_left = Safe.left + UIKit.S4
+		relic_scroll.offset_right = -(Safe.right + UIKit.S4)
+	if enemy_row != null:
+		enemy_row.offset_top = ZONE_ENEMY_TOP
+		enemy_row.offset_bottom = ZONE_ENEMY_BOTTOM
+	if cast_zone != null:
+		cast_zone.offset_top = ZONE_CAST_TOP
+		cast_zone.offset_bottom = ZONE_CAST_BOTTOM
+		cast_zone.offset_left = Safe.left + UIKit.S4
+		cast_zone.offset_right = -(Safe.right + UIKit.S4)
+	if hero_row != null:
+		hero_row.offset_top = ZONE_HERO_TOP
+		hero_row.offset_bottom = ZONE_HERO_BOTTOM
+	if tray_panel != null:
+		# The tray is anchored to the bottom EDGE, not to the safe area: the slab
+		# runs into the home-indicator strip so there is no bare background under
+		# it. Its contents are what get pushed up, via the bottom content margin.
+		tray_panel.offset_top = -(TRAY_H + eff_bottom)
+		var box: StyleBoxFlat = tray_panel.get_theme_stylebox("panel")
+		if box != null:
+			box.content_margin_bottom = UIKit.S4 + eff_bottom
+	_publish_hud_rects(h)
+
+
+## The scenery's canopy hangs off the top of the enemy band and its horizon runs
+## along the line the party stands on, so a band that moved leaves the painting
+## behind. Redrawn rather than re-anchored: `Forest.scenery` bakes the two y
+## positions into a `_draw`.
+func _rebuild_arena_bg() -> void:
+	if not is_instance_valid(arena_bg):
+		return
+	var idx := arena_bg.get_index()
+	var old := arena_bg
+	arena_bg = _build_arena_bg(int(args.get("opts", {}).get("chapter", 1)))
+	add_child(arena_bg)
+	move_child(arena_bg, idx)
+	old.queue_free()
+
+
+func _on_viewport_changed() -> void:
+	if bc == null or top_turn == null or not is_instance_valid(top_turn):
+		return
+	_solve_zones()
+	_apply_zones()
+	_rebuild_arena_bg()
+	_refresh()
+
+
+## Hand the two rects that matter to the page, so the Playwright regression can
+## assert they are on the glass. Deferred one frame: a container's rect is only
+## real after its sort.
+func _publish_hud_rects(_h: float) -> void:
+	if not OS.has_feature("web"):
+		return
+	_publish_deferred.call_deferred()
+
+
+func _publish_deferred() -> void:
+	if top_turn != null and is_instance_valid(top_turn) and top_turn.get_parent() != null:
+		Safe.publish_hud("topbar", (top_turn.get_parent() as Control).get_global_rect())
+	if tray_panel != null and is_instance_valid(tray_panel):
+		Safe.publish_hud("tray", tray_panel.get_global_rect())
+	if essence_bar != null and is_instance_valid(essence_bar):
+		Safe.publish_hud("essence", essence_bar.get_global_rect())
 
 
 ## The arena: chapter sky, a dark canopy the enemies stand under, a horizon
@@ -360,7 +586,7 @@ func _active_die() -> Dictionary:
 func _refresh_top() -> void:
 	top_turn.text = "%s %d" % [Data.t("ui_turn"), bc.s.turn]
 	if essence_bar != null and essence_bar.visible:
-		essence_bar.set_value(int(bc.s.mana), BattleCore.MANA_CAP)
+		essence_bar.set_value(int(bc.s.mana), BattleCore.MANA_CAP, _castable_cost())
 	# U+2B6E, not the U+21BB this used to be: U+21BB is in no Noto face, so it
 	# was only ever drawing because Windows had Segoe UI Symbol behind it, and
 	# it came out a tofu box the moment the game ran in a browser. Same arrow,
@@ -368,33 +594,85 @@ func _refresh_top() -> void:
 	top_reroll.text = "⭮ ∞" if bc.rerolls_unlimited() else "⭮ %d" % bc.s.rerolls
 
 
-## Does anybody in this party actually touch Essence? A party with no Gather /
-## Ritual faces anywhere across its eight dice would otherwise stare at a bar
-## that can never move, which reads as a broken resource rather than an unused
-## one. Faces can be swapped in mid-run, so this is re-evaluated per battle.
-func _party_uses_essence() -> bool:
+## What a Ritual would cost the pool right now, for the meter's shimmer, or -1
+## if nothing castable is on the table.
+##
+## The die in the player's hand wins: while a Ritual is picked up or lifted, the
+## cells that ARE about to be spent are the ones that light, which makes the
+## meter a preview of the action rather than a general statement about the
+## party. With nothing held it falls back to the cheapest castable Ritual
+## anywhere on the table — "there is something you can afford", which is the
+## question a player asks before they pick anything up.
+func _castable_cost() -> int:
+	var a := _active_die()
+	if not a.is_empty():
+		var c := bc.can_use(int(a.hero), int(a.die))
+		if c.ok and c.face.has("spell"):
+			return bc.spell_cost(c.face)
+	var best := -1
 	for i in bc.s.heroes.size():
-		for slot in BattleCore.DICE * BattleCore.FACES:
-			var fd := bc.hero_face(i, slot)
-			if fd.has("mana") or fd.has("spell"):
-				return true
-	# an Essence relic is a reason to show it too — 靈息水晶 and 森之心 both
-	# hand out Essence whether or not a face ever spends it
-	return GameData.has_relic_effect(bc.s.relics, "battle_start_mana") \
-			or GameData.has_relic_effect(bc.s.relics, "forest_heart")
+		for d in BattleCore.DICE:
+			var uc := bc.can_use(i, d)
+			if not uc.ok or not uc.face.has("spell"):
+				continue
+			var cost := bc.spell_cost(uc.face)
+			if cost <= int(bc.s.mana) and (best < 0 or cost < best):
+				best = cost
+	return best
+
+
+## Always, since round 6.
+##
+## This used to ask whether the party owned any Gather or Ritual face at all and
+## hid the meter otherwise — a bar that can never move reads as a broken
+## resource rather than an unused one. U1 and U2 retired the question: every
+## party draws Essence at the start of every turn, and every party can spend it
+## on a reroll, so there is no longer a party for whom the meter is dead.
+##
+## Kept as a function, and still called, rather than deleted: it is the one
+## place that records WHY the meter is unconditional now, and if a mode ever
+## turns Essence off again this is where that belongs.
+func _party_uses_essence() -> bool:
+	return true
 
 
 ## A ten-cell meter: current Essence lit, the rest sunk. Long-pressing it opens
 ## the same glossary entry a Ritual face's cost badge does.
+##
+## ── why it moves ────────────────────────────────────────────────────
+## Round 5's meter was a static bar in the corner. It was also, for most
+## parties, a bar that never changed, and the two facts reinforced each other:
+## nothing drew the eye to it because nothing happened there. U1 and U2 mean
+## something happens every single turn, so the meter now says so —
+##
+##   · a chip flies IN when the pool gains and OUT when it is spent, carrying
+##     the signed amount, so a change is legible without watching the number;
+##   · the cells a currently-affordable Ritual would consume shimmer, which
+##     turns "can I cast anything?" from arithmetic into a glance;
+##   · the whole bar pulses when Essence lands.
+##
+## All three are decoration over the same two integers. Nothing here can change
+## what the pool is; if the animation and the number ever disagree, the number
+## is right.
 class _EssenceBar:
 	extends Control
 
 	const CELLS := 10
 	const BAR := Vector2(268, 30)
+	## How long a gain/spend chip takes to fly, and how far it travels.
+	const CHIP_T := 0.55
+	const CHIP_RISE := 26.0
+	## Shimmer speed for the affordable cells, in radians a second.
+	const SHIMMER_W := 3.4
 
 	var value := 0
 	var cap := 10
 	var _label: Label
+	## Cells [_glow_from, _glow_to) shimmer: the ones a castable Ritual would eat.
+	var _glow_from := -1
+	var _glow_to := -1
+	var _shimmer := 0.0
+	var _pulse := 0.0
 
 	func _init() -> void:
 		custom_minimum_size = BAR
@@ -413,12 +691,66 @@ class _EssenceBar:
 		add_child(_label)
 		_apply()
 
-	func set_value(v: int, c := 10) -> void:
-		if v == value and c == cap:
+	## `spend` is the cost of the cheapest Ritual the party could cast right now,
+	## or -1 for none — that is what decides which cells shimmer.
+	func set_value(v: int, c := 10, spend := -1) -> void:
+		var lo := -1
+		var hi := -1
+		if spend > 0 and spend <= v:
+			lo = v - spend
+			hi = v
+		var same: bool = v == value and c == cap and lo == _glow_from and hi == _glow_to
+		if same:
 			return
+		var delta := v - value
+		var had := _label != null   # no chip for the meter's very first fill
 		value = v
 		cap = maxi(c, 1)
+		_glow_from = lo
+		_glow_to = hi
+		set_process(lo >= 0 or _pulse > 0.0)
+		if had and delta != 0:
+			_fly(delta)
+			if delta > 0:
+				pulse()
 		_apply()
+
+	## Flash the whole bar. Public because the things worth flashing for are not
+	## all value changes — rolling an Essence face is news before it is spent.
+	func pulse() -> void:
+		_pulse = 1.0
+		set_process(true)
+		queue_redraw()
+
+	## The signed amount, as a chip that flies into the bar on a gain and out of
+	## it on a spend. Freed by the tween that moves it, so nothing accumulates.
+	func _fly(delta: int) -> void:
+		var chip := UIKit.chip("%+d" % delta,
+				UITheme.BLUE if delta > 0 else UITheme.ORANGE, UITheme.F_CAPTION, UITheme.S2)
+		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		chip.z_index = 2
+		add_child(chip)
+		# laid out by hand: a chip parked in the middle of a meter is not a child
+		# any container should be sorting
+		chip.position = Vector2(size.x * 0.5 - 18.0,
+				(-CHIP_RISE if delta > 0 else 0.0) + size.y * 0.1)
+		chip.modulate.a = 0.0 if delta > 0 else 1.0
+		var to_y: float = chip.position.y + (CHIP_RISE if delta > 0 else CHIP_RISE)
+		var tw := create_tween()
+		tw.set_parallel(true)
+		tw.tween_property(chip, "position:y", to_y, CHIP_T).set_trans(Tween.TRANS_SINE)
+		tw.tween_property(chip, "modulate:a", 0.0 if delta < 0 else 1.0, CHIP_T * 0.45)
+		tw.chain().tween_property(chip, "modulate:a", 0.0, CHIP_T * 0.5)
+		tw.chain().tween_callback(chip.queue_free)
+
+	func _process(delta: float) -> void:
+		if _pulse > 0.0:
+			_pulse = maxf(_pulse - delta * 2.6, 0.0)
+		if _glow_from >= 0:
+			_shimmer += delta * SHIMMER_W
+		elif _pulse <= 0.0:
+			set_process(false)
+		queue_redraw()
 
 	func _apply() -> void:
 		if _label != null:
@@ -434,15 +766,21 @@ class _EssenceBar:
 		var pad := 4.0
 		var gap := 2.0
 		var cw := (size.x - pad * 2.0 - gap * (n - 1)) / float(n)
+		# 0 at rest, up to 0.30 at the top of a pulse
+		var flash := _pulse * 0.30
+		var shine := 0.18 + 0.17 * sin(_shimmer)
 		for i in n:
 			var r := Rect2(Vector2(pad + i * (cw + gap), pad),
 					Vector2(cw, size.y - pad * 2.0))
 			if i < value:
-				draw_rect(r, UITheme.BLUE.lightened(0.12))
+				draw_rect(r, UITheme.BLUE.lightened(0.12 + flash))
 				draw_rect(Rect2(r.position, Vector2(r.size.x, r.size.y * 0.34)),
 						Color(1, 1, 1, 0.22))
+				# the cells a castable Ritual is about to take, breathing
+				if i >= _glow_from and i < _glow_to:
+					draw_rect(r, Color(1, 1, 1, shine))
 			else:
-				draw_rect(r, Color(0.30, 0.34, 0.46, 0.42))
+				draw_rect(r, Color(0.30, 0.34, 0.46, 0.42 + flash * 0.5))
 
 
 # ============================================================ relic strip
@@ -558,23 +896,92 @@ func _drop_spec_for(i: int, d: int) -> Dictionary:
 
 ## The pad is permanent; only its emphasis changes. Live = a die that can land
 ## here is in the air, so it lights up green and the label goes full strength.
+## The strip under the arena. Two states, and the second one is the round-6
+## change:
+##
+##   idle    — "✦ 施放 Cast", the standing invitation that teaches the gesture.
+##   holding — the full effect sentence for whatever die is picked up or lifted,
+##             in both languages, with every number already worked out against
+##             this hero, this turn, these relics.
+##
+## The pips under a die are the glance; this is the sentence. Between them a
+## player can read their whole hand without opening anything, and the long-press
+## card goes back to being what it should be — the place you go to look up a
+## keyword, not the only place the game explains itself.
 func _refresh_cast_zone() -> void:
 	var spec := _drop_spec()
 	var live: bool = not _active_die().is_empty() and bool(spec.cast)
 	var chapter := int(args.get("opts", {}).get("chapter", 1))
 	if cast_btn != null:
 		cast_btn.visible = not sel.is_empty() and bool(spec.cast)
+	_refresh_cast_text()
 	if live:
 		cast_panel.add_theme_stylebox_override("panel", UIKit.card_box(
-				UITheme.surface(chapter), UIKit.R_LG, UIKit.B_FOCUS, UIKit.GREEN))
+				UITheme.surface(chapter), UIKit.R_LG, UIKit.B_FOCUS, UIKit.GREEN,
+				CAST_PAD))
 		cast_label.add_theme_color_override("font_color", UIKit.CREAM)
 		cast_zone.modulate.a = 1.0
 	else:
 		var idle := UIKit.flat_box(UITheme.surface_deep(chapter), UIKit.R_LG,
-				UIKit.B_BASE, UITheme.surface(chapter).lightened(0.18))
+				UIKit.B_BASE, UITheme.surface(chapter).lightened(0.18), CAST_PAD)
 		cast_panel.add_theme_stylebox_override("panel", idle)
 		cast_label.add_theme_color_override("font_color", UIKit.CREAM_DARK)
-		cast_zone.modulate.a = 0.55
+		# A held die that lands somewhere ELSE (an enemy, an ally) still gets its
+		# sentence read out, so the strip stays at full strength whenever it is
+		# saying something. It only sits back when it is an empty invitation.
+		cast_zone.modulate.a = 1.0 if not _active_die().is_empty() else 0.55
+
+
+## Font sizes for the strip. The prompt is a heading; a sentence is body text,
+## and a bilingual one is two lines of it.
+const CAST_PAD := 6
+const CAST_F_PROMPT := UITheme.F_H2
+## Sizes the sentence is allowed to shrink through, largest first. It stops at
+## F_MICRO: below that the text is present but not readable, and a strip nobody
+## can read is worse than one honest line of "…".
+const CAST_F_STEPS := [UITheme.F_BODY_SM, UITheme.F_CAPTION, 13, UITheme.F_MICRO]
+
+
+func _refresh_cast_text() -> void:
+	if cast_label == null:
+		return
+	var a := _active_die()
+	var fd := {}
+	if not a.is_empty():
+		fd = bc.die_face(int(a.hero), int(a.die))
+	if fd.is_empty():
+		cast_label.text = "✦ " + Data.t("ui_cast_zone")
+		cast_label.add_theme_font_size_override("font_size", CAST_F_PROMPT)
+		return
+	var i := int(a.hero)
+	# a wild that has already picked its source is describing the COPIED face,
+	# which is the one that will actually resolve
+	if not pending_wild_src.is_empty() and fd.get("wild", false):
+		fd = bc.die_face(int(pending_wild_src.hero), int(pending_wild_src.die))
+	var txt := "%s — %s" % [Data.face_name(fd), Glossary.effect_sentence(bc.live_face(i, fd))]
+	cast_label.add_theme_font_size_override("font_size", _cast_font_for(txt))
+	cast_label.text = txt
+
+
+## The largest size from `CAST_F_STEPS` at which `txt` still fits the strip.
+##
+## Measured against the font rather than guessed from the string length: the
+## sentences are bilingual, and a Chinese line and an English one of the same
+## character count are nowhere near the same width. `get_multiline_string_size`
+## wraps exactly the way the Label will, so what this returns is what fits.
+func _cast_font_for(txt: String) -> int:
+	var font := cast_label.get_theme_font("font")
+	if font == null:
+		return CAST_F_STEPS[1]
+	# the strip, less its side margins, its border and the panel padding
+	var avail_w := Safe.canvas_size().x - 2.0 * UIKit.S4 - 2.0 * (CAST_PAD + UIKit.B_STRONG)
+	var avail_h := (ZONE_CAST_BOTTOM - ZONE_CAST_TOP) - 2.0 * (CAST_PAD + UIKit.B_STRONG)
+	for fs in CAST_F_STEPS:
+		var sz := font.get_multiline_string_size(txt, HORIZONTAL_ALIGNMENT_CENTER,
+				avail_w, int(fs), -1, TextServer.BREAK_WORD_BOUND | TextServer.BREAK_GRAPHEME_BOUND)
+		if sz.y <= avail_h:
+			return int(fs)
+	return int(CAST_F_STEPS[CAST_F_STEPS.size() - 1])
 
 
 func _refresh_enemies() -> void:
@@ -620,7 +1027,12 @@ func _ground_shadow(cx: float, cy: float, rx: float) -> Control:
 ## whatever is left over is what the creature gets. An oversized boss now
 ## shrinks; it never pushes the cast pad out of the way.
 func _enemy_art_budget() -> float:
-	return ZONE_ENEMY_BOTTOM - ZONE_ENEMY_TOP - ENEMY_CHROME_H
+	# Floored, because the band is now solved against the device rather than
+	# fixed at 474: a phone with deep insets can hand the enemies less than their
+	# own chrome, and a negative art height would flip the card inside out. At
+	# the floor the creature is small and the card is honest about it; that beats
+	# a broken rect.
+	return maxf(ZONE_ENEMY_BOTTOM - ZONE_ENEMY_TOP - ENEMY_CHROME_H, ENEMY_ART_HARD_MIN)
 
 
 ## Card geometry shrinks as the fight gets crowded, so one boss reads huge and
@@ -783,19 +1195,38 @@ func _intent_terms(e: Dictionary, f: Dictionary) -> Array:
 	return [["blank", -1]]
 
 
+## An enemy's threat, in the SAME pips the player's own dice wear.
+##
+## It used to be one chip carrying the headline glyph and then every rider's
+## number glued onto it as bare digits — "⚔ 6 2" for an attack that also
+## poisons, which reads as a number nobody can parse. Now each term is its own
+## pip, in the shorthand grammar (`Shorthand`): the poison rider wears the
+## poison glyph, exactly as it does under your Badger's die and on the status
+## badge it will become. One picture, one meaning, on both sides of the arena.
 func _make_intent_chip(j: int, d: int, roll: Dictionary, spec: Dictionary) -> Control:
 	var f: Dictionary = roll.face
 	var e: Dictionary = bc.s.enemies[j]
 	var terms := _intent_terms(e, f)
 	var head := String(terms[0][0])
 	var col := Glossary.hue(head)
-	var txt := "" if int(terms[0][1]) < 0 else str(int(terms[0][1]))
-	# trailing riders (全體 / 穿刺 / 附帶中毒…) glue onto the headline number
-	for i in range(1, terms.size()):
-		if int(terms[i][1]) >= 0:
-			txt += " %d" % int(terms[i][1])
 	var dimmed: bool = roll.cancelled or roll.done
-	var chip := UIKit.icon_chip(Glossary.glyph_key(head), txt, col, UIKit.F_BODY_SM, UIKit.S2)
+	# the outer chip keeps the headline's hue and frame — that is what makes an
+	# intent read as one threat rather than as loose badges
+	var chip := UIKit.chip("", col, UIKit.F_BODY_SM, UIKit.S1)
+	var inner := HBoxContainer.new()
+	inner.add_theme_constant_override("separation", 3)
+	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for t in terms:
+		var key := String(t[0])
+		var n := int(t[1])
+		inner.add_child(Shorthand.pip(
+				{"key": key, "text": "" if n < 0 else str(n), "hue": Glossary.hue(key)},
+				UIKit.F_BODY_SM))
+	# `UIKit.chip` builds its own Label child; the pip row replaces it
+	for c in chip.get_children():
+		chip.remove_child(c)
+		c.queue_free()
+	chip.add_child(inner)
 	var keys := []
 	for t in terms:
 		keys.append(String(t[0]))
@@ -1103,15 +1534,30 @@ func _on_die_long_pressed(i: int, d: int) -> void:
 			maxi(slot, 0) % BattleCore.FACES)
 
 
-## The rolled face's name under the die — name only, per language mode; the
-## effect text lives in the long-press tooltip.
+## Height of the name block: the face name, then its shorthand pips.
+const NAME_H := 46.0
+const PIPS_H := 26.0
+
+
+## Under each die: the rolled face's NAME, and under that what it actually does.
+##
+## The name alone was the round-5 shape and it does not work. "翻湧 / Surge"
+## identifies a face you have met before and tells a new player nothing, so the
+## only way to read your own hand was to long-press all eight dice in turn. The
+## pip row (see `Shorthand`) answers "what does this do" without a gesture; the
+## long-press card is still where the sentence and the keyword definitions live.
+##
+## The pips are built from the LIVE face, so a Badger swinging with 老班長 and a
+## Whetstone shows ⚔5 under a face the data file calls 3.
 func _make_die_name(i: int, d: int) -> Control:
 	var h: Dictionary = bc.s.heroes[i]
 	var slot: int = int(h.rolled[d])
 	# tall enough for two wrapped lines: an English face name like "Arrow Shot"
 	# needs both, and bilingual mode stacks the Chinese name on top of it
-	var box := Control.new()
-	box.custom_minimum_size = Vector2(Die3D.SIZE.x, 46)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 0)
+	box.custom_minimum_size = Vector2(Die3D.SIZE.x, NAME_H + PIPS_H)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if slot < 0:
 		return box
 	var fd := bc.hero_face(i, slot)
@@ -1125,13 +1571,19 @@ func _make_die_name(i: int, d: int) -> Control:
 	var l := UIKit.label(text, (UIKit.F_MICRO + 1) if mode == "both" else UIKit.F_CAPTION, UIKit.CREAM)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.size = Vector2(Die3D.SIZE.x, 46)
-	l.custom_minimum_size = Vector2(Die3D.SIZE.x, 46)
+	l.custom_minimum_size = Vector2(Die3D.SIZE.x, NAME_H)
 	l.clip_text = true
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if bool(h.used) and not bc.can_use(i, d).ok:
+	var dimmed: bool = bool(h.used) and not bc.can_use(i, d).ok
+	if dimmed:
 		l.add_theme_color_override("font_color", UIKit.CREAM.darkened(0.45))
 	box.add_child(l)
+	var pips := Shorthand.row(bc.live_face(i, fd), Die3D.SIZE.x)
+	if dimmed:
+		# a spent die keeps its pips — "what did I just do with this" is a real
+		# question — but stops competing with the dice still in play
+		pips.modulate = Color(0.68, 0.68, 0.7, 0.9)
+	box.add_child(pips)
 	return box
 
 
@@ -1141,6 +1593,49 @@ func _refresh_buttons() -> void:
 	btn_reroll.disabled = not bc.can_reroll()
 	btn_undo.disabled = not bc.can_undo()
 	btn_end.disabled = bc.s.over
+	btn_buy_reroll.disabled = not bc.can_buy_reroll().ok
+
+
+## U2, as a button: "2🌿 → ⭮". Small, and next to the reroll counter it feeds,
+## because it is a conversion rather than an action — the throw it buys is still
+## spent with the button beside it.
+##
+## Built by hand rather than through `UIKit.button`'s text: the two symbols in
+## it are the game's own drawn glyphs (the same Essence drop the meter and every
+## Ritual cost badge wear), not characters, so there is nothing to type and
+## nothing for the font subset to have to carry. A Button does not lay its
+## children out, so the row is parked in a full-rect Control that ignores input.
+func _build_buy_reroll() -> Button:
+	var b := UIKit.button("", UITheme.BLUE.lightened(0.34), UIKit.F_BODY, Vector2(96, 78))
+	b.pressed.connect(_on_buy_reroll)
+	var hold := Control.new()
+	hold.set_anchors_preset(Control.PRESET_FULL_RECT)
+	hold.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.set_anchors_preset(Control.PRESET_FULL_RECT)
+	row.add_theme_constant_override("separation", 1)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var n := UIKit.label(str(BattleCore.ESSENCE_REROLL_COST), UIKit.F_BODY, UIKit.INK)
+	n.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(n)
+	row.add_child(Glyphs.icon("mana", 24.0, UITheme.BLUE.darkened(0.4)))
+	var arrow := UIKit.label("→⭮", UIKit.F_BODY, UIKit.INK)
+	arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(arrow)
+	hold.add_child(row)
+	b.add_child(hold)
+	_attach_longpress(b, func() -> void: _show_term("essence_reroll", ["mana"]))
+	return b
+
+
+func _on_buy_reroll() -> void:
+	if not bc.buy_reroll():
+		return
+	Sfx.play("button")
+	if essence_bar != null:
+		essence_bar.pulse()
+	_refresh()
 
 
 func _refresh_potions() -> void:

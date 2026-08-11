@@ -1,0 +1,11 @@
+{
+  "name": "dice-grove-web-tests",
+  "private": true,
+  "description": "Browser regression for the web build's viewport handling.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}

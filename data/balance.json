@@ -1,87 +1,93 @@
 {
-  "xp_levels": {
-    "2": 4,
-    "3": 10,
-    "4": 18,
-    "5": 28,
-    "6": 40,
-    "7": 54
-  },
-  "xp_reward": {
-    "battle": 1,
-    "elite": 2,
-    "boss": 3
-  },
-  "base_rerolls": 0,
-  "mana_cap": 10,
-  "potion_cap": 3,
-  "overheal_block_pct": 50,
-  "post_battle_heal_pct": 25,
-  "revive_hp_pct": 30,
-  "rest_heal_pct": 30,
-  "gold_battle": {
-    "1": [
-      12,
-      18
-    ],
-    "2": [
-      18,
-      26
-    ],
-    "3": [
-      28,
-      40
-    ]
-  },
-  "gold_elite_mult": 2,
-  "gold_boss": {
-    "1": 50,
-    "2": 75,
-    "3": 100
-  },
-  "shop_prices": {
-    "C": 45,
-    "R": 70,
-    "E": 110,
-    "relic": 130,
-    "potion": 35,
-    "forge": 60
-  },
-  "offer_rarity": {
-    "C": 70,
-    "R": 25,
-    "E": 5
-  },
-  "offer_rarity_elite": {
-    "C": 25,
-    "R": 60,
-    "E": 15
-  },
-  "offer_rarity_boss": {
-    "R": 60,
-    "E": 40
-  },
-  "boss_advanced_picks": 2,
-  "offer_skip_gold": 5,
-  "hero_face_offer_chance": 30,
-  "elite_hp_mult": 1.5,
-  "map_rows": 9,
-  "node_weights": {
-    "battle": 55,
-    "event": 20,
-    "elite": 10,
-    "shop": 5,
-    "rest": 5,
-    "treasure": 5
-  },
-  "elites_per_chapter": {
-    "1": 1,
-    "2": 2,
-    "3": 2
-  },
-  "chapter_colors": {
-    "1": "#3a6b35",
-    "2": "#7a5230",
-    "3": "#3d2b52"
-  }
+ "xp_levels": {
+  "2": 4,
+  "3": 10,
+  "4": 18,
+  "5": 28,
+  "6": 40,
+  "7": 54,
+  "8": 70
+ },
+ "xp_reward": {
+  "battle": 1,
+  "elite": 2,
+  "boss": 3
+ },
+ "base_rerolls": 0,
+ "mana_cap": 10,
+ "potion_cap": 3,
+ "overheal_block_pct": 50,
+ "post_battle_heal_pct": 25,
+ "revive_hp_pct": 30,
+ "rest_heal_pct": 30,
+ "gold_battle": {
+  "1": [
+   12,
+   18
+  ],
+  "2": [
+   18,
+   26
+  ],
+  "3": [
+   28,
+   40
+  ]
+ },
+ "gold_elite_mult": 2,
+ "gold_boss": {
+  "1": 50,
+  "2": 75,
+  "3": 100
+ },
+ "shop_prices": {
+  "C": 45,
+  "R": 70,
+  "E": 110,
+  "relic": 130,
+  "potion": 35,
+  "forge": 60
+ },
+ "offer_rarity": {
+  "C": 70,
+  "R": 25,
+  "E": 5
+ },
+ "offer_rarity_elite": {
+  "C": 25,
+  "R": 60,
+  "E": 15
+ },
+ "offer_rarity_boss": {
+  "R": 60,
+  "E": 40
+ },
+ "boss_advanced_picks": 2,
+ "offer_skip_gold": 5,
+ "hero_face_offer_chance": 30,
+ "elite_hp_mult": 1.5,
+ "map_rows": 9,
+ "node_weights": {
+  "battle": 55,
+  "event": 20,
+  "elite": 10,
+  "shop": 5,
+  "rest": 5,
+  "treasure": 5
+ },
+ "elites_per_chapter": {
+  "1": 1,
+  "2": 2,
+  "3": 2
+ },
+ "chapter_colors": {
+  "1": "#3a6b35",
+  "2": "#7a5230",
+  "3": "#3d2b52"
+ },
+ "enemy_hp_mult": {
+  "1": 1.1,
+  "2": 1.1,
+  "3": 1.0
+ }
 }

@@ -55,8 +55,13 @@ func _ready() -> void:
 func _t_b3_two_phase() -> void:
 	var bc := _mk(["B3"], {"chapter": 2})
 	var e: Dictionary = bc.s.enemies[0]
-	var p1_hp := int(GameData.bosses.B3.hp)
-	var p2_hp := int(GameData.bosses.B3.phase2_hp)
+	# Boss pools go through the per-chapter world multiplier now (round 6), so
+	# the expectation is derived rather than typed — the day that dial moves,
+	# this follows it instead of failing.
+	var p1_hp := int(round(int(GameData.bosses.B3.hp)
+			* float(GameData.balance.enemy_hp_mult[str(int(GameData.bosses.B3.chapter))])))
+	var p2_hp := int(round(int(GameData.bosses.B3.phase2_hp)
+			* float(GameData.balance.enemy_hp_mult[str(int(GameData.bosses.B3.chapter))])))
 	_check(e.hp == p1_hp and e.dice == 2, "B3 phase 1: %d HP, 2 dice" % p1_hp)
 	e.poison = 5
 	e.hp = 1
@@ -193,13 +198,15 @@ func _t_all_faces_usable() -> void:
 
 
 func _t_relics() -> void:
-	# --- the Common tier: N01 reroll +1, N05 essence +2, N11 first-turn +2
-	var bc := _mk(["E01"], {"relics": ["N01", "N05", "N11"]})
-	_check(bc.s.rerolls == 1 + 2, "N01+N11 rerolls 3 (no base), got %d" % bc.s.rerolls)
-	_check(bc.s.mana == 3 + 2, "N05 essence 5 (with the Owl), got %d" % bc.s.mana)
+	# --- the Common tier: N05 essence +2, N11 first-turn rerolls +2
+	var bc := _mk(["E01"], {"relics": ["N05", "N11"]})
+	_check(bc.s.rerolls == 2, "N11 rerolls 2 (no base), got %d" % bc.s.rerolls)
+	_check(bc.s.mana == 3 + 2 + BattleCore.MANA_REGEN,
+			"N05 essence %d (Owl 3 + relic 2 + U1), got %d"
+					% [3 + 2 + BattleCore.MANA_REGEN, bc.s.mana])
 	_silence(bc)
 	bc.end_turn()
-	_check(bc.s.rerolls == 1, "turn 2: N01 alone = 1, got %d" % bc.s.rerolls)
+	_check(bc.s.rerolls == 0, "turn 2: N11 has expired, got %d" % bc.s.rerolls)
 	# N02 atk+1, N03 block+1
 	var bc2 := _mk(["B1"], {"relics": ["N02", "N03"], "chapter": 1})
 	_silence(bc2)
@@ -228,12 +235,59 @@ func _t_relics() -> void:
 	bc3.s.heroes[1].used = false
 	bc3.use_face(1, 0, {"target": 0})
 	_check(int(bc3.s.enemies[0].burn_new[0]) == 3, "N10 burn 2+1=3")
-	# N12 reroll carry
-	var bc4 := _mk(["E01"], {"relics": ["N12"]})
+	# --- N01 導靈杖: the FIRST Ritual of each TURN is a point cheaper, and only
+	# --- the first. Asserted through `spell_cost` because that is what `can_use`
+	# --- and the UI both read — a discount the player is shown but not charged
+	# --- (or charged but not shown) would be the real bug here.
+	var bc4 := _mk(["E01"], {"relics": ["N01"]})
 	_silence(bc4)
-	bc4.s.rerolls = 5
+	var ritual: Dictionary = GameData.faces.owl_starshower
+	_check(bc4.spell_cost(ritual) == int(ritual.spell) - 1,
+			"N01: first Ritual costs %d, got %d" % [int(ritual.spell) - 1,
+					bc4.spell_cost(ritual)])
+	bc4.s.mana = 10
+	_face(bc4, 0, "owl_starshower")
+	bc4.use_face(0, 0)
+	_check(bc4.s.mana == 10 - (int(ritual.spell) - 1),
+			"N01: the discounted price is what was actually taken, pool %d" % bc4.s.mana)
+	_check(bc4.spell_cost(ritual) == int(ritual.spell),
+			"N01: the second Ritual of the same turn is full price, got %d"
+					% bc4.spell_cost(ritual))
+	# and never below 1, however many discounts pile on
+	var cheap := {"spell": 1}
+	_check(bc4.spell_cost(cheap) == 1, "N01 never takes a Ritual under 1")
+	# the whole point of the round-7 change: the allowance re-arms every turn,
+	# so the discount is a thing you plan around rather than a one-off rebate
 	bc4.end_turn()
-	_check(bc4.s.rerolls == 3, "N12 carried 3 rerolls, got %d" % bc4.s.rerolls)
+	_check(bc4.spell_cost(ritual) == int(ritual.spell) - 1,
+			"N01: next turn's first Ritual is discounted again, got %d"
+					% bc4.spell_cost(ritual))
+	bc4.s.mana = 10
+	_face(bc4, 0, "owl_starshower")
+	bc4.use_face(0, 0)
+	_check(bc4.s.mana == 10 - (int(ritual.spell) - 1),
+			"N01: and the second turn's discount is the price actually charged, pool %d"
+					% bc4.s.mana)
+	_check(bc4.spell_cost(ritual) == int(ritual.spell),
+			"N01: still only the first of the turn, got %d" % bc4.spell_cost(ritual))
+
+	# --- N12 靈息迴環: end a turn holding 3+ and next turn opens with an extra
+	var bc5 := _mk(["E01"], {"relics": ["N12"]})
+	_silence(bc5)
+	bc5.s.mana = BattleCore.ESSENCE_LOOP_FLOOR
+	var before := int(bc5.s.mana)
+	bc5.end_turn()
+	_check(bc5.s.mana == before + BattleCore.MANA_REGEN + 1,
+			"N12: regen %d + loop 1 on top of %d, got %d"
+					% [BattleCore.MANA_REGEN, before, bc5.s.mana])
+	# …and pays nothing on a pool that was spent down
+	var bc6 := _mk(["E01"], {"relics": ["N12"]})
+	_silence(bc6)
+	bc6.s.mana = BattleCore.ESSENCE_LOOP_FLOOR - 1
+	var before2 := int(bc6.s.mana)
+	bc6.end_turn()
+	_check(bc6.s.mana == before2 + BattleCore.MANA_REGEN,
+			"N12: under the floor pays nothing, got %d" % bc6.s.mana)
 	_t_advanced_relics()
 
 
@@ -285,8 +339,9 @@ func _t_advanced_relics() -> void:
 
 	# --- A05 森之心: rituals cost less, essence trickles in
 	var bc4 := _mk(["E01"], {"relics": ["A05"]})
-	_check(bc4.s.mana == 3 + 1, "A05: +1 essence on turn 1 (with the Owl), got %d"
-			% int(bc4.s.mana))
+	_check(bc4.s.mana == 3 + 1 + BattleCore.MANA_REGEN,
+			"A05: %d essence on turn 1 (Owl 3 + relic 1 + U1), got %d"
+					% [3 + 1 + BattleCore.MANA_REGEN, int(bc4.s.mana)])
 	var fireball: Dictionary = GameData.faces.owl_starfall    # spell 3
 	_check(bc4.spell_cost(fireball) == 2, "A05: ritual 3 costs 2")
 	var frost: Dictionary = GameData.faces.owl_wardshield     # spell 1
@@ -294,8 +349,9 @@ func _t_advanced_relics() -> void:
 	_silence(bc4)
 	var m := int(bc4.s.mana)
 	bc4.end_turn()
-	_check(int(bc4.s.mana) == mini(m + 1, BattleCore.MANA_CAP),
-			"A05: +1 again next turn, got %d" % int(bc4.s.mana))
+	_check(int(bc4.s.mana) == mini(m + 1 + BattleCore.MANA_REGEN, BattleCore.MANA_CAP),
+			"A05: +1 (relic) +%d (U1) again next turn, got %d"
+					% [BattleCore.MANA_REGEN, int(bc4.s.mana)])
 
 	# --- A06 獸王戰鼓: the SECOND attack of the turn is the one that gains
 	var bc5 := _mk(["E01", "E01"], {"relics": ["A06"]})
@@ -337,7 +393,8 @@ func _t_elite_affixes() -> void:
 			found_atk = true
 			break
 	_check(found_atk, "frenzied faces found")
-	var base_hp := int(GameData.enemies.E02.hp[0])
+	var base_hp := int(round(int(GameData.enemies.E02.hp[0])
+			* float(GameData.balance.enemy_hp_mult["1"])))
 	var want := int(floor(base_hp * float(GameData.balance.elite_hp_mult)))
 	_check(bc.s.enemies[0].max_hp == want, "elite hp x1.5 = %d, got %d" % [want, bc.s.enemies[0].max_hp])
 	var bc2 := _mk(["E02"], {"elite": true, "affix": "stoneskin", "chapter": 1})

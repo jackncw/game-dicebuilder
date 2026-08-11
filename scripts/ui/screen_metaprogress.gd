@@ -11,10 +11,10 @@ func _ready() -> void:
 
 	var scroll := ScrollContainer.new()
 	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scroll.offset_top = UIKit.S5
+	Safe.pin_top(scroll, UIKit.S5)
 	scroll.offset_left = UIKit.S4
 	scroll.offset_right = -UIKit.S4
-	scroll.offset_bottom = -128
+	Safe.pin_bottom(scroll, 128)
 	add_child(scroll)
 	var vb := VBoxContainer.new()
 	vb.add_theme_constant_override("separation", UIKit.S3)

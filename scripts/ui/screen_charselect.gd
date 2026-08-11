@@ -21,7 +21,7 @@ func _ready() -> void:
 	var vb := VBoxContainer.new()
 	vb.anchor_left = 0.0
 	vb.anchor_right = 1.0
-	vb.offset_top = UIKit.S5
+	Safe.pin_top(vb, UIKit.S5)
 	vb.offset_left = UIKit.S4
 	vb.offset_right = -UIKit.S4
 	vb.add_theme_constant_override("separation", UIKit.S4)
@@ -40,7 +40,12 @@ func _ready() -> void:
 	vb.add_child(gc)
 	_build_grid()
 
-	var tray := UIKit.footer(1, 168.0)
+	# 196, not the 168 this was: the tray holds two stacked button rows (84 + 64
+	# plus their separation = 160) and a PanelContainer hands its child at least
+	# the child's minimum size, so at 168 the Cancel button was already hanging
+	# 24px off the bottom of the canvas — before any phone inset was involved.
+	# `tests/screens_crawl.gd` is what finally noticed.
+	var tray := UIKit.footer(1, 196.0)
 	add_child(tray)
 	embark = UIKit.button(Data.t("ui_start"), UIKit.GREEN.lightened(0.3),
 			UIKit.F_H2 + 2, Vector2(340, 84))
