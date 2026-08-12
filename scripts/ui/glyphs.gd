@@ -25,7 +25,7 @@ const ALIAS := {
 	# 2026-08 character overhaul
 	"resonate_req": "resonate", "team_atk": "atk", "all_pierce": "pierce",
 	"thorn_hold": "thorns", "thorns_double": "thorns", "atk_from_block": "block",
-	"block_from_mana": "mana", "lock_boost": "lock", "twin_dance": "lock",
+	"block_from_mana": "mana", "twin_dance": "multi",
 	"self_atk_now": "charge", "heal_on_hit": "lifesteal",
 	"next_dice_boost": "chargeup", "low_hp_atk": "pain",
 	"old_sergeant": "block", "quilled_hide": "block", "held_breath": "pierce",
@@ -497,8 +497,8 @@ static func _multi(ci: CanvasItem, c: Vector2, u: float, t: Color, k: Color) -> 
 				[dx - 5.0, 14]], t, k, 1.8)
 
 
-## 鎖定 — a padlock. The pin the player taps on a die, and the thing 蓄力,
-## 呼應, 換位 and 雙舞 are all measured against.
+## A padlock. 釘骰機制已於第十輪移除 —— 今日冇任何 glossary 條目再用呢個
+## glyph,留低只係因為 die3d 的 locked-out badge 同一語彙(每回合一次)。
 static func _lock(ci: CanvasItem, c: Vector2, u: float, t: Color, k: Color) -> void:
 	_ring(ci, c, u, [0, -3], 8.0, k, 3.4, PI, TAU)
 	_ring(ci, c, u, [0, -3], 8.0, t, 1.8, PI, TAU)

@@ -151,7 +151,6 @@ func _force(b: Control, hero: int, die: int, face_id: String) -> void:
 	h.rolled[die] = slot
 	h.used = false
 	h.used_die = -1
-	h.locked = [false, false]
 	b._refresh()
 	# the rebuilt widgets have no rect until the containers sort them
 	await get_tree().process_frame
@@ -262,6 +261,14 @@ func _case_illegal(mode: String) -> void:
 func _case_enemy_die_body(mode: String) -> void:
 	var b := await _new_battle()
 	await _force(b, 3, 0, "sp_trickery")
+	# 第十輪任務1之後,即時生效嘅防禦面 setup 嗰刻已 done、唔再可被暈眩 ——
+	# 呢個測試要嘅係「跌落卡身搵最大隻活骰」,所以 craft 返兩粒純攻擊 intent
+	for j in [0, 1]:
+		b.bc.s.enemies[j].rolls = [{"face": {"id": "x", "zh": "撞擊", "en": "Bash", "atk": 4},
+				"cancelled": false, "done": false}]
+	b._refresh()
+	await get_tree().process_frame
+	await get_tree().process_frame
 	var live0: bool = not b.bc.s.enemies[0].rolls[0].cancelled
 	await _drag(mode, _die_center(b, 3, 0), _enemy_center(b, 0))
 	_check(live0 and b.bc.s.enemies[0].rolls[0].cancelled,

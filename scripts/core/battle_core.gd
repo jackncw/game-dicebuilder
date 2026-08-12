@@ -118,13 +118,14 @@ func _make_hero(h: Dictionary) -> Dictionary:
 		"face_extras": h.face_extras.duplicate(true),
 		"cursed": [],          # slot indices blanked this battle
 		# one entry per die: the rolled slot index (-1 = no die this turn)
-		"rolled": [-1, -1], "locked": [false, false],
-		# Locks persist across turns (that is what makes 蓄力 / 呼應 work).
-		# `lock_turns` counts the complete turns a die has sat pinned; it feeds
-		# Charge and is wiped by using, unlocking or rerolling the die.
-		"lock_turns": [0, 0],
-		"keep_lock": [false, false],   # 雙舞 spent this die but kept the pin
-		"die_boost": [0, 0],           # 換位 / 孤注, live this turn
+		"rolled": [-1, -1],
+		# 蓄力(第十輪重定義):逐個 slot 計嘅層數。回合結束時一個蓄力面仍然
+		# 展示喺骰上而未被使用,就 +1 層(上限 CHARGE_TURN_CAP);使用後歸零。
+		# 舊版靠「釘住粒骰」累積 —— 但釘骰從未接上任何 UI,真人根本做唔到,
+		# 第十輪連引擎一齊清走。
+		"face_charge": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+		"bound_die": -1,       # 束縛:本回合被封住嘅骰(-1 = 冇)
+		"die_boost": [0, 0],           # 孤注, live this turn
 		"die_boost_next": [0, 0],
 		"twin_dance": false,           # 雙舞 claimed this turn
 		"atk_now": 0,                  # 暴走, this turn only
@@ -228,6 +229,28 @@ func _resolve_enemy_face(f: Dictionary, ti: int, affix := "") -> Dictionary:
 	if affix == "venomous" and out.has("atk"):
 		out["poison"] = int(out.get("poison", 0)) + int(GameData.encounters.elite_affixes.venomous.poison_on_hit)
 	return out
+
+
+## 任務1(第十輪)的分類器:一個敵方面「即時生效」若且唯若佢係純防禦/增益 ——
+## 帶格擋/蓄力/反擊/嚎叫,而且完全冇任何指向玩家(或者盤面)的行動 key。混合
+## 面(如果將來出現「攻擊+格擋」)整面留返結算階段,寧願格擋半邊冇用都唔好
+## 令攻擊提早結算。治療刻意唔喺名單入面。
+const _ENEMY_INSTANT_KEYS := ["block", "charge", "counter", "howl"]
+const _ENEMY_ACT_KEYS := ["atk", "heal", "poison", "burn", "weaken", "bind",
+	"curse", "expose", "mana_drain", "summon", "cancel_die"]
+
+
+static func _enemy_face_instant(f: Dictionary) -> bool:
+	var defensive := false
+	for k in _ENEMY_INSTANT_KEYS:
+		if f.has(k):
+			defensive = true
+	if not defensive:
+		return false
+	for k in _ENEMY_ACT_KEYS:
+		if f.has(k):
+			return false
+	return true
 
 
 func _make_boss(key: String) -> Dictionary:
@@ -334,23 +357,11 @@ func _start_turn() -> void:
 	# once a battle. It sits next to the U2 reset because they are the same kind
 	# of thing: a once-a-turn allowance the player is meant to plan around.
 	s["spell_cast_this_turn"] = false
-	# hero turn-start upkeep
+	# hero turn-start upkeep — every die rolls fresh every turn(釘骰機制已
+	# 於第十輪移除,冇任何面會跨回合保留)
 	for h in s.heroes:
-		# Which dice survive into this turn has to be decided BEFORE `used_dice`
-		# is cleared: a die that was spent rolls fresh even if it was pinned,
-		# unless 雙舞 explicitly kept the pin on it.
-		var spent: Array = h.get("used_dice", [])
 		for d in DICE:
-			var keeps: bool = h.locked[d] and int(h.rolled[d]) >= 0 \
-					and not h.down and not h.stolen \
-					and (d not in spent or bool(h.keep_lock[d]))
-			if keeps:
-				h.lock_turns[d] = int(h.lock_turns[d]) + 1
-			else:
-				h.locked[d] = false
-				h.lock_turns[d] = 0
-				h.rolled[d] = -1
-		h.keep_lock = [false, false]
+			h.rolled[d] = -1
 		h.die_boost = h.die_boost_next.duplicate()
 		h.die_boost_next = [0, 0]
 		h.twin_dance = false
@@ -365,6 +376,9 @@ func _start_turn() -> void:
 		h.expose_next = false
 		h.bound = h.bound_next
 		h.bound_next = false
+		# 束縛(第十輪重定義):被束縛的英雄本回合隨機一顆骰不可用。粒骰照
+		# 擲照顯示(玩家見到自己失去咗乜),但唔用得;可被淨化解開。
+		h["bound_die"] = rng.randi_range(0, DICE - 1) if h.bound else -1
 		h.zanshin = h.zanshin_next
 		h.zanshin_next = 0
 		if h.stolen:
@@ -402,12 +416,47 @@ func _start_turn() -> void:
 				face.atk += e.charge
 			e.rolls.append({"face": face, "cancelled": false, "done": false})
 		e.charge = 0
+	enemy_instant_pass()
 	# roll player dice — every die that did not stay pinned
 	for i in s.heroes.size():
 		for d in DICE:
 			if int(s.heroes[i].rolled[d]) < 0:
 				_roll_hero_die(i, d)
 	_ev({"t": "turn_start", "turn": s.turn})
+
+
+## 第十輪任務1:敵方防禦/增益面(格擋、蓄力、反擊架式、嚎叫)擲出嗰刻即時
+## 生效。真人試玩揭發:呢啲面以前喺敵方結算階段先執行,而玩家攻擊全部喺
+## 之前,回合尾又清 block —— 敵方格擋由出世到而家一點傷害都未擋過,反擊
+## 架式一下都未反過。即時生效之後,玩家喺分配階段就睇住敵人嘅格擋值同反擊
+## 姿態嚟落骰(穿刺面由此先有存在意義)。治療/攻擊/debuff/召喚照舊留喺敵方
+## 結算階段 —— 即時回血會搞亂斬殺判斷。已生效嘅面標 done,結算階段自然跳
+## 過;代價係佢哋唔再可以被暈眩/奪骰(已經生效,冇嘢好取消)。
+## Public 係為咗測試可以 craft rolls 之後自己觸發;每回合 `_start_turn` 叫一次。
+func enemy_instant_pass() -> void:
+	for i in s.enemies.size():
+		var e: Dictionary = s.enemies[i]
+		if e.dead:
+			continue
+		for d in e.rolls.size():
+			var r: Dictionary = e.rolls[d]
+			var f: Dictionary = r.face
+			if r.done or r.cancelled or not _enemy_face_instant(f):
+				continue
+			r.done = true
+			r["instant"] = true
+			if f.has("block"):
+				e.block += _enemy_face_value(e, f, "block")
+			if f.has("charge"):
+				e.charge += int(f.charge)
+			if f.has("counter"):
+				e.counter = int(f.counter)
+			if f.has("howl"):
+				for k in s.enemies.size():
+					var w: Dictionary = s.enemies[k]
+					if not w.dead and w.key == "E07":
+						w.howl += int(f.howl)
+			_ev({"t": "enemy_instant", "enemy": i, "die": d, "face": f})
 
 
 func _boss_turn_start(e: Dictionary) -> void:
@@ -457,14 +506,14 @@ func _is_blank(h: Dictionary, slot: int) -> bool:
 
 
 ## A hero whose dice can still be rerolled: alive, present and not yet acted.
+## (束縛唔再封重擲 —— 第十輪起佢封嘅係一顆骰的使用權,見 `can_use`。)
 func _rerollable(h: Dictionary) -> bool:
-	return not (h.down or h.stolen or h.used or h.bound)
+	return not (h.down or h.stolen or h.used)
 
 
-## Reroll both dice of every hero that has not acted yet. Dice the player
-## pinned stay put, and heroes who already acted are untouched entirely
-## (their spent die stays spent, their locked-out die is not rerolled).
-## Costs 1 reroll.
+## Reroll both dice of every hero that has not acted yet; heroes who already
+## acted are untouched entirely. Costs 1 reroll. 想保住一個好面?先用咗佢 ——
+## 行動過的英雄唔會被重擲,呢個就係取代釘骰之後的「保面」方法。
 ## True while the reroll button should still work — 賭徒之骨 makes rerolls
 ## unlimited, so "how many are left" stops being the gate.
 func rerolls_unlimited() -> bool:
@@ -507,7 +556,7 @@ func reroll() -> bool:
 		if not _rerollable(h):
 			continue
 		for d in DICE:
-			if not h.locked[d] and h.rolled[d] >= 0:
+			if h.rolled[d] >= 0:
 				any = true
 	if not any:
 		return false
@@ -524,32 +573,18 @@ func reroll() -> bool:
 		if not _rerollable(h):
 			continue
 		for d in DICE:
-			if h.locked[d] or h.rolled[d] < 0:
+			if h.rolled[d] < 0:
 				continue
-			h.lock_turns[d] = 0
 			_roll_hero_die(i, d)
 	return true
 
 
-## Pin or unpin one die. A pinned die survives rerolls AND the turn boundary —
-## that is the whole basis of 蓄力 / 呼應 / 換位 / 雙舞. Unpinning throws away
-## whatever Charge it had banked, so it stays a real decision. A die already
-## spent this turn cannot be pinned; it is gone until next turn.
-func toggle_lock(i: int, d: int) -> void:
-	var h: Dictionary = s.heroes[i]
-	if h.down or h.stolen or int(h.rolled[d]) < 0:
-		return
-	if d in h.get("used_dice", []):
-		return
-	h.locked[d] = not h.locked[d]
-	if not h.locked[d]:
-		h.lock_turns[d] = 0
-
-
-## Complete turns hero i's die d has spent pinned, capped where 蓄力 stops
-## paying. The face's own `charge_up` multiplies it.
-func charge_turns(i: int, d: int) -> int:
-	return mini(int(s.heroes[i].lock_turns[d]), CHARGE_TURN_CAP)
+## 蓄力層數(第十輪):slot 而唔係 die —— 層數跟住個面,重擲唔會洗走佢,
+## 只有「使用」先歸零。回合結束時仍展示而未使用先會 +1(見結算)。
+func charge_stacks(i: int, slot: int) -> int:
+	if slot < 0:
+		return 0
+	return mini(int(s.heroes[i].face_charge[slot]), CHARGE_TURN_CAP)
 
 
 # ============================================================ face access
@@ -599,24 +634,16 @@ func pierces(fd: Dictionary) -> bool:
 	return fd.get("pierce", false) or bool(s.get("all_pierce", false))
 
 
-## Is hero i's 呼應 condition satisfied for face fd? The rule reads off the
-## hero's OTHER die: it must be pinned, and the face showing on it must be of
-## the named kind. That is what makes the lock a resource rather than a
-## convenience — you have to give up a reroll target to earn the bonus.
+## Is hero i's 呼應 condition satisfied for face fd? 第十輪重定義:讀嘅係同一
+## 位英雄「另一顆骰本回合擲出」嘅面 —— 孖生骰而家展示緊乜,係玩家睇得到嘅
+## 資訊,呼應 = 孖骰協同。舊版仲要求另一顆骰處於鎖定狀態;釘骰機制已移除。
 func resonate_met(i: int, fd: Dictionary) -> bool:
-	var slot := int(fd.get("slot", -1))
-	if slot < 0:
-		return false
-	var other: int = 1 - (slot / FACES)
-	if other < 0 or other >= DICE or not s.heroes[i].locked[other]:
-		return false
 	return resonate_would_match(i, fd)
 
 
-## The same question with the pin taken as read: would the face on the hero's
-## other die answer, if it were pinned? Split out so the simulator (and a UI
-## hint) can weigh up whether pinning is worth doing, rather than having to pin
-## speculatively and undo it.
+## The actual test, kept under its historical name because the simulator and the
+## UI hint both call it: does the face showing on the hero's other die match the
+## named kind?
 func resonate_would_match(i: int, fd: Dictionary) -> bool:
 	var h: Dictionary = s.heroes[i]
 	var slot := int(fd.get("slot", -1))
@@ -650,8 +677,8 @@ func passive_value_bonus(i: int) -> int:
 
 
 ## Extra points this face earns from where it is sitting rather than from what
-## it is: Charge banked in the lock, a met 呼應, and any one-turn boost parked
-## on the die by 換位 / 孤注. Lands on the face's headline number only.
+## it is: banked 蓄力 layers, a met 呼應, and any one-turn boost parked on the
+## die by 孤注. Lands on the face's headline number only.
 func face_bonus(i: int, fd: Dictionary) -> int:
 	var h: Dictionary = s.heroes[i]
 	var slot := int(fd.get("slot", -1))
@@ -663,7 +690,7 @@ func face_bonus(i: int, fd: Dictionary) -> int:
 	var v := int(h.die_boost[d])
 	var cu := int(fd.get("charge_up", 0))
 	if cu > 0:
-		v += cu * charge_turns(i, d)
+		v += cu * charge_stacks(i, slot)
 	if fd.has("resonate") and resonate_met(i, fd):
 		v += int(fd.resonate)
 		# 一唱一和: the Fox reads his own dice better than anyone
@@ -816,10 +843,13 @@ func can_use(i: int, d: int) -> Dictionary:
 	if h.used:
 		if d in h.get("used_dice", []):
 			return {"ok": false, "err": "spent"}
-		# 雙舞 buys the hero a second action, but only with the die they pinned
-		var danced: bool = bool(h.get("twin_dance", false)) and h.locked[d]
+		# 雙舞(第十輪重定義)buys the hero a second action with their other die
+		var danced: bool = bool(h.get("twin_dance", false))
 		if not danced and not twin_available(i):
 			return {"ok": false, "err": "locked_out"}
+	# 束縛:本回合被封住嗰顆骰唔用得(可被淨化解開)
+	if d == int(h.get("bound_die", -1)):
+		return {"ok": false, "err": "bound"}
 	var slot: int = int(h.rolled[d])
 	if slot < 0:
 		return {"ok": false, "err": "no_roll"}
@@ -994,7 +1024,7 @@ func use_face(i: int, d: int, params := {}) -> Dictionary:
 	h["used_dice"] = spent
 	# 雙舞's extra action is its own thing; it must not eat the Twin Moon Seal's
 	# one-hero-a-turn slot as well.
-	var danced: bool = second_die and bool(h.get("twin_dance", false)) and h.locked[d]
+	var danced: bool = second_die and bool(h.get("twin_dance", false))
 	if second_die and not danced:
 		s.twin_hero = i
 	if fd.has("spell"):
@@ -1010,20 +1040,14 @@ func use_face(i: int, d: int, params := {}) -> Dictionary:
 		s = snap.state
 		rng.state = snap.rng
 		return res
-	# The pin is released only AFTER the face resolves: 蓄力 reads the very
-	# lock it is about to give up, so clearing it first would zero the stack the
-	# player spent three turns earning. 雙舞 keeps the pin and the face on the
-	# die; every other use lets it go.
-	h.lock_turns[d] = 0
-	if danced:
-		h.keep_lock[d] = true
-	else:
-		h.locked[d] = false
 	# growth: permanent +1 for this run (on the hero's own slot)
 	var own_slot: int = int(h.rolled[d])
 	var own := hero_face(i, own_slot)
 	if own.get("growth", false):
 		h.face_mods[own_slot] = int(h.face_mods[own_slot]) + 1
+	# 蓄力歸零 AFTER the face resolves —— `face_bonus` 啱啱先讀完層數
+	if own.has("charge_up"):
+		h.face_charge[own_slot] = 0
 	if _is_attack_face(fd):
 		s.attack_used_this_turn = true
 		# A06 獸王戰鼓 builds up *between* attacks: this one already resolved at
@@ -1112,12 +1136,6 @@ func _resolve_player_face(i: int, fd: Dictionary, params: Dictionary) -> Diction
 		s["all_pierce"] = true
 	if fd.get("twin_dance", false):
 		h.twin_dance = true
-	if fd.has("lock_boost"):
-		# 換位 sharpens whichever die is currently pinned. With nothing pinned
-		# there is nothing to sharpen; the Block half still lands.
-		for d2 in DICE:
-			if h.locked[d2]:
-				h.die_boost_next[d2] = int(h.die_boost_next[d2]) + int(fd.lock_boost)
 	if fd.has("next_dice_boost"):
 		for d2 in DICE:
 			h.die_boost_next[d2] = int(h.die_boost_next[d2]) + int(fd.next_dice_boost)
@@ -1440,6 +1458,10 @@ func _cleanse(h: Dictionary) -> void:
 	h.weaken_next = 0
 	h.expose = false
 	h.expose_next = false
+	# 束縛可被淨化移除(第十輪):今回合封住嘅骰即時解封,下回合嘅都拆埋
+	h.bound = false
+	h.bound_next = false
+	h["bound_die"] = -1
 
 
 # ============================================================ potions
@@ -1771,7 +1793,7 @@ func forecast_enemy(j: int) -> Array:
 		var r: Dictionary = e.rolls[d]
 		var f: Dictionary = r.face
 		var row := {"die": d, "face": f, "done": bool(r.done),
-			"cancelled": bool(r.cancelled)}
+			"cancelled": bool(r.cancelled), "instant": bool(r.get("instant", false))}
 		if f.has("atk"):
 			var v := _enemy_face_value(e, f, "atk")
 			if f.get("pack_bonus", 0) and _wolf_attacked_before(j):
@@ -1886,6 +1908,19 @@ func _end_of_turn_settlement() -> void:
 		if h.regen > 0 and not h.down:
 			_heal_hero(i, h.regen)
 			h.regen -= 1
+	# 蓄力累積(第十輪):回合結束時一個蓄力面仍展示喺骰上而未使用 → +1 層。
+	# 「未使用」包括「用咗另一顆骰」—— 引弓不發就係蓄力,唔使再另外釘骰。
+	for i2 in s.heroes.size():
+		var hc: Dictionary = s.heroes[i2]
+		if hc.down or hc.stolen:
+			continue
+		var spent2: Array = hc.get("used_dice", [])
+		for d2 in DICE:
+			var slot2 := int(hc.rolled[d2])
+			if slot2 < 0 or _is_blank(hc, slot2) or d2 in spent2:
+				continue
+			if hero_face(i2, slot2).has("charge_up"):
+				hc.face_charge[slot2] = mini(int(hc.face_charge[slot2]) + 1, CHARGE_TURN_CAP)
 	# block clear (Ember keeps up to 10) — enemy block persists only via passives
 	var crown: bool = _relic("thorn_crown") > 0
 	for h in s.heroes:

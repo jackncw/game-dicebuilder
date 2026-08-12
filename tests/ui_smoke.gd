@@ -144,11 +144,6 @@ func _t_tap_playthrough() -> void:
 	var guard := 0
 	while not battle.bc.s.over and guard < 40:
 		guard += 1
-		if guard == 1:
-			battle.bc.toggle_lock(0, 0)
-			battle._refresh()
-			battle.bc.toggle_lock(0, 0)
-			battle._refresh()
 		if guard == 2:
 			battle.bc.s.rerolls = 1
 			battle._on_reroll()

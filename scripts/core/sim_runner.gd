@@ -759,9 +759,6 @@ static func play_battle(bc: BattleCore, max_turns := 60) -> void:
 		var guard := 0
 		while not bc.s.over and guard < 40:
 			guard += 1
-			# Pins are re-decided every pass: spending one die changes what the
-			# other one is worth pinning for.
-			_manage_locks(bc)
 			# Rerolls are re-checked on EVERY pass, not once at the top of the
 			# turn. Insight faces and the Lucky keyword hand rerolls out in the
 			# middle of a turn and sim v1 simply banked and wasted them, which
@@ -1097,9 +1094,9 @@ static func charge_tel_begin(hero_id := "HARE") -> void:
 		"boss_fired": 0, "boss_stacks_sum": 0, "boss_dmg_sum": 0,
 		# 蓄力 faces spent with nothing banked (fired cold)
 		"cold": 0, "cold_dmg_sum": 0,
-		# banked value thrown away: pin dropped mid-charge, or the fight ended
-		# with the shot still in the barrel
-		"abandoned": 0, "stranded": 0,
+		# banked value thrown away: the fight ended with stacks still in the
+		# barrel(第十輪起層數跟面唔跟釘,冇「中途棄置」呢回事)
+		"stranded": 0,
 		# the comparison: every OTHER attack this hero made
 		"plain": 0, "plain_dmg_sum": 0,
 		"boss_plain": 0, "boss_plain_dmg_sum": 0,
@@ -1145,12 +1142,12 @@ static func _charge_note_use(bc: BattleCore, best: Dictionary) -> void:
 		return
 	var params: Dictionary = best.get("params", {})
 	var dmg := _charge_dmg_of(bc, i, d, params)
-	# Is this a turn spent holding a charge on the OTHER die? Price what the hold
-	# cost, before recording what was actually used.
+	# Is this a turn spent holding a charge face showing on the OTHER die? Price
+	# what the hold cost, before recording what was actually used.
 	var other: int = 1 - d
 	var oth := bc.die_face(i, other)
-	if bool(bc.s.heroes[i].locked[other]) and not oth.is_empty() \
-			and int(oth.get("charge_up", 0)) > 0 and bc.charge_turns(i, other) >= 0:
+	if not oth.is_empty() and int(oth.get("charge_up", 0)) > 0 \
+			and other not in bc.s.heroes[i].get("used_dice", []):
 		charge_tel.held_turns += 1
 		var cold_now := _charge_dmg_of(bc, i, other, params)
 		if cold_now >= 0 and dmg >= 0:
@@ -1166,7 +1163,7 @@ static func _charge_note_use(bc: BattleCore, best: Dictionary) -> void:
 			charge_tel.boss_plain += 1
 			charge_tel.boss_plain_dmg_sum += dmg
 		return
-	var stacks := bc.charge_turns(i, d)
+	var stacks := bc.charge_stacks(i, int(fd.get("slot", -1)))
 	if stacks <= 0:
 		charge_tel.cold += 1
 		charge_tel.cold_dmg_sum += dmg
@@ -1192,31 +1189,15 @@ static func _charge_note_use(bc: BattleCore, best: Dictionary) -> void:
 	charge_tel.by_face[fid] = row
 
 
-## A pin the policy is about to drop. If it was mid-charge, that banked value is
-## gone — count it, because "how often does the charge never go off" is half the
-## answer to whether charging is worth doing.
-static func _charge_note_unpin(bc: BattleCore, i: int, d: int) -> void:
-	if not charge_tel.get("on", false):
-		return
-	if String(bc.s.heroes[i].id) != String(charge_tel.hero):
-		return
-	var fd := bc.die_face(i, d)
-	if not fd.is_empty() and int(fd.get("charge_up", 0)) > 0 and bc.charge_turns(i, d) > 0:
-		charge_tel.abandoned += 1
-
-
 static func _charge_note_battle_end(bc: BattleCore) -> void:
 	if not charge_tel.get("on", false):
 		return
 	for i in bc.s.heroes.size():
-		if String(bc.s.heroes[i].id) != String(charge_tel.hero):
+		var h: Dictionary = bc.s.heroes[i]
+		if String(h.id) != String(charge_tel.hero):
 			continue
-		for d in BattleCore.DICE:
-			if not bool(bc.s.heroes[i].locked[d]):
-				continue
-			var fd := bc.die_face(i, d)
-			if not fd.is_empty() and int(fd.get("charge_up", 0)) > 0 \
-					and bc.charge_turns(i, d) > 0:
+		for slot in BattleCore.DICE * BattleCore.FACES:
+			if int(h.face_charge[slot]) > 0:
 				charge_tel.stranded += 1
 
 
@@ -1274,8 +1255,7 @@ static func print_charge_report(n := 150, hero_id := "HARE", seed_v := 20260805)
 	if boss_total > 0:
 		print("              share of %s's boss-fight damage from banked shots: %d%%" % [
 				hero_id, int(round(100.0 * int(t.boss_dmg_sum) / boss_total))])
-	print("wasted      : %d charges abandoned mid-bank, %d stranded when the fight ended" % [
-			int(t.abandoned), int(t.stranded)])
+	print("wasted      : %d charge stacks stranded when the fight ended" % int(t.stranded))
 	# "even a FULL charge does not beat steady output" is a claim about the top of
 	# this table, not about its average — print the table so it can be checked.
 	if not t.by_stack.is_empty() and int(t.plain) > 0:
@@ -1331,77 +1311,30 @@ static func _would_kill(bc: BattleCore, i: int, d: int) -> bool:
 	return false
 
 
-## The pin policy, and the whole of what the sim knows about 蓄力 / 呼應.
+## 第十輪:釘骰機制連引擎一齊移除,「鎖定政策」跟住退役。蓄力而家係
+## 「回合結束時擲出而未使用 → +1 層」,所以政策唯一要識嘅係:一個未蓄滿
+## 的蓄力面,喺長戰入面唔好急住使 —— 揸住另一顆骰行動,層數自己會嚟。
+## 呼應亦唔使再釘:淨係讀另一顆骰本回合擲出乜。
 ##
-## Two reasons to pin, both mechanical rather than taste:
-##   1. A 蓄力 face is worth more banked than spent, until its stack is full.
-##      Pin it and take the turn's action with the other die.
-##   2. A 呼應 face pays only while its partner is pinned on the right kind of
-##      face. If the partner is already showing one, pin it.
-## Anything else is unpinned, so the reroll policy can do its job.
-##
-## What this does NOT model is a player pinning a merely good face to protect it
-## from a reroll — that is taste, it varies by player, and guessing at it would
-## put a number in BALANCE.md that no real game produces.
-static func _manage_locks(bc: BattleCore) -> void:
-	for i in bc.s.heroes.size():
-		var h: Dictionary = bc.s.heroes[i]
-		if h.down or h.stolen or h.used:
-			continue
-		var want := [false, false]
-		for d in BattleCore.DICE:
-			if int(h.rolled[d]) < 0:
-				continue
-			var fd := bc.die_face(i, d)
-			if fd.is_empty():
-				continue
-			var other: int = 1 - d
-			if int(fd.get("charge_up", 0)) > 0:
-				# Unpinning ZEROES the banked turns (`toggle_lock`), so a die
-				# holding Charge must stay pinned until it is spent — including
-				# the pass on which it tops out, and the pass on which the fight
-				# gets too short to keep banking. Deciding to stop banking means
-				# FIRE it, not throw it away; `_reserved` is what lets go.
-				if bc.charge_turns(i, d) > 0:
-					want[d] = true
-				elif bc.can_use(i, other).ok \
-						and _enemy_hp_left(bc) >= CHARGE_WORTH_BANKING:
-					want[d] = true
-			if (fd.has("resonate") or fd.has("resonate_req")) and bc.resonate_would_match(i, fd):
-				want[other] = true
-		for d2 in BattleCore.DICE:
-			if int(h.rolled[d2]) >= 0 and bool(h.locked[d2]) != bool(want[d2]):
-				if bool(h.locked[d2]):
-					_charge_note_unpin(bc, i, d2)
-				bc.toggle_lock(i, d2)
-
-
-## A die the pin policy is holding back: spending it now would throw away the
-## reason it was pinned. The greedy loop skips these.
+## A die the hold policy is keeping back: spending it now would throw away the
+## stack it is still building. The greedy loop skips these.
 static func _reserved(bc: BattleCore, i: int, d: int) -> bool:
-	var h: Dictionary = bc.s.heroes[i]
-	if not bool(h.locked[d]):
-		return false
 	var fd := bc.die_face(i, d)
 	if fd.is_empty():
 		return false
-	# Still filling up — unless the fight will be over before it pays. Banking
-	# costs the hero their CHOICE of die for three turns (they only get one
-	# action either way), which is cheap in a boss race and pure waste in a
-	# skirmish that ends on turn three. Holding a shot back to make it bigger
-	# than the thing it was going to kill is the same mistake in miniature.
+	# A charge face still filling up — unless the fight will be over before it
+	# pays, or firing it now is the kill. Holding costs nothing (the hero acts
+	# with the other die), which is why the stack cap and the 1-in-6 roll are
+	# the face's real limiters now.
 	if int(fd.get("charge_up", 0)) > 0 \
-			and bc.charge_turns(i, d) < BattleCore.CHARGE_TURN_CAP \
+			and bc.charge_stacks(i, int(fd.get("slot", -1))) < BattleCore.CHARGE_TURN_CAP \
 			and bc.can_use(i, 1 - d).ok \
 			and _enemy_hp_left(bc) >= CHARGE_WORTH_BANKING \
 			and not _would_kill(bc, i, d):
 		return true
-	# feeding a partner's 呼應, which is the better die of the two
-	var other: int = 1 - d
-	var of := bc.die_face(i, other)
-	if not of.is_empty() and (of.has("resonate") or of.has("resonate_req")) \
-			and bc.resonate_met(i, of) and bc.can_use(i, other).ok:
-		return true
+	# the partner die of a met 呼應 is worth more as the reference than spent
+	# first: spending it does not break the echo (the rolled face still shows),
+	# so nothing to reserve there any more.
 	return false
 
 
@@ -1487,11 +1420,10 @@ static func _spend_rerolls(bc: BattleCore) -> void:
 		# careful policy, because four heroes paying 1 HP a throw outruns what
 		# a greedy policy gets back from a better face. Measured, see BALANCE.md.
 		var weak_heroes := 0
-		# Dice pinned for a reason (banking 蓄力, feeding a 呼應) must survive
-		# this: they are held across turns on purpose, and rerolling one throws
-		# the stack away. Anything the policy pins here is a throwaway pin to
-		# protect a good face for one throw, and is put back afterwards.
-		var restore := []
+		# 冇釘骰之後,重擲會洗勻所有未行動英雄嘅骰 —— 真人保好面嘅方法係
+		# 「先用咗嗰位英雄先至擲」。政策照辦:枱面仲有隻好骰(3 分以上、又
+		# 唔係蓄緊力嗰隻)未用,就唔好擲住,行完動先返嚟。
+		var strong_exposed := false
 		for i in bc.s.heroes.size():
 			var h: Dictionary = bc.s.heroes[i]
 			if h.down or h.stolen or h.used:
@@ -1501,17 +1433,16 @@ static func _spend_rerolls(bc: BattleCore) -> void:
 				if int(h.rolled[d]) < 0:
 					continue
 				var score := _die_score(bc, i, d)
-				if not _reserved(bc, i, d):
-					restore.append([i, d, bool(h.locked[d])])
-					h.locked[d] = score >= 3
+				if score >= 3 and not _reserved(bc, i, d):
+					strong_exposed = true
 				best = maxi(best, score)
 			if best < 2:
 				weak_heroes += 1
+		if strong_exposed:
+			return
 		if weak_heroes >= 2:
 			bc.reroll()
-		for r in restore:
-			bc.s.heroes[int(r[0])].locked[int(r[1])] = bool(r[2])
-		if weak_heroes < 2:
+		else:
 			break
 
 
@@ -1546,8 +1477,7 @@ static func _die_score(bc: BattleCore, i: int, d: int) -> int:
 	# the turn-shaping faces: 戰吼 / 暴走 / 鷹眼 / 雙舞 / 孤注 / 豎刺 / 堅守
 	if fd.has("team_atk") or fd.has("self_atk_now") or fd.get("all_pierce", false) \
 			or fd.get("twin_dance", false) or fd.has("next_dice_boost") \
-			or fd.has("thorns_double") or fd.get("thorn_hold", false) \
-			or fd.has("lock_boost"):
+			or fd.has("thorns_double") or fd.get("thorn_hold", false):
 		return 2
 	if fd.has("heal") or fd.has("team_heal"):
 		var hurt := false
@@ -1617,7 +1547,7 @@ static func _best_action(bc: BattleCore) -> Dictionary:
 					and not bool(bc.s.heroes[i].get("twin_dance", false)):
 				continue    # only the twin-seal (or 雙舞) hero gets a second action
 			if _reserved(bc, i, d):
-				continue    # pinned on purpose — see `_manage_locks`
+				continue    # a charge face still banking — see `_reserved`
 			var c := bc.can_use(i, d)
 			if not c.ok:
 				continue
@@ -1794,9 +1724,10 @@ static func _score_die(bc: BattleCore, i: int, d: int, fd: Dictionary, lt: Dicti
 				if other.is_empty() and _party_can_still_act(bc, i):
 					_pick(other, i, d, {})
 			elif fd.get("twin_dance", false):
-				# 雙舞 is only an action if the pinned die is worth spending
-				if other.is_empty() and bc.s.heroes[i].locked[1 - d] \
-						and bc.can_use(i, 1 - d).ok:
+				# 雙舞(第十輪重定義)is only an action if the OTHER die is
+				# worth a second swing this turn
+				if other.is_empty() and bc.can_use(i, 1 - d).ok \
+						and _die_score(bc, i, 1 - d) >= 2:
 					_pick(other, i, d, {})
 			elif fd.has("next_dice_boost"):
 				# 孤注 pays next turn and costs HP now: only while comfortable
@@ -1913,7 +1844,7 @@ const PT_PARTY := 3.0      # `team_*` lands on the reference party of three
 const PT_ACTION := 4.0     # what an average face on an average die is worth
 ## Branches the policy can only take when some state is ALREADY standing —
 ## `thorns_double` with no Thorns up, `atk_from_block` with no Block, 雙舞 with
-## nothing pinned. Worth something, but not on the turn you draw them.
+## a weak partner die. Worth something, but not on the turn you draw them.
 const PT_GUARDED := 0.35
 ## Faces that pay NEXT turn: only if the fight lasts, and the greedy policy is
 ## the last thing that will make sure it does.
@@ -1935,8 +1866,6 @@ const LENS_UNPRICED := {
 	"lifesteal": "rides the attack number already priced; the HP back is real "
 		+ "but small next to the damage line.",
 	"lucky": "a reroll-shaped rider on the die, not points on the face.",
-	"lock_boost": "pays only through `_manage_locks`, whose decision to pin is "
-		+ "made in battle from the board, not from the face.",
 	"cleanse_self": "removes a debuff that may not be there. Priced at zero "
 		+ "rather than guessed, same as the other conditionals.",
 	"cleanse_target": "same as `cleanse_self`, one seat over: worth a lot on a "

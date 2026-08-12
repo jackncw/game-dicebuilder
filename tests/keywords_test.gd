@@ -131,11 +131,11 @@ func _ready() -> void:
 	_t_reroll_sources()
 	_t_reroll_skips_acted_heroes()
 	_t_face_plus()
-	# ---- 2026-08 character overhaul: the lock rule and the four new keywords
-	_t_lock_persists()
+	# ---- 第十輪:釘骰移除後嘅四個 keyword(蓄力/呼應/呼應條件/雙舞)
+	_t_dice_roll_fresh()
 	_t_charge_up()
 	_t_charge_cap_and_reset()
-	_t_charge_lost_on_unlock()
+	_t_charge_survives_reroll()
 	_t_resonate()
 	_t_resonate_timing()
 	_t_resonate_requirement()
@@ -144,7 +144,7 @@ func _ready() -> void:
 	_t_multi_hit()
 	_t_multi_hit_thorns()
 	# ---- the faces built on top of them
-	_t_lock_boost()
+	_t_switch_echo()
 	_t_twin_dance()
 	_t_all_in()
 	_t_shield_bash()
@@ -167,6 +167,22 @@ func _ready() -> void:
 	_t_attuned_aim_charge()
 	_t_passive_call_and_answer()
 	_t_passive_cornered_fury()
+	# ---- 第十輪任務1:敵方側 keyword 全面補測。敵方格擋 bug 證明咗 keyword
+	# 測試淨係驗玩家側係盲點 —— 凡係敵我雙方都用嘅 keyword,敵方側逐個過。
+	_t_enemy_block_instant()
+	_t_enemy_block_cleared_at_settlement()
+	_t_enemy_counter_instant()
+	_t_enemy_charge_next_turn()
+	_t_enemy_howl_instant()
+	_t_enemy_heal_settlement()
+	_t_enemy_instant_not_targetable()
+	_t_enemy_pierce_hero_block()
+	_t_enemy_attack_riders()
+	_t_enemy_weaken_hero()
+	_t_enemy_expose_hero()
+	_t_enemy_aoe_attack()
+	_t_enemy_mana_drain()
+	_t_enemy_cancel_die()
 	print("KEYWORDS: %d tests, %d failures" % [tests, fails])
 	if fails == 0:
 		print("KEYWORDS OK")
@@ -202,6 +218,8 @@ func _t_pierce() -> void:
 func _t_cleave() -> void:
 	var bc := _mk(["BADGER", "HARE", "OWL", "HEDGE"], ["E01", "E01", "E01"])
 	_silence_enemies(bc)
+	for e in bc.s.enemies:
+		e.block = 0   # setup may have rolled instant 格擋 (round 10, task 1)
 	_face(bc, 0, "sp_whirl_blade")
 	var hps := []
 	for e in bc.s.enemies:
@@ -214,6 +232,8 @@ func _t_cleave() -> void:
 func _t_sweep() -> void:
 	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E02", "E02", "E02"])
 	_silence_enemies(bc)
+	for e in bc.s.enemies:
+		e.block = 0   # setup may have rolled instant 格擋 (round 10, task 1)
 	_face(bc, 0, "sp_scatter")
 	var hps := []
 	for e in bc.s.enemies:
@@ -497,19 +517,26 @@ func _t_curse() -> void:
 
 
 func _t_bind() -> void:
+	# 束縛(第十輪重定義):下回合隨機一顆骰不可用;粒骰照擲;可被淨化移除
 	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E06"])
 	_enemy_rolls(bc, 0, [{"bind": 1}])
 	bc.s.heroes[0].taunt = true   # force bind target hero 0
 	bc.end_turn()
 	_check(bc.s.heroes[0].bound, "hero bound next turn")
-	for i in [1, 2, 3]:
-		bc.s.heroes[i].locked = [true, true]
-	var rolled0: Array = bc.s.heroes[0].rolled.duplicate()
-	bc.s.heroes[0].locked = [false, false]
+	var bd := int(bc.s.heroes[0].bound_die)
+	_check(bd == 0 or bd == 1, "one die sealed, got %d" % bd)
+	_check(int(bc.s.heroes[0].rolled[bd]) >= 0, "the sealed die still rolled — you see what you lost")
+	var c := bc.can_use(0, bd)
+	_check(not c.ok and c.err == "bound", "the sealed die refuses, err=%s" % String(c.get("err", "")))
+	_check(String(bc.can_use(0, 1 - bd).get("err", "")) != "bound", "the other die is not sealed")
+	# rerolls are NOT blocked by the new Bind
 	bc.s.rerolls = 1
-	var consumed := bc.reroll()
-	_check(not consumed, "reroll refused when only bound dice are eligible")
-	_check(bc.s.heroes[0].rolled == rolled0, "bound dice not rerolled")
+	_check(bc.reroll(), "a bound hero can still reroll")
+	# 淨化解開
+	bc._cleanse(bc.s.heroes[0])
+	_check(int(bc.s.heroes[0].bound_die) == -1 and not bc.s.heroes[0].bound,
+			"cleanse removes the bind")
+	_check(String(bc.can_use(0, bd).get("err", "")) != "bound", "the die answers again after cleanse")
 
 
 func _t_steal_b4() -> void:
@@ -612,7 +639,7 @@ func _t_die_theft() -> void:
 
 
 ## 迴響 Reverb — the party-wide "next face +X". Not to be confused with 呼應
-## Echo, which reads the hero's own locked die (see `_t_resonate`).
+## Echo, which reads the face on the hero's own twin die (see `_t_resonate`).
 func _t_reverb() -> void:
 	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E04"])
 	_silence_enemies(bc)
@@ -712,17 +739,14 @@ func _t_reroll_skips_acted_heroes() -> void:
 	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E01"])
 	_silence_enemies(bc)
 	bc.s.rerolls = 1
-	# hero 0 acts; hero 1 pins its A die; heroes 2-3 are free
+	# hero 0 acts; heroes 1-3 are free
 	_face_pair(bc, 0, "hare_guard2", "hareb_roll")
 	bc.use_face(0, 0)
 	var acted_rolled: Array = bc.s.heroes[0].rolled.duplicate()
-	bc.toggle_lock(1, 0)
-	var pinned: int = int(bc.s.heroes[1].rolled[0])
 	var free_before: Array = bc.s.heroes[3].rolled.duplicate()
 	_check(bc.reroll(), "reroll spent")
 	_check(bc.s.heroes[0].rolled == acted_rolled, "acted hero's dice untouched")
 	_check(bc.s.heroes[0].used and bc.s.heroes[0].used_dice == [0], "acted hero stays spent")
-	_check(int(bc.s.heroes[1].rolled[0]) == pinned, "pinned die not rerolled")
 	_check(bc.s.rerolls == 0, "one reroll consumed")
 	# with a fixed rng this eventually differs; assert only that it may change
 	_check(bc.s.heroes[3].rolled.size() == 2, "free hero still has two dice %s" % [free_before])
@@ -750,82 +774,80 @@ func _t_face_plus() -> void:
 	_check(int(hero.face_plus[0]) == 0 and int(hero.face_mods[0]) == 0, "swap resets the slot")
 
 
-# ============================================================ the lock rule
-# Locks survive the turn boundary. Everything the Hare, the Fox and the
-# Hedgehog's 反震錘 do is built on that, so it gets tested on its own before
-# any of the keywords that read it.
+# ============================================================ 第十輪:釘骰已移除
+# Dice roll fresh every turn. 蓄力 banks per-face stacks for turns it ends
+# rolled-but-unspent; 呼應 reads the face showing on the hero's twin die.
 
-func _t_lock_persists() -> void:
+func _t_dice_roll_fresh() -> void:
 	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E01"])
 	_silence_enemies(bc)
-	bc.toggle_lock(0, 0)
-	var pinned: int = int(bc.s.heroes[0].rolled[0])
-	_check(bc.s.heroes[0].locked[0], "die pinned")
 	bc.end_turn()
-	_check(bc.s.heroes[0].locked[0], "pin survived the turn boundary")
-	_check(int(bc.s.heroes[0].rolled[0]) == pinned, "pinned die kept its face")
-	_check(int(bc.s.heroes[0].lock_turns[0]) == 1, "one full turn banked, got %d"
-			% int(bc.s.heroes[0].lock_turns[0]))
-	# the unpinned die of the same hero rolls fresh every turn
-	_check(int(bc.s.heroes[0].rolled[1]) >= 6, "the free die still rolled")
-	# unpinning drops the banked turns
-	bc.toggle_lock(0, 0)
-	_check(not bc.s.heroes[0].locked[0] and int(bc.s.heroes[0].lock_turns[0]) == 0,
-			"unpinning cleared the bank")
+	for i in 4:
+		var h: Dictionary = bc.s.heroes[i]
+		_check(int(h.rolled[0]) >= 0 and int(h.rolled[0]) <= 5, "hero %d A die re-rolled" % i)
+		_check(int(h.rolled[1]) >= 6 and int(h.rolled[1]) <= 11, "hero %d B die re-rolled" % i)
+	_check(not bc.s.heroes[0].has("locked"), "the pin state is gone from the engine")
 
 
 func _t_charge_up() -> void:
 	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E04"])
 	bc.s.enemies[0].block = 0
-	_face(bc, 0, "hare_aim4")        # atk 4, charge_up 2
+	_face(bc, 0, "hare_aim4")        # atk 5, charge_up 2
 	var fd := bc.hero_face(0, 0)
-	_check(bc.attack_value(0, fd) == 5, "unpinned: no charge, got %d" % bc.attack_value(0, fd))
-	bc.toggle_lock(0, 0)
-	_check(bc.attack_value(0, fd) == 5, "pinned but no turn passed yet: still 5")
+	_check(bc.attack_value(0, fd) == 5, "no stacks yet: printed 5, got %d" % bc.attack_value(0, fd))
 	_silence_enemies(bc)
-	bc.end_turn()
+	bc.end_turn()                     # ends rolled-but-unspent → banks a stack
+	_face(bc, 0, "hare_aim4")         # dice re-roll every turn; put it back up
 	fd = bc.hero_face(0, 0)
-	_check(bc.attack_value(0, fd) == 7, "one turn locked: 5+2=7, got %d" % bc.attack_value(0, fd))
+	_check(bc.charge_stacks(0, 0) == 1, "one stack banked, got %d" % bc.charge_stacks(0, 0))
+	_check(bc.attack_value(0, fd) == 7, "one stack: 5+2=7, got %d" % bc.attack_value(0, fd))
 	_silence_enemies(bc)
 	bc.end_turn()
-	_check(bc.attack_value(0, bc.hero_face(0, 0)) == 9, "two turns locked: 5+4=9, got %d"
+	_face(bc, 0, "hare_aim4")
+	_check(bc.attack_value(0, bc.hero_face(0, 0)) == 9, "two stacks: 5+4=9, got %d"
 			% bc.attack_value(0, bc.hero_face(0, 0)))
 
 
 func _t_charge_cap_and_reset() -> void:
 	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E04"])
-	bc.s.enemies[0].block = 0
 	_face(bc, 0, "hare_aim4")
-	bc.toggle_lock(0, 0)
 	for _k in 5:
 		_silence_enemies(bc)
 		bc.end_turn()
-	_check(int(bc.s.heroes[0].lock_turns[0]) == 5, "five turns actually elapsed")
-	_check(bc.charge_turns(0, 0) == 3, "charge stops counting at 3, got %d" % bc.charge_turns(0, 0))
+		_face(bc, 0, "hare_aim4")     # keep the face showing every turn
+	_check(int(bc.s.heroes[0].face_charge[0]) == 3, "stacks cap at 3, got %d"
+			% int(bc.s.heroes[0].face_charge[0]))
 	var fd := bc.hero_face(0, 0)
 	_check(bc.attack_value(0, fd) == 11, "capped at 5 + 3×2 = 11, got %d" % bc.attack_value(0, fd))
-	# and spending it wipes the bank. E04 re-arms its 2 Block at every turn
-	# start, so the reset has to happen here rather than at setup.
+	# and spending it wipes the bank. E04 re-arms Block at every turn start (and
+	# may have rolled an instant 硬化), so zero it right before the shot.
 	bc.s.enemies[0].block = 0
 	var hp0: int = bc.s.enemies[0].hp
 	bc.use_face(0, 0, {"target": 0})
 	_check(bc.s.enemies[0].hp == hp0 - 11, "the charged shot actually landed for 11, dealt %d"
 			% (hp0 - bc.s.enemies[0].hp))
-	_check(int(bc.s.heroes[0].lock_turns[0]) == 0, "charge reset to zero after use")
-	_check(not bc.s.heroes[0].locked[0], "the pin is released with the face")
+	_check(int(bc.s.heroes[0].face_charge[0]) == 0, "stacks reset to zero after use")
 
 
-func _t_charge_lost_on_unlock() -> void:
+func _t_charge_survives_reroll() -> void:
+	# 層數跟面唔跟擲:重擲走咗個面層數仍在;個面冇擲出嘅回合就唔加層
 	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E04"])
 	_face(bc, 0, "hare_aim4")
-	bc.toggle_lock(0, 0)
 	_silence_enemies(bc)
 	bc.end_turn()
-	_check(bc.charge_turns(0, 0) == 1, "banked one")
-	bc.toggle_lock(0, 0)             # player changes their mind
-	_check(bc.charge_turns(0, 0) == 0, "unpinning threw the charge away")
+	_check(bc.charge_stacks(0, 0) == 1, "banked one")
+	bc.s.rerolls = 1
+	bc.reroll()
+	_check(bc.charge_stacks(0, 0) == 1, "a reroll does not clear the stack")
+	# a turn the face is NOT showing banks nothing
+	bc.s.heroes[0].rolled = [1, -1]
+	_silence_enemies(bc)
+	bc.end_turn()
+	_check(bc.charge_stacks(0, 0) == 1, "no show, no stack — still 1, got %d"
+			% bc.charge_stacks(0, 0))
 	_face(bc, 0, "hare_aim4")
-	_check(bc.attack_value(0, bc.hero_face(0, 0)) == 5, "back to the printed 5")
+	_check(bc.attack_value(0, bc.hero_face(0, 0)) == 7, "face back up: 5+2=7, got %d"
+			% bc.attack_value(0, bc.hero_face(0, 0)))
 
 
 func _t_resonate() -> void:
@@ -835,41 +857,39 @@ func _t_resonate() -> void:
 	bc.s.enemies[0].block = 0
 	_face_pair(bc, 0, "hedge_recoil4", "hedge_guard3")
 	var fd := bc.hero_face(0, 0)
-	_check(bc.attack_value(0, fd) == 5, "other die not pinned: no echo, got %d"
-			% bc.attack_value(0, fd))
-	bc.toggle_lock(0, 1)             # pin the B die, which shows 格擋
-	_check(bc.resonate_met(0, fd), "echo condition met on a locked block face")
+	_check(bc.resonate_met(0, fd), "twin die shows a block face → echo met, no pin needed")
 	_check(bc.attack_value(0, fd) == 7, "echo +2 → 7, got %d" % bc.attack_value(0, fd))
 	# the wrong CATEGORY does not answer
 	var bc2 := _mk(["HEDGE", "HARE", "BADGER", "OWL"], ["E04"])
 	_face_pair(bc2, 0, "hedge_recoil4", "hedgeb_hammer3")   # B die is an attack
-	bc2.toggle_lock(0, 1)
 	_check(not bc2.resonate_met(0, bc2.hero_face(0, 0)),
 			"an attack face does not answer a block-category echo")
 	_check(bc2.attack_value(0, bc2.hero_face(0, 0)) == 5, "no bonus from the wrong category")
+	# and no twin die on the table at all cannot answer
+	var bc3 := _mk(["HEDGE", "HARE", "BADGER", "OWL"], ["E04"])
+	_face(bc3, 0, "hedge_recoil4")
+	_check(not bc3.resonate_met(0, bc3.hero_face(0, 0)), "no twin die, no echo")
 
 
-## The condition is read when the face is SPENT, not when it is rolled: pinning
-## the partner die later in the same turn still pays.
+## The condition reads the twin die at use time, and a blanked twin cannot answer.
 func _t_resonate_timing() -> void:
 	var bc := _mk(["HEDGE", "HARE", "BADGER", "OWL"], ["E04"])
 	_silence_enemies(bc)
 	bc.s.enemies[0].block = 0
 	_face_pair(bc, 0, "hedge_recoil4", "hedge_guard3")
 	var hp0: int = bc.s.enemies[0].hp
-	bc.toggle_lock(0, 1)
 	bc.use_face(0, 0, {"target": 0})
 	_check(bc.s.enemies[0].hp == hp0 - 7, "echo applied at use time (5+2), dealt %d"
 			% (hp0 - bc.s.enemies[0].hp))
-	# an UNPINNED partner showing the right face is not enough — the lock is the
-	# cost the keyword charges
+	# a cursed (blank) twin face answers nothing
 	var bc2 := _mk(["HEDGE", "HARE", "BADGER", "OWL"], ["E04"])
 	_silence_enemies(bc2)
 	bc2.s.enemies[0].block = 0
 	_face_pair(bc2, 0, "hedge_recoil4", "hedge_guard3")
+	bc2.s.heroes[0].cursed.append(6)
 	var hp1: int = bc2.s.enemies[0].hp
 	bc2.use_face(0, 0, {"target": 0})
-	_check(bc2.s.enemies[0].hp == hp1 - 5, "no lock, no echo, dealt %d"
+	_check(bc2.s.enemies[0].hp == hp1 - 5, "a blank twin does not answer, dealt %d"
 			% (hp1 - bc2.s.enemies[0].hp))
 
 
@@ -878,12 +898,12 @@ func _t_resonate_requirement() -> void:
 	var bc := _mk(["FOX", "HARE", "BADGER", "OWL"], ["E04"])
 	_silence_enemies(bc)
 	bc.s.enemies[0].block = 0
-	_face_pair(bc, 0, "fox_phantom", "fox_stab3")   # atk 1 ×4, requires an attack echo
+	_face_pair(bc, 0, "fox_phantom", "fox_guard2")   # twin shows a BLOCK face
 	var c := bc.can_use(0, 0)
 	_check(not c.ok and c.err == "resonate", "gated face refuses without the echo, err=%s"
 			% String(c.get("err", "")))
-	bc.toggle_lock(0, 1)
-	_check(bc.can_use(0, 0).ok, "usable once the partner die is pinned on an attack")
+	_face_pair(bc, 0, "fox_phantom", "fox_stab3")    # twin shows an attack
+	_check(bc.can_use(0, 0).ok, "usable while the twin die shows an attack face")
 	var hp0: int = bc.s.enemies[0].hp
 	bc.use_face(0, 0, {"target": 0})
 	_check(bc.s.enemies[0].hp == hp0 - 4, "1×4 landed 4, dealt %d" % (hp0 - bc.s.enemies[0].hp))
@@ -956,21 +976,22 @@ func _t_multi_hit_thorns() -> void:
 			% (hp0 - bc.s.heroes[0].hp))
 
 
-# ============================================================ faces built on the lock
+# ============================================================ 狐狸的雙骰面
 
-func _t_lock_boost() -> void:
+func _t_switch_echo() -> void:
+	# 換位(第十輪重設計):格擋 2,呼應攻擊面 +2;狐狸被動一唱一和再 +1
 	var bc := _mk(["FOX", "HARE", "BADGER", "OWL"], ["E04"])
 	_silence_enemies(bc)
-	_face_pair(bc, 0, "fox_shift", "fox_stab3")   # A: block 2 + lock_boost 1
-	bc.toggle_lock(0, 1)
+	_face_pair(bc, 0, "fox_shift", "fox_stab3")   # twin shows an attack
 	bc.use_face(0, 0)
-	_check(bc.s.heroes[0].block == 2, "switch still gave its block")
-	_check(int(bc.s.heroes[0].die_boost_next[1]) == 1, "boost parked on the pinned die")
-	bc.end_turn()
-	_check(int(bc.s.heroes[0].die_boost[1]) == 1, "boost is live the following turn")
-	var fd := bc.hero_face(0, int(bc.s.heroes[0].rolled[1]))
-	_check(bc.attack_value(0, fd) == 5, "the pinned 刺擊 is worth 4+1, got %d"
-			% bc.attack_value(0, fd))
+	_check(bc.s.heroes[0].block == 5, "block 2 + echo 2 + 一唱一和 1 = 5, got %d"
+			% bc.s.heroes[0].block)
+	var bc2 := _mk(["FOX", "HARE", "BADGER", "OWL"], ["E04"])
+	_silence_enemies(bc2)
+	_face_pair(bc2, 0, "fox_shift", "fox_guard2")  # twin shows a block face
+	bc2.use_face(0, 0)
+	_check(bc2.s.heroes[0].block == 2, "no attack twin → just the printed 2, got %d"
+			% bc2.s.heroes[0].block)
 
 
 func _t_twin_dance() -> void:
@@ -978,19 +999,15 @@ func _t_twin_dance() -> void:
 	_silence_enemies(bc)
 	bc.s.enemies[0].block = 0
 	_face_pair(bc, 0, "fox_twindance", "fox_stab3")
-	bc.toggle_lock(0, 1)
-	var pinned_slot: int = int(bc.s.heroes[0].rolled[1])
 	bc.use_face(0, 0)
 	_check(bc.s.heroes[0].twin_dance, "twin dance armed")
-	_check(bc.can_use(0, 1).ok, "the pinned die is usable as a second action")
+	_check(bc.can_use(0, 1).ok, "the other die is usable as a second action")
 	var hp0: int = bc.s.enemies[0].hp
 	bc.use_face(0, 1, {"target": 0})
 	_check(bc.s.enemies[0].hp == hp0 - 4, "the danced die dealt 4")
-	_check(bc.s.heroes[0].locked[1], "the pin survived being spent")
 	_check(bc.s.twin_hero == -1, "twin dance did not claim the Twin Moon Seal slot")
-	bc.end_turn()
-	_check(bc.s.heroes[0].locked[1] and int(bc.s.heroes[0].rolled[1]) == pinned_slot,
-			"pinned die kept its face into the next turn")
+	_check(not bc.can_use(0, 0).ok and not bc.can_use(0, 1).ok,
+			"both dice spent — the hero is done for the turn")
 
 
 func _t_all_in() -> void:
@@ -1317,11 +1334,11 @@ func _t_attuned_aim_charge() -> void:
 	# cold: the printed 1
 	_check(bc.use_face(0, 0).ok, "Attuned Aim resolves cold")
 	_check(bc.s.mana == m + 1, "cold Attuned Aim draws 1, got %d" % (bc.s.mana - m))
-	# two turns in the lock: 1 + 2
+	# two stacks banked: 1 + 2
 	var bc2 := _mk(["HARE", "BADGER", "HEDGE", "FOX"], ["E01"])
 	_silence_enemies(bc2)
 	_face(bc2, 0, "hare_attunedaim")
-	bc2.s.heroes[0].lock_turns[0] = 2
+	bc2.s.heroes[0].face_charge[0] = 2
 	var m2 := int(bc2.s.mana)
 	_check(bc2.use_face(0, 0).ok, "Attuned Aim resolves charged")
 	_check(bc2.s.mana == m2 + 3,
@@ -1329,17 +1346,18 @@ func _t_attuned_aim_charge() -> void:
 	# and the sentence agrees with the engine, which is what the cast strip shows
 	var bc3 := _mk(["HARE", "BADGER", "HEDGE", "FOX"], ["E01"])
 	_face(bc3, 0, "hare_attunedaim")
-	bc3.s.heroes[0].lock_turns[0] = 2
+	bc3.s.heroes[0].face_charge[0] = 2
 	var live := bc3.live_face(0, bc3.hero_face(0, 0))
 	_check(int(live.mana) == 3, "the live face reports 3, got %d" % int(live.mana))
 
 
 func _t_passive_call_and_answer() -> void:
 	var bc := _mk(["FOX", "HARE", "BADGER", "OWL"], ["E04"])
-	_face_pair(bc, 0, "fox_echo3", "fox_stab3")   # atk 3, resonate 2 on an attack
+	_face_pair(bc, 0, "fox_echo3", "fox_guard2")   # twin shows a block face
 	var fd := bc.hero_face(0, 0)
 	_check(bc.attack_value(0, fd) == 4, "unanswered: plain 4, got %d" % bc.attack_value(0, fd))
-	bc.toggle_lock(0, 1)
+	_face_pair(bc, 0, "fox_echo3", "fox_stab3")    # twin shows an attack
+	fd = bc.hero_face(0, 0)
 	_check(bc.attack_value(0, fd) == 7, "4 + echo 2 + passive 1 = 7, got %d"
 			% bc.attack_value(0, fd))
 
@@ -1352,3 +1370,184 @@ func _t_passive_cornered_fury() -> void:
 	_check(bc.attack_value(0, fd) == 3, "full hp: no fury")
 	bc.s.heroes[0].hp = 12   # 12/24 = 50%
 	_check(bc.attack_value(0, fd) == 5, "at 50%%: fury +2, got %d" % bc.attack_value(0, fd))
+
+
+# ============================================================ 第十輪任務1:敵方側
+# Crafted rolls bypass `_start_turn`, so each instant test calls
+# `enemy_instant_pass()` by hand — the same call `_start_turn` makes.
+
+func _t_enemy_block_instant() -> void:
+	var bc := _mk(["BADGER", "HARE", "OWL", "HEDGE"], ["E01"])
+	_silence_enemies(bc)
+	bc.s.enemies[0].block = 0
+	_enemy_rolls(bc, 0, [{"block": 3}])
+	bc.enemy_instant_pass()
+	_check(bc.s.enemies[0].block == 3, "block landed the moment it was rolled, got %d"
+			% bc.s.enemies[0].block)
+	var r: Dictionary = bc.s.enemies[0].rolls[0]
+	_check(bool(r.done) and bool(r.get("instant", false)), "the die is marked resolved+instant")
+	# and the player's attack this turn actually runs into it
+	_face(bc, 0, "bdg_heavy4")        # atk 4 + sergeant 1 = 5
+	var hp0: int = bc.s.enemies[0].hp
+	bc.use_face(0, 0, {"target": 0})
+	_check(bc.s.enemies[0].hp == hp0 - 2, "5 into block 3 → 2 through, dealt %d"
+			% (hp0 - bc.s.enemies[0].hp))
+	_check(bc.s.enemies[0].block == 0, "the block was spent absorbing it")
+
+
+func _t_enemy_block_cleared_at_settlement() -> void:
+	var bc := _mk(["BADGER", "HARE", "OWL", "HEDGE"], ["E01"])
+	_silence_enemies(bc)
+	_enemy_rolls(bc, 0, [{"block": 3}])
+	bc.enemy_instant_pass()
+	_check(bc.s.enemies[0].block >= 3, "block up during the player phase")
+	bc._end_of_turn_settlement()
+	_check(bc.s.enemies[0].block == 0, "unspent enemy block clears at end of turn")
+
+
+func _t_enemy_counter_instant() -> void:
+	# 反擊架式即時生效:玩家本回合打佢就會被反傷(以前係死code,一下都冇反過)
+	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E01"])
+	_silence_enemies(bc)
+	bc.s.enemies[0].block = 0
+	_enemy_rolls(bc, 0, [{"counter": 4}])
+	bc.enemy_instant_pass()
+	_check(int(bc.s.enemies[0].counter) == 4, "counter stance up before the player acts")
+	_face(bc, 0, "sp_heavy_blow")
+	var hp0: int = bc.s.heroes[0].hp
+	bc.use_face(0, 0, {"target": 0})
+	_check(bc.s.heroes[0].hp == hp0 - 4, "attacking into the stance cost 4, lost %d"
+			% (hp0 - bc.s.heroes[0].hp))
+
+
+func _t_enemy_charge_next_turn() -> void:
+	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E01"])
+	_silence_enemies(bc)
+	_enemy_rolls(bc, 0, [{"charge": 4}])
+	bc.enemy_instant_pass()
+	_check(int(bc.s.enemies[0].charge) == 4, "charge banked at roll time")
+	_check(bool(bc.s.enemies[0].rolls[0].done), "and the die is already resolved")
+	# next turn's attack faces come out that much harder
+	bc.s.enemies[0].faces = [{"id": "x", "zh": "撞", "en": "Bash", "atk": 4}]
+	bc.end_turn()
+	_check(int(bc.s.enemies[0].rolls[0].face.atk) == 8, "next roll reads 4+4, got %d"
+			% int(bc.s.enemies[0].rolls[0].face.atk))
+
+
+func _t_enemy_howl_instant() -> void:
+	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E07", "E07"])
+	bc.s.heroes[0].taunt = true
+	bc.s.heroes[0].block = 0
+	_enemy_rolls(bc, 0, [{"howl": 2}])
+	_enemy_rolls(bc, 1, [{"atk": 5}])
+	bc.enemy_instant_pass()
+	_check(int(bc.s.enemies[1].howl) == 2, "the whole pack hears the howl immediately")
+	var hp0: int = bc.s.heroes[0].hp
+	bc.end_turn()
+	_check(hp0 - int(bc.s.heroes[0].hp) >= 7, "the bite landed 5+2 with the howl, lost %d"
+			% (hp0 - int(bc.s.heroes[0].hp)))
+
+
+func _t_enemy_heal_settlement() -> void:
+	# 敵方治療唔即時 —— 即時回血會令斬殺判斷混亂,照舊留喺敵方結算階段
+	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E01"])
+	bc.s.enemies[0].hp = 5
+	_enemy_rolls(bc, 0, [{"heal": 4}])
+	bc.enemy_instant_pass()
+	_check(bc.s.enemies[0].hp == 5, "heal did NOT fire at roll time")
+	_check(not bool(bc.s.enemies[0].rolls[0].done), "the heal die still waits for the enemy phase")
+	bc.end_turn()
+	_check(bc.s.enemies[0].hp == 9, "…and lands in the enemy phase, hp=%d" % bc.s.enemies[0].hp)
+
+
+func _t_enemy_instant_not_targetable() -> void:
+	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E01", "E01"])
+	_enemy_rolls(bc, 0, [{"block": 3}])
+	_enemy_rolls(bc, 1, [{"atk": 4}])
+	bc.enemy_instant_pass()
+	var refs := bc._targetable_dice()
+	_check(refs.size() == 1 and int(refs[0].enemy) == 1,
+			"a resolved block die cannot be stunned or stolen (%d targetable)" % refs.size())
+
+
+func _t_enemy_pierce_hero_block() -> void:
+	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E08"])
+	bc.s.heroes[0].taunt = true
+	bc.s.heroes[0].block = 10
+	_enemy_rolls(bc, 0, [{"atk": 4, "pierce": true}])
+	var hp0: int = bc.s.heroes[0].hp
+	bc.end_turn()
+	_check(hp0 - int(bc.s.heroes[0].hp) == 4, "enemy pierce went under 10 block for 4, lost %d"
+			% (hp0 - int(bc.s.heroes[0].hp)))
+
+
+func _t_enemy_attack_riders() -> void:
+	# 中毒/灼燒/弱化 riders on an enemy hit land on the hero
+	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E01"])
+	bc.s.heroes[0].taunt = true
+	bc.s.heroes[0].block = 0
+	_enemy_rolls(bc, 0, [{"atk": 2, "poison": 2, "burn": 1, "weaken": 1}])
+	var hp0: int = bc.s.heroes[0].hp
+	bc.end_turn()
+	var h: Dictionary = bc.s.heroes[0]
+	_check(int(h.poison) == 1, "poison 2 applied, ticked once at settlement → 1, got %d"
+			% int(h.poison))
+	_check(h.burn == [1], "burn 1 armed for next turn, got %s" % [h.burn])
+	_check(int(h.weaken) == 1, "weaken lands the following turn, got %d" % int(h.weaken))
+	_check(hp0 - int(h.hp) == 4, "atk 2 + poison tick 2 = 4 HP, lost %d" % (hp0 - int(h.hp)))
+
+
+func _t_enemy_weaken_hero() -> void:
+	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E01"])
+	bc.s.heroes[0].taunt = true
+	_enemy_rolls(bc, 0, [{"weaken": 2}])
+	bc.end_turn()
+	_check(int(bc.s.heroes[0].weaken) == 2, "weaken 2 live the next turn")
+	_face(bc, 0, "sp_heavy_blow")     # atk 7 on the Hare (no sergeant bonus)
+	_check(bc.attack_value(0, bc.hero_face(0, 0)) == 5, "7 − weaken 2 = 5, got %d"
+			% bc.attack_value(0, bc.hero_face(0, 0)))
+
+
+func _t_enemy_expose_hero() -> void:
+	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E01"])
+	bc.s.heroes[0].taunt = true
+	bc.s.heroes[0].block = 0
+	_enemy_rolls(bc, 0, [{"expose": true}, {"atk": 4}])
+	var hp0: int = bc.s.heroes[0].hp
+	bc.end_turn()
+	_check(hp0 - int(bc.s.heroes[0].hp) == 6, "exposed then hit: 4 × 1.5 = 6, lost %d"
+			% (hp0 - int(bc.s.heroes[0].hp)))
+
+
+func _t_enemy_aoe_attack() -> void:
+	var bc := _mk(["HARE", "OWL", "FOX", "HEDGE"], ["E01"])   # nobody with auto-block
+	var hps := []
+	for h in bc.s.heroes:
+		h.block = 0
+		hps.append(int(h.hp))
+	_enemy_rolls(bc, 0, [{"atk": 3, "aoe": true}])
+	bc.end_turn()
+	for i in 4:
+		_check(hps[i] - int(bc.s.heroes[i].hp) == 3, "aoe hit hero %d for 3, lost %d"
+				% [i, hps[i] - int(bc.s.heroes[i].hp)])
+
+
+func _t_enemy_mana_drain() -> void:
+	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E01"])
+	bc.s.mana = 5
+	_enemy_rolls(bc, 0, [{"mana_drain": 3}])
+	bc.end_turn()
+	# 5 − 3 drained, then +1 regeneration at the next turn start
+	_check(int(bc.s.mana) == 3, "drain 3 then regen 1 → 3, got %d" % int(bc.s.mana))
+
+
+func _t_enemy_cancel_die() -> void:
+	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E01"])
+	_enemy_rolls(bc, 0, [{"cancel_die": 1}])
+	bc.end_turn_begin()
+	bc.enemy_step()
+	var n := 0
+	for h in bc.s.heroes:
+		if bool(h.used):
+			n += 1
+	_check(n == 1, "nullify cancelled exactly one hero's dice, got %d" % n)

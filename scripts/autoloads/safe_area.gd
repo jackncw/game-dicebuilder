@@ -194,6 +194,16 @@ func pin_band(c: Control, top_base: float, bottom_base: float) -> Control:
 	return c
 
 
+## Both offsets measured from the BOTTOM anchor — a fixed-height strip hanging
+## above the footer (the reward screen's roster band). `c` must have both
+## vertical anchors on the bottom edge.
+func pin_bottom_band(c: Control, top_base: float, bottom_base: float) -> Control:
+	var p := {"c": c, "base": top_base, "base2": bottom_base, "edge": "bband"}
+	_pins.append(p)
+	_apply_pin(p)
+	return c
+
+
 ## A bottom-pinned tray whose SLAB runs to the physical edge (so there is no bare
 ## background under the home indicator) while its CONTENTS clear the inset. The
 ## panel keeps whatever bottom content margin its stylebox already had.
@@ -222,6 +232,9 @@ func _apply_pin(p: Dictionary) -> void:
 		"band":
 			c.offset_top = top + float(p.base)
 			c.offset_bottom = top + float(p.base2)
+		"bband":
+			c.offset_top = -(bottom + float(p.base))
+			c.offset_bottom = -(bottom + float(p.base2))
 		"footer":
 			c.offset_top = -(float(p.base) + bottom)
 			var box: StyleBoxFlat = c.get_theme_stylebox("panel")

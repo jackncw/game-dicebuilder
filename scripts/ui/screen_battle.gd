@@ -1209,7 +1209,10 @@ func _make_intent_chip(j: int, d: int, roll: Dictionary, spec: Dictionary) -> Co
 	var terms := _intent_terms(e, f)
 	var head := String(terms[0][0])
 	var col := Glossary.hue(head)
-	var dimmed: bool = roll.cancelled or roll.done
+	# 即時生效的防禦面(任務1)唔算「熄咗」:效果正掛在敵人身上,chip 保持
+	# 本色,只加一個 ✓ 話你知佢已經著咗。灰化留返俾被取消/已執行的意圖。
+	var instant: bool = bool(roll.get("instant", false))
+	var dimmed: bool = (roll.cancelled or roll.done) and not instant
 	# the outer chip keeps the headline's hue and frame — that is what makes an
 	# intent read as one threat rather than as loose badges
 	var chip := UIKit.chip("", col, UIKit.F_BODY_SM, UIKit.S1)
@@ -1222,6 +1225,8 @@ func _make_intent_chip(j: int, d: int, roll: Dictionary, spec: Dictionary) -> Co
 		inner.add_child(Shorthand.pip(
 				{"key": key, "text": "" if n < 0 else str(n), "hue": Glossary.hue(key)},
 				UIKit.F_BODY_SM))
+	if instant:
+		inner.add_child(UIKit.label("✓", UIKit.F_BODY_SM, UIKit.GREEN))
 	# `UIKit.chip` builds its own Label child; the pip row replaces it
 	for c in chip.get_children():
 		chip.remove_child(c)
@@ -1513,7 +1518,9 @@ func _make_die(i: int, d: int, spec: Dictionary) -> Control:
 	for ref in spec.wild:
 		if int(ref.hero) == i and int(ref.die) == d:
 			is_wild_src = true
-	dv.set_die(faces, slot % BattleCore.FACES, not usable.ok, bool(h.locked[d]),
+	# 第四個參數(pinned)恆為 false:釘骰機制於第十輪移除,badge 只留
+	# locked-out 一款
+	dv.set_die(faces, slot % BattleCore.FACES, not usable.ok, false,
 			locked_out or spent, is_active or is_wild_src)
 	dv.interactive = not bc.s.over
 	# a spent, locked-out, blanked or unaffordable die still taps (for its
@@ -2559,8 +2566,8 @@ const TUTORIAL_STEPS := [
 	 "There is exactly one way to spend a die: hold it and drag it onto its target. Enemy to attack, ally to heal, yourself for self-buffs, centre pad for no-target faces. A tap only selects — it never spends — and letting go before the die has really left its slot cancels, so you cannot fumble one away."],
 	["看不懂某個詞?長按任何骰子、狀態圖示或敵人意圖,就會彈出詳情卡,寫明它的作用以及每個名詞的解釋。詳情卡裡的骰子還可以用手指撥動,檢視六個面。",
 	 "Not sure what something means? Press and hold any die, status badge or enemy intent to open its detail card — what it does, and every term it uses spelled out. You can spin the die in that card to see all six faces."],
-	["每位英雄每回合只能行動一次——使用了一顆骰子,另一顆即時鎖住,下回合才恢復。",
-	 "Each hero acts once per turn — spending one die locks the other until next turn."],
+	["每位英雄每回合只能行動一次——使用了一顆骰子,另一顆本回合就不能再用,下回合才恢復。",
+	 "Each hero acts once per turn — after spending one die, the other cannot be used until next turn."],
 	["頂端的藍色長條是靈息:向森林借來的力量,全隊共用,只有靈術面會消耗它。隊伍若完全沒有靈息相關的骰面,這條就不會顯示。",
 	 "The blue meter at the top is Essence — power borrowed from the forest, shared by the whole party, and spent only by Ritual faces. It stays hidden for a party with no Essence faces at all."],
 	["本作沒有基礎重擲,重擲要靠遺物、藥水和骰面。左上角是你已取得的遺物,長按可以查看。用錯了可以「復原」。準備好就按「結束回合」。",
@@ -2817,6 +2824,11 @@ func _enemy_action_row(e: Dictionary, plan: Dictionary, width: float) -> Control
 	if bool(plan.cancelled):
 		said.zh += "(已取消)"
 		said.en += " (cancelled)"
+	elif bool(plan.get("instant", false)):
+		# 防禦/增益面擲出即時生效(第十輪任務1)—— 佢唔係「已執行完那回事」,
+		# 而係「效果現在正掛在敵人身上」,所以措辭有別於已結算的攻擊
+		said.zh += "(已生效)"
+		said.en += " (already active)"
 	elif bool(plan.done):
 		said.zh += "(已執行)"
 		said.en += " (resolved)"
@@ -2874,8 +2886,8 @@ func _enemy_action_sentence(e: Dictionary, plan: Dictionary) -> Dictionary:
 		zh.append("使%s易傷" % who_zh)
 		en.append("inflicts Expose on %s" % who_en)
 	if f.has("bind"):
-		zh.append("束縛%s,使其下回合無法重擲" % who_zh)
-		en.append("Binds %s — no reroll next turn" % who_en)
+		zh.append("束縛%s,使其下回合隨機一顆骰無法使用(可被淨化移除)" % who_zh)
+		en.append("Binds %s — one random die unusable next turn (Cleanse removes it)" % who_en)
 	if f.has("charge"):
 		zh.append("蓄力 %d,下次攻擊會強得多" % int(f.charge))
 		en.append("Charges %d — its next attack hits far harder" % int(f.charge))

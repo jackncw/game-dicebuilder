@@ -632,7 +632,8 @@
   "rarity": "S",
   "hero": "FOX",
   "block": 2,
-  "lock_boost": 1,
+  "resonate": 2,
+  "resonate_cat": "attack",
   "target": "self"
  },
  "foxb_echo2": {

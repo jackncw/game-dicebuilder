@@ -12,14 +12,16 @@ func setup(p_args: Dictionary) -> void:
 func _ready() -> void:
 	add_child(UIKit.background(1, 132.0, 1030.0))
 
+	# 任務2 通用規則:內容(首爆機嗰陣有兩張解鎖卡)高過可視高度就捲動,
+	# 唔好同 footer 迫
+	var scroll := UIKit.scroll_screen(150.0, 124.0 + UIKit.S2)
+	scroll.offset_left = UIKit.S5
+	scroll.offset_right = -UIKit.S5
+	add_child(scroll)
 	var vb := VBoxContainer.new()
-	vb.anchor_left = 0.0
-	vb.anchor_right = 1.0
-	Safe.pin_top(vb, 150)
-	vb.offset_left = UIKit.S5
-	vb.offset_right = -UIKit.S5
+	vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vb.add_theme_constant_override("separation", UIKit.S4)
-	add_child(vb)
+	scroll.add_child(vb)
 
 	# the title wraps: "The forest is at peace!" alongside the Chinese runs
 	# well past 720px in bilingual mode

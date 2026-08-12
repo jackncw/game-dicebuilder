@@ -351,6 +351,24 @@ static func background(chapter: int, canopy := 118.0, horizon := 0.0,
 	return Forest.scenery(chapter, canopy, horizon, motes)
 
 
+## 任務2(第十輪)通用規則:一個 screen 嘅內容高過可視高度,成個內容區要
+## 可以上下捲動,唔准互相 squash。呢個 helper 起一條 top/bottom 都釘好嘅
+## 直向 ScrollContainer;caller 將內容 VBox 掛入去就得。`top_base` 係頂
+## (在 safe inset 之下)、`bottom_base` 係底(在 safe inset 之上)要讓開
+## 幾多 canvas 單位。
+static func scroll_screen(top_base: float, bottom_base: float) -> ScrollContainer:
+	var scroll := ScrollContainer.new()
+	scroll.anchor_left = 0.0
+	scroll.anchor_right = 1.0
+	scroll.anchor_top = 0.0
+	scroll.anchor_bottom = 1.0
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	Safe.pin_top(scroll, top_base)
+	Safe.pin_bottom(scroll, bottom_base)
+	return scroll
+
+
 ## Bottom-pinned tray: the same slab the battle screen puts its controls on.
 ## Returns the tray; add rows to `tray.get_child(0)` (a VBoxContainer).
 ##

@@ -15,10 +15,66 @@ extends Control
 ## over and a hold that opens all twelve faces.
 
 var _offer_box: VBoxContainer
+var _scroll: ScrollContainer
 ## Which die each character's strip token is showing (0 = A, 1 = B).
 var _strip_die := {}
 var _strip_dice := {}      # hero index → Die3D
 var _strip_labels := {}    # hero index → the A/B caption under it
+
+const FOOT_H := 116.0
+
+
+## The offer cards' laid-out rects, for the browser-side regression. No-op off
+## the web (`Safe.publish_hud`).
+func _publish_offers() -> void:
+	if _offer_box == null or not is_instance_valid(_offer_box):
+		return
+	for i in _offer_box.get_child_count():
+		Safe.publish_hud("offer%d" % i, (_offer_box.get_child(i) as Control).get_global_rect())
+	if is_instance_valid(_scroll):
+		Safe.publish_hud("reward_scroll", _scroll.get_global_rect())
+
+
+## 摺疊咗嘅升級訊息,點開先逐行睇 —— 內容多極都唔會郁到戰利品卡
+func _show_levelups(ups: Dictionary) -> void:
+	var root := Control.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(root)
+	var scrim := ColorRect.new()
+	scrim.color = Color(0, 0, 0, 0.66)
+	scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scrim.mouse_filter = Control.MOUSE_FILTER_STOP
+	root.add_child(scrim)
+	var col := VBoxContainer.new()
+	col.set_anchors_preset(Control.PRESET_FULL_RECT)
+	col.offset_left = UIKit.S5
+	col.offset_right = -UIKit.S5
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.add_theme_constant_override("separation", UIKit.S3)
+	root.add_child(col)
+	var panel := UIKit.panel(UIKit.CREAM, UIKit.R_LG, UIKit.B_STRONG)
+	var pv := VBoxContainer.new()
+	pv.add_theme_constant_override("separation", UIKit.S2)
+	panel.add_child(pv)
+	pv.add_child(UIKit.text_block(Data.bi("升級", "Level-ups"), UIKit.F_H2, UITheme.INK, 560.0))
+	for id in ups:
+		var hdef: Dictionary = GameData.heroes[id]
+		pv.add_child(UIKit.text_block(Data.bi("%s 升級了!新骰面已加入獎勵池" % hdef.zh,
+				"%s levelled up! New face added to pools" % hdef.en),
+				UIKit.F_BODY_SM, UITheme.INK, 560.0, HORIZONTAL_ALIGNMENT_LEFT))
+	var cc := CenterContainer.new()
+	cc.add_child(panel)
+	col.add_child(cc)
+	var ok := UIKit.button(Data.t("ui_ok"), UIKit.CREAM, UIKit.F_BODY, Vector2(220, 64))
+	ok.pressed.connect(func() -> void:
+		Sfx.play("button")
+		root.queue_free())
+	var oc := CenterContainer.new()
+	oc.add_child(ok)
+	col.add_child(oc)
+	scrim.gui_input.connect(func(ev: InputEvent) -> void:
+		if (ev is InputEventMouseButton or ev is InputEventScreenTouch) and ev.pressed:
+			root.queue_free())
 
 
 func setup(_args: Dictionary) -> void:
@@ -31,14 +87,17 @@ func _ready() -> void:
 	add_child(RunWidgets.topbar())
 
 	var pr: Dictionary = Game.pending_reward
+	# 任務2(第十輪):固定結構 —— 結算摘要(固定高度,升級訊息摺疊)→ 戰利品
+	# 三選一 → 底部角色列。內容區本身可以捲動,任何組合都唔准推冧個 layout。
+	var scroll := UIKit.scroll_screen(62.0, FOOT_H + ROSTER_H + 26.0)
+	scroll.offset_left = UIKit.S5
+	scroll.offset_right = -UIKit.S5
+	add_child(scroll)
+	_scroll = scroll
 	var vb := VBoxContainer.new()
-	vb.anchor_left = 0.0
-	vb.anchor_right = 1.0
-	Safe.pin_top(vb, 62)
-	vb.offset_left = UIKit.S5
-	vb.offset_right = -UIKit.S5
+	vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vb.add_theme_constant_override("separation", UIKit.S3)
-	add_child(vb)
+	scroll.add_child(vb)
 
 	vb.add_child(UIKit.title(Data.t("ui_victory"), UIKit.F_H1))
 
@@ -55,12 +114,25 @@ func _ready() -> void:
 	money.add_child(UIKit.chip("XP +%d" % int(pr.get("xp_amount", 1)),
 			UIKit.BLUE, UIKit.F_BODY, UIKit.S3))
 	rv.add_child(money)
+	# 升級訊息:兩行以內照舊逐行;多過兩行摺疊成一行「+N 項,點開睇」——
+	# 升四級嗰陣戰利品卡曾經被四行 levelled-up 推到睇唔到(真人試玩)
 	var ups: Dictionary = pr.get("xp_ups", {})
-	for id in ups:
-		var hdef: Dictionary = GameData.heroes[id]
-		rv.add_child(UIKit.text_block(Data.bi("%s 升級了!新骰面已加入獎勵池" % hdef.zh,
-				"%s levelled up! New face added to pools" % hdef.en),
-				UIKit.F_BODY_SM, UITheme.CAT_ON_DARK.heal, 600.0))
+	if ups.size() <= 2:
+		for id in ups:
+			var hdef: Dictionary = GameData.heroes[id]
+			rv.add_child(UIKit.text_block(Data.bi("%s 升級了!新骰面已加入獎勵池" % hdef.zh,
+					"%s levelled up! New face added to pools" % hdef.en),
+					UIKit.F_BODY_SM, UITheme.CAT_ON_DARK.heal, 600.0))
+	else:
+		var fold := UIKit.button("★ " + Data.bi("%d 位英雄升級了 — 點開查看" % ups.size(),
+				"%d heroes levelled up — tap to view" % ups.size()),
+				UITheme.CAT_ON_DARK.heal, UIKit.F_BODY_SM, Vector2(480, 54))
+		fold.pressed.connect(func() -> void:
+			Sfx.play("button")
+			_show_levelups(ups))
+		var fc := CenterContainer.new()
+		fc.add_child(fold)
+		rv.add_child(fc)
 	vb.add_child(recap)
 
 	# ③ the offer (built now, revealed behind the relic cards)
@@ -71,9 +143,14 @@ func _ready() -> void:
 	vb.add_child(_offer_box)
 	for offer in pr.offers:
 		_offer_box.add_child(_offer_card(offer))
+	# the Playwright regression reads these rects off `window.__dgHUD`; re-publish
+	# whenever the column scrolls so the assertion sees where the cards ARE
+	_publish_offers.call_deferred()
+	scroll.get_v_scroll_bar().value_changed.connect(func(_v: float) -> void:
+		_publish_offers.call_deferred())
 
-	add_child(_roster_strip(ROSTER_TOP))
-	var tray := UIKit.footer(chapter, 116.0)
+	add_child(_roster_strip())
+	var tray := UIKit.footer(chapter, FOOT_H)
 	add_child(tray)
 	var skip := UIKit.button("%s (+%d💰)" % [Data.t("ui_skip"), int(GameData.balance.offer_skip_gold)],
 			UIKit.CREAM_DARK, UIKit.F_BODY, Vector2(300, 72))
@@ -249,19 +326,18 @@ func _offer_card(offer: Dictionary) -> Control:
 ## you can flick, tap to switch between their A and B die, and hold — anywhere
 ## on the token — to open all twelve of their faces. It is the answer to the
 ## question every offer card raises without making the player leave the screen.
-## The strip sits between the offer list and the footer tray. Both of those are
-## fixed, so the band it gets is fixed too — the token below is sized to fit it
-## rather than the other way round.
-const ROSTER_TOP := 1000.0
+## 任務2:the strip HANGS OFF THE FOOTER(bottom-pinned)而唔再係由頂數落嚟
+## 嘅絕對座標 —— 手機高度短過設計稿嗰陣,舊做法會叠正落 footer 度。
 const ROSTER_H := 150.0
 
 
-func _roster_strip(y: float) -> Control:
+func _roster_strip() -> Control:
 	var stage := Control.new()
 	stage.anchor_left = 0.0
 	stage.anchor_right = 1.0
-	stage.offset_top = y
-	stage.offset_bottom = y + ROSTER_H
+	stage.anchor_top = 1.0
+	stage.anchor_bottom = 1.0
+	Safe.pin_bottom_band(stage, FOOT_H + ROSTER_H, FOOT_H)
 	var row := HBoxContainer.new()
 	row.set_anchors_preset(Control.PRESET_FULL_RECT)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER

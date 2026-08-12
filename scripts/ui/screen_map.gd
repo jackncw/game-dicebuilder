@@ -1,19 +1,38 @@
 extends Control
 ## StS-style map: 9 rows climbing bottom→top, tap a connected node to enter.
+##
+## 任務4(第十輪):the whole chapter lives inside a vertical ScrollContainer
+## on its classic 1130→154 ladder — a phone-height canvas scrolls the climb
+## instead of compressing it, and the current reachable rung is auto-scrolled
+## into view. 呢個順手執埋一個潛藏 bug:節點以前行 inset-aware 座標而路徑/
+## 樹行固定座標,一有 notch 兩者就對唔上;而家全部行同一套內容座標。
 
 const NODE_R := 34.0
-const TYPE_CHAR := {
-	"battle": "戰", "event": "事", "elite": "精",
-	"shop": "店", "rest": "營", "treasure": "寶", "boss": "王",
-}
 const TYPE_COLOR := {
 	"battle": UIKit.RED, "event": UIKit.YELLOW, "elite": UIKit.PURPLE,
 	"shop": UIKit.BLUE, "rest": UIKit.GREEN, "treasure": UIKit.ORANGE,
 	"boss": UIKit.RED,
 }
+## 節點類型注釋(跟語言模式)。540 寬度實測(mockup 截圖自評)20px 帶
+## outline 仲讀得出;再細先需要圖例條方案。
+const TYPE_NAME := {
+	"battle": ["戰鬥", "Battle"], "event": ["事件", "Event"],
+	"elite": ["精英", "Elite"], "shop": ["商店", "Shop"],
+	"rest": ["休息", "Rest"], "treasure": ["寶箱", "Chest"],
+	"boss": ["頭目", "Boss"],
+}
+const TYPE_LABEL_FONT := 20
+
+## Content-space ladder: bottom row at 1130, step 122, boss row at 154 — the
+## geometry the map has always had, now on a scrollable 1200-tall sheet.
+const MAP_H := 1200.0
+const FOOT_H := 116.0
+const TOP_BAND := 64.0
 
 var _lp_timer: SceneTreeTimer = null
 var _tooltip: Control = null
+var _scroll: ScrollContainer = null
+var _avail_btns: Array = []
 
 
 func setup(_args: Dictionary) -> void:
@@ -23,11 +42,21 @@ func setup(_args: Dictionary) -> void:
 func _ready() -> void:
 	var chapter := int(Game.run.chapter)
 	add_child(UIKit.background(chapter, 96.0, 0.0))
-	add_child(RunWidgets.topbar())
+
+	_scroll = ScrollContainer.new()
+	_scroll.anchor_left = 0.0
+	_scroll.anchor_right = 1.0
+	_scroll.anchor_top = 0.0
+	_scroll.anchor_bottom = 1.0
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	Safe.pin_top(_scroll, TOP_BAND)
+	Safe.pin_bottom(_scroll, FOOT_H)
+	add_child(_scroll)
 
 	var graph := Control.new()
-	graph.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(graph)
+	graph.custom_minimum_size = Vector2(720.0, MAP_H)
+	graph.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll.add_child(graph)
 	var lines := _EdgeLines.new()
 	lines.map = Game.run.map
 	lines.chapter = chapter
@@ -50,16 +79,37 @@ func _ready() -> void:
 			var is_current: bool = r == int(Game.run.row) and c == int(Game.run.col)
 			var is_past: bool = r <= int(Game.run.row)
 			var btn := _make_node_btn(node, is_avail, is_current, is_past)
-			btn.position = pos - Vector2(NODE_R, NODE_R) * (1.35 if node.type == "boss" else 1.0)
+			var half := NODE_R * (1.35 if node.type == "boss" else 1.0)
+			btn.position = pos - Vector2(half, half)
 			graph.add_child(btn)
+			var rr: int = r
+			var cc: int = c
 			if is_avail:
-				var rr: int = r
-				var cc: int = c
+				_avail_btns.append(btn)
 				btn.pressed.connect(func() -> void:
 					Sfx.play("button")
 					Game.enter_node(rr, cc))
+			else:
+				# 未去到(或者已經過咗)嘅節點:一撳彈類型名確認 —— 細螢幕下
+				# 靠注釋唔夠嘅後備通道
+				btn.pressed.connect(func() -> void:
+					_show_type_tip(node, btn))
+			# 類型注釋:icon 下面一行細字(戰鬥/精英/事件…),跟語言模式
+			var nm: Array = TYPE_NAME.get(String(node.type), ["?", "?"])
+			var lbl := UIKit.outlined(UIKit.text_block(
+					Data.bi(String(nm[0]), String(nm[1])), TYPE_LABEL_FONT,
+					UIKit.CREAM if (is_avail or is_current or not is_past) else UIKit.CREAM_DARK,
+					150.0), 5)
+			lbl.position = Vector2(pos.x - 75.0, pos.y + half - 2.0)
+			lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			if is_past and not is_current:
+				lbl.modulate = Color(1, 1, 1, 0.5)
+			graph.add_child(lbl)
 
-	var tray := UIKit.footer(chapter, 116.0)
+	# 拉埋 topbar 先加,等佢浮喺 scroll 上面
+	add_child(RunWidgets.topbar())
+
+	var tray := UIKit.footer(chapter, FOOT_H)
 	add_child(tray)
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -76,17 +126,57 @@ func _ready() -> void:
 	row.add_child(hint)
 	tray.get_child(0).add_child(row)
 
+	_autoscroll.call_deferred()
+	if _scroll.get_v_scroll_bar() != null:
+		_scroll.get_v_scroll_bar().value_changed.connect(func(_v: float) -> void:
+			_publish_rects.call_deferred())
 
-## Where row `r` of the map sits. The nine rows are spread across whatever
-## vertical band is left between the run top bar and the footer, so a phone that
-## eats 94px of notch compresses the climb instead of pushing the boss clearing
-## up underneath the status bar. With no insets this is the 1130 → 154 ladder
-## the map has always had, step 122, to the pixel.
+
+## 當前可去嘅節點自動捲入視野 —— run 開頭喺梯底,尾段喺梯頂,唔應該要玩家
+## 自己搵。
+func _autoscroll() -> void:
+	if not is_instance_valid(_scroll):
+		return
+	var target := MAP_H
+	var avail: Array = RunState.available_nodes(Game.run)
+	for a in avail:
+		target = minf(target, node_pos(int(a[0]), 0.0).y)
+	var vis := _scroll.size.y
+	_scroll.scroll_vertical = int(clampf(target - vis * 0.55, 0.0, maxf(MAP_H - vis, 0.0)))
+	_publish_rects.call_deferred()
+
+
+## The reachable nodes' rects, for the browser-side regression (`__dgHUD`).
+func _publish_rects() -> void:
+	for i in _avail_btns.size():
+		var b = _avail_btns[i]
+		if is_instance_valid(b):
+			Safe.publish_hud("map_avail%d" % i, (b as Control).get_global_rect())
+
+
+## 撳未可去嘅節點:喺節點旁邊彈個類型名細牌,1.6 秒自動散
+func _show_type_tip(node: Dictionary, btn: Control) -> void:
+	if is_instance_valid(_tooltip):
+		_tooltip.queue_free()
+	var nm: Array = TYPE_NAME.get(String(node.type), ["?", "?"])
+	var panel := UIKit.panel(UIKit.CREAM, 12, 3)
+	panel.add_child(UIKit.label(Data.bi(String(nm[0]), String(nm[1])), UIKit.F_BODY, UIKit.OUTLINE))
+	var g := btn.get_global_rect()
+	add_child(panel)
+	# beside the node, clamped onto the canvas
+	panel.position = Vector2(clampf(g.position.x + g.size.x * 0.5 - 60.0, 8.0, 560.0),
+			maxf(g.position.y - 64.0, 8.0))
+	_tooltip = panel
+	get_tree().create_timer(1.6).timeout.connect(func() -> void:
+		if is_instance_valid(panel):
+			panel.queue_free())
+
+
+## Where row `r` of the map sits, in GRAPH CONTENT coordinates. One coordinate
+## system for nodes, edges and trees alike — the scroll container does the
+## phone-height work now, so no inset maths in here.
 static func node_pos(r: int, x: float) -> Vector2:
-	var bottom := 1280.0 - Safe.bottom - 150.0
-	var top := Safe.top + 154.0
-	var step := (bottom - top) / 8.0
-	return Vector2(60.0 + x * 600.0, bottom - r * step)
+	return Vector2(60.0 + x * 600.0, 1130.0 - r * 122.0)
 
 
 func _make_node_btn(node: Dictionary, avail: bool, current: bool, past: bool) -> Button:
@@ -115,7 +205,8 @@ func _make_node_btn(node: Dictionary, avail: bool, current: bool, past: bool) ->
 	icon.set_anchors_preset(Control.PRESET_FULL_RECT)
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(icon)
-	b.disabled = not avail
+	# 唔再 disabled:非可去節點都受撳 —— 撳落去彈類型名(任務4)。視覺上照舊
+	# 靠底色深淺同 modulate 分可去/未可去。
 	if past and not current:
 		b.modulate = Color(1, 1, 1, 0.45)
 	# spyglass: preview enemies on battle nodes

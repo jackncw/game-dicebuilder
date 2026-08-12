@@ -143,6 +143,23 @@ func _boot_direct(screen: String) -> void:
 				team.append(GameData.new_hero(String(id)))
 			Game.goto("battle", {"team": team, "enemies": ["E01", "E02", "E03"],
 				"opts": {"chapter": 1}, "battle_seed": 91117})
+		"map":
+			# 任務4 的 Playwright 幾何迴歸:新 run 嘅第一章地圖(可去節點喺梯底)
+			Game.run = RunState.new_run(GameData.starter_hero_ids(), 4242)
+			Game.goto("map")
+		"reward":
+			# 任務2 的最壞情況:全隊四人同一場升級,加三張戰利品卡
+			Game.run = RunState.new_run(GameData.starter_hero_ids(), 4242)
+			var rng := RunState.rng_of(Game.run)
+			var ups := {}
+			for id2 in GameData.starter_hero_ids():
+				ups[String(id2)] = 2
+			Game.pending_reward = {
+				"gold": 23, "xp_amount": 3, "xp_ups": ups, "kind": "battle",
+				"offers": RunState.gen_offers(Game.run, rng, "battle", {}),
+				"extra_relics": [], "advanced": [], "advanced_showcase": false,
+			}
+			Game.goto("reward")
 		_:
 			Game.goto(screen)
 

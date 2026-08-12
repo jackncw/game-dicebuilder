@@ -71,7 +71,7 @@ static func _number(fd: Dictionary, key: String) -> String:
 	var n := int(v)
 	if n == 0:
 		return ""
-	if key in ["charge_up", "resonate", "buff_next_atk", "echo", "lock_boost"]:
+	if key in ["charge_up", "resonate", "buff_next_atk", "echo"]:
 		return "+%d" % n
 	return str(n)
 

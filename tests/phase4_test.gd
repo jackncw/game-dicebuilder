@@ -168,11 +168,10 @@ func _t_all_faces_usable() -> void:
 		bc.s.heroes[1].faces[0] = "hare_quick3"
 		bc.s.heroes[1].rolled = [0, -1]
 		# 呼應-gated faces (絕影) refuse to be spent unless the user's OTHER die
-		# is pinned on the right kind of face, so give every sweep subject one.
+		# shows the right kind of face, so give every sweep subject one.
 		if fd.has("resonate_req") or fd.has("resonate"):
 			bc.s.heroes[0].faces[6] = "hare_quick3"
 			bc.s.heroes[0].rolled[1] = 6
-			bc.s.heroes[0].locked[1] = true
 		var params := {}
 		match String(fd.get("target", "none")):
 			"enemy":

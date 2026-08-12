@@ -263,10 +263,6 @@
     "zh": "施放",
     "en": "Cast"
   },
-  "ui_die_locked": {
-    "zh": "鎖定",
-    "en": "Locked"
-  },
   "ui_pick_replace": {
     "zh": "選擇一個要被取代的骰面",
     "en": "Choose a face to replace"

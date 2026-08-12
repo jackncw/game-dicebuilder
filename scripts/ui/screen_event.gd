@@ -37,14 +37,24 @@ func _build() -> void:
 	add_child(RunWidgets.party_strip(1014.0, 152.0))
 
 	var ev: Dictionary = GameData.events[event_id]
+	# 任務2 通用規則:選項多或者事件文長,內容區捲動,唔好逼埋 party strip。
+	# 底界係 party strip 條地線(1014,由頂數,同背景嘅 horizon 綁埋一齊),
+	# 所以呢度用固定 offset 而唔係 bottom pin。
+	var scroll := ScrollContainer.new()
+	scroll.anchor_left = 0.0
+	scroll.anchor_right = 1.0
+	scroll.anchor_top = 0.0
+	scroll.anchor_bottom = 0.0
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	Safe.pin_top(scroll, 96)
+	scroll.offset_bottom = 866.0
+	scroll.offset_left = UIKit.S6
+	scroll.offset_right = -UIKit.S6
+	add_child(scroll)
 	vb = VBoxContainer.new()
-	vb.anchor_left = 0.0
-	vb.anchor_right = 1.0
-	Safe.pin_top(vb, 96)
-	vb.offset_left = UIKit.S6
-	vb.offset_right = -UIKit.S6
+	vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vb.add_theme_constant_override("separation", UIKit.S4)
-	add_child(vb)
+	scroll.add_child(vb)
 
 	vb.add_child(UIKit.title(Data.bi(String(ev.zh), String(ev.en)), UIKit.F_H1))
 

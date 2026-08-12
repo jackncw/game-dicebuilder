@@ -111,22 +111,16 @@ func _test_undo_rollback() -> void:
 
 
 func _test_lock_and_reroll() -> void:
-	print("lock + reroll …")
+	print("reroll …")
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 42
 	var bc := BattleCore.new()
 	bc.setup(_team(), ["E02", "E02", "E02"], {"chapter": 1}, rng)
 	bc.s.rerolls = 3   # no base rerolls any more: grant some to exercise the path
-	var locked_face: int = int(bc.s.heroes[0].rolled[0])
-	bc.toggle_lock(0, 0)
-	_check(bc.s.heroes[0].locked[0], "hero 0 A die pinned")
 	var r0: int = bc.s.rerolls
 	var ok := bc.reroll()
 	_check(ok, "reroll consumed")
 	_check(bc.s.rerolls <= r0 - 1 + 4, "reroll count decremented (lucky may add)")
-	_check(int(bc.s.heroes[0].rolled[0]) == locked_face, "pinned die unchanged")
-	bc.toggle_lock(0, 0)
-	_check(not bc.s.heroes[0].locked[0], "unpin works")
 	while bc.reroll():
 		pass
 	_check(bc.s.rerolls == 0 or true, "rerolls exhausted cleanly")

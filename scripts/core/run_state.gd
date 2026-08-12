@@ -21,7 +21,9 @@ static func new_run(team_ids: Array, seed_v: int, meta_levels := {}) -> Dictiona
 		"chapter": 1,
 		"row": -1, "col": -1,
 		"team": team,
-		"gold": 0,
+		# 第十輪:開局帶 50 金 —— 第一章商店見到藥水(35)買得起、普通面(45)
+		# 掂到邊,「買唔買」先至係一個決定。旋鈕在 balance.json `start_gold`。
+		"gold": int(GameData.balance.get("start_gold", 0)),
 		"relics": [],
 		"potions": [],
 		"run_atk_buff": 0,

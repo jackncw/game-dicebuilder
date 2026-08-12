@@ -25,7 +25,7 @@ const MAIN_ORDER := ["atk", "random_atk", "atk_from_block", "block",
 const MOD_ORDER := ["pierce", "hits", "charge_up", "resonate", "resonate_req",
 	"cleave", "aoe", "combo", "lifesteal", "heal_on_hit", "poison",
 	"burn", "weaken", "expose", "taunt", "thorns", "thorn_hold", "stun",
-	"growth", "lucky", "low_hp_atk", "lock_boost",
+	"growth", "lucky", "low_hp_atk",
 	"pain", "spell", "echo", "cleanse_self", "cleanse_target", "self_heal",
 	"buff_next_atk", "wild", "steal_die"]
 
@@ -277,15 +277,12 @@ static func effect_sentence(fd: Dictionary) -> String:
 	if _is_on(fd, "next_dice_boost"):
 		zh.append("下回合他兩顆骰的數值 +%d" % int(fd.next_dice_boost))
 		en.append("both his dice are worth +%d next turn" % int(fd.next_dice_boost))
-	if _is_on(fd, "lock_boost"):
-		zh.append("他鎖定中的骰下回合數值 +%d" % int(fd.lock_boost))
-		en.append("the die he has locked is worth +%d next turn" % int(fd.lock_boost))
 	if _is_on(fd, "all_pierce"):
 		zh.append("本回合全隊所有攻擊無視格擋")
 		en.append("every attack your party makes this turn ignores Block")
 	if _is_on(fd, "twin_dance"):
-		zh.append("本回合他可以額外使用鎖定中的那顆骰,而且鎖定不會解除")
-		en.append("he may also spend the die he has locked this turn, and the lock survives it")
+		zh.append("本回合他可以再使用另一顆骰")
+		en.append("he may also spend his other die this turn")
 	if _is_on(fd, "thorn_hold"):
 		zh.append("本回合結束時他的荊棘不會消退")
 		en.append("his Thorns do not decay at the end of this turn")
@@ -373,16 +370,16 @@ static func effect_sentence(fd: Dictionary) -> String:
 		tail_zh.append("本回合若已使用過攻擊面則 +2")
 		tail_en.append("+2 if an attack face was already used this turn")
 	if _is_on(fd, "charge_up"):
-		tail_zh.append("每在鎖定位渡過一回合 +%d,最多 +%d" % [int(fd.charge_up), int(fd.charge_up) * 3])
-		tail_en.append("+%d per full turn spent locked, up to +%d" % [int(fd.charge_up), int(fd.charge_up) * 3])
+		tail_zh.append("回合結束時擲出而未使用就蓄一層:每層 +%d,最多 +%d" % [int(fd.charge_up), int(fd.charge_up) * 3])
+		tail_en.append("banks a stack each turn it ends rolled but unspent: +%d per stack, up to +%d" % [int(fd.charge_up), int(fd.charge_up) * 3])
 	if _is_on(fd, "resonate"):
-		tail_zh.append("呼應:另一顆骰鎖定在%s面時 +%d" % [
+		tail_zh.append("呼應:另一顆骰擲出%s面時 +%d" % [
 				_cat_word_zh(String(fd.get("resonate_cat", "attack"))), int(fd.resonate)])
-		tail_en.append("Echo: +%d while the other die is locked on %s face" % [
+		tail_en.append("Echo: +%d while his other die shows %s face" % [
 				int(fd.resonate), _cat_word_en(String(fd.get("resonate_cat", "attack")))])
 	if _is_on(fd, "resonate_req"):
-		tail_zh.append("必須另一顆骰鎖定在%s面才可使用" % _cat_word_zh(String(fd.resonate_req)))
-		tail_en.append("only usable while the other die is locked on %s face" % _cat_word_en(String(fd.resonate_req)))
+		tail_zh.append("必須另一顆骰擲出%s面才可使用" % _cat_word_zh(String(fd.resonate_req)))
+		tail_en.append("only usable while the other die shows %s face" % _cat_word_en(String(fd.resonate_req)))
 	if _is_on(fd, "low_hp_atk"):
 		tail_zh.append("HP 在 50%% 或以下時改為 %d" % int(fd.low_hp_atk))
 		tail_en.append("becomes %d at 50%% HP or less" % int(fd.low_hp_atk))
@@ -423,7 +420,7 @@ static func effect_sentence(fd: Dictionary) -> String:
 
 
 ## The face category 呼應 is asking about, as a word that reads inside a
-## sentence ("鎖定在攻擊面時" / "locked on an attack face").
+## sentence ("擲出攻擊面時" / "shows an attack face").
 static func _cat_word_zh(cat: String) -> String:
 	match cat:
 		"block": return "格擋"

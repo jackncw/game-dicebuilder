@@ -253,8 +253,8 @@
   "en": "Bind",
   "glyph": "bind",
   "hue": "control",
-  "d_zh": "被束縛的英雄下回合無法重擲",
-  "d_en": "The bound hero cannot reroll next turn"
+  "d_zh": "被束縛的英雄下回合隨機一顆骰無法使用(骰子照擲,看得到失去了甚麼)。可被淨化移除。與偷骰不同:偷骰是頭目的招數,骰子直接被拿走再歸還;束縛是普通減益,淨化就能解開",
+  "d_en": "Next turn one random die of the bound hero cannot be used (it still rolls — you see what you lost). Cleanse removes it. Unlike Steal, which is a boss gimmick that takes the die away and returns it, Bind is an ordinary debuff a Cleanse undoes"
  },
  "steal": {
   "zh": "偷骰",
@@ -328,37 +328,29 @@
   "d_zh": "沒有任何效果的面。擲到空白面即是這顆骰子本回合沒有用處",
   "d_en": "A face with no effect at all — rolling it means that die does nothing this turn"
  },
- "lock": {
-  "zh": "鎖定",
-  "en": "Lock",
-  "glyph": "lock",
-  "hue": "control",
-  "d_zh": "點骰子上的鎖就可以把它釘住。被鎖住的骰不會被重擲,而且會一直保留到下一個回合——直到你解鎖它,或者把它用掉。蓄力、呼應、換位和雙舞全部建基於這條規則",
-  "d_en": "Tap the pin on a die to lock it. A locked die is never rerolled and keeps its face into the following turns — until you unlock it or spend it. Charge, Echo, Switch and Twin Dance all build on this rule"
- },
  "charge_up": {
   "zh": "蓄力",
   "en": "Charge",
   "glyph": "chargeup",
   "hue": "attack",
-  "d_zh": "這個面每在鎖定位渡過一個完整回合,使用時數值 +X(最多累積到 +3X);一使用就歸零,解鎖或重擲亦會歸零",
-  "d_en": "For every full turn this face spends locked, it is worth +X more when spent (stacking up to +3X). Using it resets the stack to zero, and so does unlocking or rerolling the die"
+  "d_zh": "回合結束時這個面仍然擲出在骰上而未被使用,就蓄一層。使用時每層數值 +X(最多 3 層)。層數跟著這個面,重擲不會清掉它;使用後歸零",
+  "d_en": "Each turn that ends with this face rolled but unspent banks one stack. When spent it is worth +X per stack (3 stacks at most). Stacks belong to the face — rerolls do not clear them; spending it does"
  },
  "resonate": {
   "zh": "呼應",
   "en": "Echo",
   "glyph": "resonate",
   "hue": "attack",
-  "d_zh": "使用這個面時,如果同一位英雄另一顆骰處於鎖定狀態,而且它當時的面屬於指定類別(預設為攻擊面),此面數值 +X",
-  "d_en": "When this face is spent, if the same hero's other die is locked and the face showing on it is of the named kind (an attack face unless stated otherwise), this face gets +X"
+  "d_zh": "使用這個面時,如果同一位英雄另一顆骰本回合擲出的是指定類別的面(預設為攻擊面),此面數值 +X。孖生骰現在顯示甚麼,你是看得到的——呼應就是雙骰協同",
+  "d_en": "When this face is spent, if the face the same hero's OTHER die rolled this turn is of the named kind (an attack face unless stated otherwise), this face gets +X. The twin die's face is information you can see — Echo is twin-dice synergy"
  },
  "resonate_req": {
   "zh": "呼應條件",
   "en": "Echo Requirement",
   "glyph": "resonate",
   "hue": "control",
-  "d_zh": "這個面只有在呼應條件成立時才可以使用:同一位英雄另一顆骰必須處於鎖定狀態,而且顯示指定類別的面",
-  "d_en": "This face can only be used while its Echo condition holds: the same hero's other die must be locked and showing a face of the named kind"
+  "d_zh": "這個面只有在呼應條件成立時才可以使用:同一位英雄另一顆骰本回合擲出的面必須屬於指定類別",
+  "d_en": "This face can only be used while its Echo condition holds: the face the same hero's other die rolled this turn must be of the named kind"
  },
  "hits": {
   "zh": "多重攻擊",
@@ -416,21 +408,13 @@
   "d_zh": "獲得等同隊伍當前靈息的格擋(上限 X)。靈息不會因此消耗",
   "d_en": "Gain Block equal to the party's current Essence, capped at X. The Essence itself is not spent"
  },
- "lock_boost": {
-  "zh": "磨刃",
-  "en": "Whet",
-  "glyph": "lock",
-  "hue": "defense",
-  "d_zh": "這位英雄目前鎖定中的那顆骰,下回合數值 +X",
-  "d_en": "Whichever die this hero currently has locked is worth +X next turn"
- },
  "twin_dance": {
   "zh": "雙舞",
   "en": "Twin Dance",
-  "glyph": "lock",
+  "glyph": "multi",
   "hue": "special",
-  "d_zh": "本回合這位英雄可以額外使用他鎖定中的那顆骰,而且用完之後那顆骰仍然保持鎖定、保持同一個面",
-  "d_en": "This turn the hero may also spend the die they have locked — and that die stays locked, on the same face, afterwards"
+  "d_zh": "使用後,本回合這位英雄可以再使用另一顆骰,不受「每回合一次」限制,也不佔用雙月徽記的名額",
+  "d_en": "After this is used, the hero may also spend their other die this turn — the one-action-a-turn rule does not apply, and the Twin Moon Seal's slot is not consumed"
  },
  "self_atk_now": {
   "zh": "暴走",
@@ -469,8 +453,8 @@
   "en": "One action a turn",
   "glyph": "cancel",
   "hue": "control",
-  "d_zh": "每位英雄每回合只可以使用一顆骰子。使用了 A 骰,B 骰即時鎖住,下回合才解鎖",
-  "d_en": "Each hero may spend only one die a turn. Spending the A die locks the B die out until next turn"
+  "d_zh": "每位英雄每回合只可以使用一顆骰子。用了其中一顆,另一顆本回合就不能再用,下回合恢復",
+  "d_en": "Each hero may spend only one die a turn. After one die is spent, the other cannot be used until next turn"
  },
  "relic": {
   "zh": "遺物",
@@ -569,20 +553,20 @@
   "d_en": "The Crown stops Thorns decaying at all; Hold Fast only stops it for one turn — held together, Hold Fast's Thorns clause does nothing and you are spending a die on Block 2. Bristle is the opposite: with the base no longer falling back, every doubling compounds."
  },
  "ruling_twin_moon_lock": {
-  "zh": "遺物裁定:雙月徽記 vs 鎖定機制",
-  "en": "Ruling: Twin Moon Seal vs the lock",
+  "zh": "遺物裁定:雙月徽記 vs 雙舞",
+  "en": "Ruling: Twin Moon Seal vs Twin Dance",
   "glyph": "r_twinmoon",
   "hue": "special",
-  "d_zh": "徽記讓一位英雄一回合用兩顆骰,所以他可以「開火 + 續蓄」:用鎖定中的蓄力面,同一回合再用另一顆。「雙舞」不會佔用徽記的名額 —— 兩者可以在同一回合疊加,那是狐影雙刃最強的一手。",
-  "d_en": "The Seal lets one hero spend both dice, so they can fire a banked Charge and still act with the other die. Twin Dance does NOT consume the Seal's one-hero slot — the two stack in a single turn, and that is the Fox Duelist's best hand."
+  "d_zh": "「雙舞」的額外行動不佔用徽記的一人名額 —— 狐影雙刃用雙舞打完兩顆骰,徽記仍然可以留給另一位英雄用兩顆。一回合最多因此有六次行動(四人各一 + 雙舞一 + 徽記一)。",
+  "d_en": "Twin Dance's extra action does NOT consume the Seal's one-hero slot — the Fox can dance through both his dice while the Seal still lets ANOTHER hero spend both of theirs. That is how a turn reaches six actions (one each, plus the dance, plus the Seal)."
  },
  "ruling_bone_lock": {
   "zh": "遺物裁定:賭徒之骨 vs 蓄力",
   "en": "Ruling: Gambler's Bone vs Charge",
   "glyph": "r_bone",
   "hue": "special",
-  "d_zh": "鎖定中的骰永遠不會被重擲,所以無限重擲不會洗走蓄力層數 —— 但每次重擲全隊各扣 1 點 HP,而蓄力要三個回合才滿。同時帶自損面的隊伍要自己算清楚這條數。",
-  "d_en": "A pinned die is never rerolled, so unlimited rerolls cannot wash a Charge stack away — but each reroll costs every hero 1 HP, and a full Charge takes three turns. A party also running Recoil faces has to do that arithmetic itself."
+  "d_zh": "蓄力層數跟著骰面,不跟著這一擲 —— 無限重擲把蓄力面洗走,層數仍在,下次擲回來照樣生效。但賭徒之骨每次重擲全隊各扣 1 點 HP,追著一個蓄滿的面重擲,代價要自己算清楚。",
+  "d_en": "Charge stacks belong to the face, not to the current throw — rerolling the face away does not clear them, and they are all still there when it comes back up. But the Bone charges every hero 1 HP per reroll, so chasing a fully-banked face has a price you must do the arithmetic on."
  },
  "ruling_channeling_rod_turn": {
   "zh": "遺物裁定:導靈杖 vs 森之心",
@@ -629,7 +613,7 @@
   "en": "Essence Reroll",
   "glyph": "insight",
   "hue": "resource",
-  "d_zh": "任何時候可以用 2 點靈息換 1 次重擲,每回合限一次。買到嘅係「一次重擲」,幾時擲、擲之前鎖邊粒骰,仍然由你決定",
-  "d_en": "Trade 2 Essence for one reroll, once a turn, at any point in your phase. It buys the throw, not the throw itself — you still choose when to spend it and which dice to pin first"
+  "d_zh": "任何時候可以用 2 點靈息換 1 次重擲,每回合限一次。買到嘅係「一次重擲」,幾時擲仍然由你決定——想保住好面,先用咗嗰位英雄再擲",
+  "d_en": "Trade 2 Essence for one reroll, once a turn, at any point in your phase. It buys the throw — you still choose when to spend it, and acting with a hero first is how you keep their good face out of the shuffle"
  }
 }
