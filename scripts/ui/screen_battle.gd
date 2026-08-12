@@ -866,18 +866,18 @@ func _drop_spec_for(i: int, d: int) -> Dictionary:
 		fd = bc.die_face(int(pending_wild_src.hero), int(pending_wild_src.die))
 	# a theft that already picked its die now needs an enemy to hit
 	if not pending_theft.is_empty():
-		return {"enemies": bc._alive_enemies(), "heroes": [], "enemy_dice": false,
+		return {"enemies": bc.alive_enemies(), "heroes": [], "enemy_dice": false,
 			"cast": false, "wild": []}
 	var spec := none.duplicate(true)
 	match String(fd.get("target", "none")):
 		"enemy":
-			spec.enemies = bc._alive_enemies()
+			spec.enemies = bc.alive_enemies()
 		"ally":
 			for j in bc.s.heroes.size():
 				spec.heroes.append(j)     # healing a downed ally revives them
 		"enemy_die":
 			spec.enemy_dice = true
-			spec.enemies = bc._alive_enemies()
+			spec.enemies = bc.alive_enemies()
 		"self":
 			spec.heroes = [i]
 		"wild":
@@ -885,10 +885,10 @@ func _drop_spec_for(i: int, d: int) -> Dictionary:
 		_:
 			# target "none" covers three very different shapes
 			if fd.get("aoe", false) and (fd.has("atk") or fd.has("poison") or fd.has("burn")):
-				spec.enemies = bc._alive_enemies()
+				spec.enemies = bc.alive_enemies()
 			elif fd.has("team_block") or fd.has("team_heal") or fd.has("team_thorns") \
 					or fd.has("team_regen"):
-				spec.heroes = bc._alive_heroes()
+				spec.heroes = bc.alive_heroes()
 			else:
 				spec.cast = true
 	return spec
@@ -1071,7 +1071,7 @@ func _art_key(e: Dictionary) -> String:
 func _make_enemy_card(j: int, e: Dictionary, is_target: bool, spec: Dictionary) -> Control:
 	var border := UIKit.GREEN if is_target else UIKit.OUTLINE
 	var chapter := int(args.get("opts", {}).get("chapter", 1))
-	var n := bc._alive_enemies().size()
+	var n := bc.alive_enemies().size()
 	var m := _enemy_metrics(n, e.kind == "boss")
 	var p := UIKit.card(chapter, UIKit.R_LG, UIKit.B_FOCUS if is_target else UIKit.B_STRONG,
 			border, UIKit.S2)
@@ -1167,7 +1167,7 @@ func _make_enemy_card(j: int, e: Dictionary, is_target: bool, spec: Dictionary) 
 func _intent_terms(e: Dictionary, f: Dictionary) -> Array:
 	var out := []
 	if f.has("atk"):
-		out.append(["atk", bc._enemy_face_value(e, f, "atk")])
+		out.append(["atk", bc.enemy_face_value(e, f, "atk")])
 		if f.get("aoe", false):
 			out.append(["aoe", -1])
 		if f.get("pierce", false):
@@ -1183,7 +1183,7 @@ func _intent_terms(e: Dictionary, f: Dictionary) -> Array:
 		if f.has(pair[0]):
 			var v := int(f[pair[0]])
 			if pair[0] in ["block", "heal"]:
-				v = bc._enemy_face_value(e, f, String(pair[0]))
+				v = bc.enemy_face_value(e, f, String(pair[0]))
 			out.append([String(pair[1]), v])
 			if f.get("aoe", false):
 				out.append(["aoe", -1])
@@ -1978,7 +1978,7 @@ func _biggest_die_of(j: int) -> Dictionary:
 		var r: Dictionary = e.rolls[d]
 		if r.cancelled or r.done:
 			continue
-		var v := bc._enemy_face_value(e, r.face, "atk") if r.face.has("atk") else 1
+		var v := bc.enemy_face_value(e, r.face, "atk") if r.face.has("atk") else 1
 		if v > best_v:
 			best_v = v
 			best = {"enemy": j, "die": d}
@@ -1988,7 +1988,7 @@ func _biggest_die_of(j: int) -> Dictionary:
 func _biggest_die_excluding(exclude: Dictionary) -> Dictionary:
 	var best := {}
 	var best_v := -1
-	for ref in bc._targetable_dice():
+	for ref in bc.targetable_dice():
 		if ref == exclude:
 			continue
 		var v := 1
@@ -1997,7 +1997,7 @@ func _biggest_die_excluding(exclude: Dictionary) -> Dictionary:
 		else:
 			var e: Dictionary = bc.s.enemies[int(ref.enemy)]
 			var f: Dictionary = e.rolls[int(ref.die)].face
-			v = bc._enemy_face_value(e, f, "atk") if f.has("atk") else 1
+			v = bc.enemy_face_value(e, f, "atk") if f.has("atk") else 1
 		if v > best_v:
 			best_v = v
 			best = ref
@@ -2461,7 +2461,7 @@ func _capture_anchors() -> void:
 ## Enemy cards are a centred row; heroes are four fixed-width columns. Good
 ## enough for the very first turn, before anything has been laid out once.
 func _fallback_enemy(j: int) -> Vector2:
-	var alive: Array = bc._alive_enemies()
+	var alive: Array = bc.alive_enemies()
 	var slot := maxi(alive.find(j), 0)
 	var n := maxi(alive.size(), 1)
 	return Vector2(360.0 + (slot - (n - 1) * 0.5) * 148.0, 190.0)

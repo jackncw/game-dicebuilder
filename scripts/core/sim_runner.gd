@@ -1500,7 +1500,7 @@ static func _expected_damage(bc: BattleCore) -> int:
 				continue
 			var f: Dictionary = r.face
 			if f.has("atk"):
-				var v: int = bc._enemy_face_value(e, f, "atk")
+				var v: int = bc.enemy_face_value(e, f, "atk")
 				if f.get("aoe", false):
 					v *= 2
 				total += v
@@ -2036,7 +2036,7 @@ static func _biggest_threat(bc: BattleCore) -> int:
 		var v := 0
 		for r in e.rolls:
 			if not r.cancelled and not r.done and r.face.has("atk"):
-				v += bc._enemy_face_value(e, r.face, "atk")
+				v += bc.enemy_face_value(e, r.face, "atk")
 		if v > best_v:
 			best_v = v
 			best = j
@@ -2059,7 +2059,7 @@ static func _biggest_die(bc: BattleCore, refs: Array, exclude = null) -> Diction
 			if dj >= e.rolls.size():
 				continue
 			var f: Dictionary = e.rolls[dj].face
-			v = bc._enemy_face_value(e, f, "atk") if f.has("atk") else 1
+			v = bc.enemy_face_value(e, f, "atk") if f.has("atk") else 1
 		if v > best_v:
 			best_v = v
 			best = {"ref": ref, "value": v}

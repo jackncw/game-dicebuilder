@@ -1465,7 +1465,7 @@ func _t_enemy_instant_not_targetable() -> void:
 	_enemy_rolls(bc, 0, [{"block": 3}])
 	_enemy_rolls(bc, 1, [{"atk": 4}])
 	bc.enemy_instant_pass()
-	var refs := bc._targetable_dice()
+	var refs := bc.targetable_dice()
 	_check(refs.size() == 1 and int(refs[0].enemy) == 1,
 			"a resolved block die cannot be stunned or stolen (%d targetable)" % refs.size())
 

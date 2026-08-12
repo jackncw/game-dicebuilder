@@ -76,7 +76,7 @@ func _t_b1_rage_stunnable() -> void:
 	bc.s.heroes[0].faces[0] = "sp_trickery"
 	bc.s.heroes[0].rolled = [0, -1]
 	bc.s.heroes[0].used = false
-	var targets := bc._targetable_dice()
+	var targets := bc.targetable_dice()
 	var found := false
 	for t in targets:
 		if int(t.die) < 0:

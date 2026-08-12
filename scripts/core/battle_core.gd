@@ -7,6 +7,29 @@ extends RefCounted
 
 const MANA_CAP := 10
 
+## ── 同權守衛(第十一輪)──────────────────────────────────────────────
+## The ONLY BattleCore surface the battle UI (screen_battle) and the simulator's
+## policy layer (sim_runner) may call. 呢兩個名單就係「玩家做得到嘅事」嘅正式
+## 定義:政策層唔准調用名單以外嘅引擎方法,亦唔准直接寫 `bc.s` —— 第十輪發現
+## 模擬器用緊真人冇得用嘅 `toggle_lock`(釘骰),BALANCE.md 嘅數字因此高估咗
+## 成隊人。`tests/api_parity_test.gd` 逐行掃兩邊 source,名單以外嘅調用即紅。
+## 讀 state(`bc.s.…` 唔帶賦值)係允許嘅 —— UI 都係咁樣顯示嘢。
+## 想俾政策層一個新能力?先問「玩家喺 UI 度做唔做到同一件事」,做到先好加。
+const PLAYER_ACTIONS := [
+	"setup", "use_face", "reroll", "buy_reroll", "use_potion", "undo",
+	"end_turn", "end_turn_begin", "enemy_step", "end_turn_finish",
+]
+const PLAYER_QUERIES := [
+	"can_use", "can_reroll", "can_buy_reroll", "can_undo", "rerolls_unlimited",
+	"hero_can_act", "twin_available", "legal_targets",
+	"hero_face", "die_face", "live_face", "live_die_face",
+	"preview_attack", "spell_cost", "charge_stacks",
+	"resonate_met", "resonate_would_match", "passive_of",
+	"peek_enemy_action", "forecast_enemy", "forecast_target", "boss_forecast",
+	"enemy_face_value", "alive_enemies", "alive_heroes", "targetable_dice",
+	"drain_events",
+]
+
 ## ── U1: natural regeneration ────────────────────────────────────────
 ## The party draws this much Essence at the start of every turn, unconditionally
 ## and for everybody.
@@ -446,7 +469,7 @@ func enemy_instant_pass() -> void:
 			r.done = true
 			r["instant"] = true
 			if f.has("block"):
-				e.block += _enemy_face_value(e, f, "block")
+				e.block += enemy_face_value(e, f, "block")
 			if f.has("charge"):
 				e.charge += int(f.charge)
 			if f.has("counter"):
@@ -910,14 +933,14 @@ func legal_targets(i: int, d: int) -> Dictionary:
 	var fd: Dictionary = c.face
 	match String(fd.get("target", "none")):
 		"enemy":
-			return {"type": "enemy", "indices": _alive_enemies()}
+			return {"type": "enemy", "indices": alive_enemies()}
 		"ally":
 			var idx := []
 			for j in s.heroes.size():
 				idx.append(j)   # heal can target downed heroes (revive)
 			return {"type": "ally", "indices": idx}
 		"enemy_die":
-			return {"type": "enemy_die", "indices": _targetable_dice()}
+			return {"type": "enemy_die", "indices": targetable_dice()}
 		"wild":
 			# copy any other die on the table this turn (own other die included)
 			var srcs := []
@@ -937,7 +960,7 @@ func legal_targets(i: int, d: int) -> Dictionary:
 			return {"type": "none", "indices": []}
 
 
-func _alive_enemies() -> Array:
+func alive_enemies() -> Array:
 	var out := []
 	for j in s.enemies.size():
 		if not s.enemies[j].dead:
@@ -945,7 +968,7 @@ func _alive_enemies() -> Array:
 	return out
 
 
-func _alive_heroes() -> Array:
+func alive_heroes() -> Array:
 	var out := []
 	for j in s.heroes.size():
 		if not s.heroes[j].down:
@@ -955,7 +978,7 @@ func _alive_heroes() -> Array:
 
 ## Enemy dice (and boss announcements) that can be stunned/stolen.
 ## Returns array of {enemy:int, die:int} ; die == -1 refers to announcement.
-func _targetable_dice() -> Array:
+func targetable_dice() -> Array:
 	var out := []
 	for j in s.enemies.size():
 		var e: Dictionary = s.enemies[j]
@@ -1083,7 +1106,7 @@ func _resolve_player_face(i: int, fd: Dictionary, params: Dictionary) -> Diction
 			# spent — the Block stays up for the enemy phase.
 			base = mini(int(h.block), int(fd.atk_from_block))
 		if fd.get("aoe", false):
-			_attack_enemies(i, fd, _alive_enemies(), base)
+			_attack_enemies(i, fd, alive_enemies(), base)
 		else:
 			var t := int(params.get("target", -1))
 			if t < 0 or t >= s.enemies.size() or s.enemies[t].dead:
@@ -1094,7 +1117,7 @@ func _resolve_player_face(i: int, fd: Dictionary, params: Dictionary) -> Diction
 			_attack_enemies(i, fd, targets, base)
 	elif fd.has("poison") and fd.get("aoe", false):
 		# pure poison sweeps (Spore Cloud / Plague Burst)
-		for j in _alive_enemies():
+		for j in alive_enemies():
 			_apply_poison(s.enemies[j], int(fd.poison))
 	elif fd.has("poison") and tgt_type == "enemy":
 		var t := int(params.get("target", -1))
@@ -1104,12 +1127,12 @@ func _resolve_player_face(i: int, fd: Dictionary, params: Dictionary) -> Diction
 	elif fd.has("burn") and fd.get("aoe", false):
 		# burn sweeps with no attack component (Smolder)
 		var b := int(fd.burn) + _relic("burn_plus")
-		for j in _alive_enemies():
+		for j in alive_enemies():
 			s.enemies[j].burn_new.append(b)
 	# ---- non-attack enemy debuffs (weaken / expose without atk)
 	if (fd.has("weaken") or fd.get("expose", false)) and not _is_attack_face(fd) and not fd.has("stun"):
 		if fd.get("aoe", false):
-			for j in _alive_enemies():
+			for j in alive_enemies():
 				_debuff_enemy(j, fd)
 		elif tgt_type == "enemy":
 			var t := int(params.get("target", -1))
@@ -1142,12 +1165,12 @@ func _resolve_player_face(i: int, fd: Dictionary, params: Dictionary) -> Diction
 	if fd.has("team_block"):
 		var v := int(fd.team_block) + _relic("block_plus")
 		v = maxi(v - h.weaken, 0) + s.echo_bonus
-		for j in _alive_heroes():
+		for j in alive_heroes():
 			s.heroes[j].block += v
 	if fd.has("thorns"):
 		h.thorns += int(fd.thorns)
 	if fd.has("team_thorns"):
-		for j in _alive_heroes():
+		for j in alive_heroes():
 			s.heroes[j].thorns += int(fd.team_thorns)
 	if fd.get("taunt", false):
 		h.taunt = true
@@ -1180,7 +1203,7 @@ func _resolve_player_face(i: int, fd: Dictionary, params: Dictionary) -> Diction
 		_heal_hero(i, int(fd.self_heal))
 	if fd.has("team_heal"):
 		var amt := _heal_value(i, fd, "team_heal")
-		for j in _alive_heroes():
+		for j in alive_heroes():
 			_heal_hero(j, amt)
 	if fd.has("regen") and tgt_type == "ally":
 		var t := int(params.get("target", i))
@@ -1188,13 +1211,13 @@ func _resolve_player_face(i: int, fd: Dictionary, params: Dictionary) -> Diction
 			return {"ok": false, "err": "need_target"}
 		s.heroes[t].regen += int(fd.regen)
 	if fd.has("team_regen"):
-		for j in _alive_heroes():
+		for j in alive_heroes():
 			s.heroes[j].regen += int(fd.team_regen)
 	return {"ok": true}
 
 
 func _cleave_targets(t: int) -> Array:
-	var alive := _alive_enemies()
+	var alive := alive_enemies()
 	var pos := alive.find(t)
 	var out := [t]
 	if pos > 0:
@@ -1221,7 +1244,7 @@ func _apply_enemy_weaken(e: Dictionary) -> void:
 		f["weakened"] = e.weaken
 
 
-func _enemy_face_value(e: Dictionary, f: Dictionary, key: String) -> int:
+func enemy_face_value(e: Dictionary, f: Dictionary, key: String) -> int:
 	var v := int(f.get(key, 0))
 	if key in ["atk", "block", "heal"]:
 		v = maxi(v - int(e.weaken), 0)
@@ -1382,18 +1405,18 @@ func _do_die_theft(i: int, params: Dictionary) -> Dictionary:
 		var t := int(params.get("theft_target", ej))
 		if t >= s.enemies.size() or s.enemies[t].dead:
 			t = ej
-		var pseudo := {"atk": _enemy_face_value(e_src, f, "atk"), "target": "enemy"}
+		var pseudo := {"atk": enemy_face_value(e_src, f, "atk"), "target": "enemy"}
 		if f.get("pierce", false):
 			pseudo["pierce"] = true
 		if f.get("aoe", false):
 			pseudo["aoe"] = true
-			_attack_enemies(i, pseudo, _alive_enemies())
+			_attack_enemies(i, pseudo, alive_enemies())
 		else:
 			_attack_enemies(i, pseudo, [t])
 	if f.has("block"):
-		s.heroes[i].block += _enemy_face_value(e_src, f, "block")
+		s.heroes[i].block += enemy_face_value(e_src, f, "block")
 	if f.has("heal"):
-		_heal_hero(i, _enemy_face_value(e_src, f, "heal"))
+		_heal_hero(i, enemy_face_value(e_src, f, "heal"))
 	return {"ok": true}
 
 
@@ -1480,15 +1503,15 @@ func use_potion(slot: int, params := {}) -> Dictionary:
 				return {"ok": false, "err": "need_target"}
 			_heal_hero(t, int(pd.value))
 		"team_heal":
-			for j in _alive_heroes():
+			for j in alive_heroes():
 				_heal_hero(j, int(pd.value))
 		"rerolls":
 			s.rerolls += int(pd.value)
 		"poison_all":
-			for j in _alive_enemies():
+			for j in alive_enemies():
 				_apply_poison(s.enemies[j], int(pd.value))
 		"team_block":
-			for j in _alive_heroes():
+			for j in alive_heroes():
 				s.heroes[j].block += int(pd.value)
 		"team_atk_buff":
 			s.team_atk_buff += int(pd.value)
@@ -1648,18 +1671,18 @@ func _execute_enemy_face(j: int, f: Dictionary) -> void:
 	if f.has("atk"):
 		_enemy_attack_heroes(j, f, true)
 	if f.has("block"):
-		e.block += _enemy_face_value(e, f, "block")
+		e.block += enemy_face_value(e, f, "block")
 	if f.has("heal"):
-		var v := _enemy_face_value(e, f, "heal")
+		var v := enemy_face_value(e, f, "heal")
 		e.hp = mini(e.hp + v, e.max_hp)
 	if f.has("weaken") and not f.has("atk"):
 		var t := _enemy_pick_target()
 		if t >= 0:
-			s.heroes[t].weaken_next += _enemy_face_value(e, f, "weaken")
+			s.heroes[t].weaken_next += enemy_face_value(e, f, "weaken")
 			_ev({"t": "hero_weakened", "hero": t})
 	if f.has("poison") and not f.has("atk"):
 		if f.get("aoe", false):
-			for t in _alive_heroes():
+			for t in alive_heroes():
 				s.heroes[t].poison += int(f.poison)
 		else:
 			var t := _enemy_pick_target()
@@ -1712,7 +1735,7 @@ func _execute_enemy_face(j: int, f: Dictionary) -> void:
 
 
 func _enemy_pick_target() -> int:
-	var alive := _alive_heroes()
+	var alive := alive_heroes()
 	if alive.is_empty():
 		return -1
 	for j in alive:
@@ -1723,7 +1746,7 @@ func _enemy_pick_target() -> int:
 
 func _enemy_attack_heroes(j: int, f: Dictionary, allow_riders: bool) -> void:
 	var e: Dictionary = s.enemies[j]
-	var base := _enemy_face_value(e, f, "atk")
+	var base := enemy_face_value(e, f, "atk")
 	# wolf pack bite bonus
 	if f.get("pack_bonus", 0) and _wolf_attacked_before(j):
 		base += int(f.pack_bonus)
@@ -1741,7 +1764,7 @@ func _enemy_attack_heroes(j: int, f: Dictionary, allow_riders: bool) -> void:
 		e.combo_count += 1
 	var targets: Array
 	if f.get("aoe", false):
-		targets = _alive_heroes()
+		targets = alive_heroes()
 	else:
 		var t := _enemy_pick_target()
 		if t < 0:
@@ -1766,7 +1789,7 @@ func _enemy_attack_heroes(j: int, f: Dictionary, allow_riders: bool) -> void:
 			if f.has("burn"):
 				h.burn_new.append(int(f.burn))
 			if f.has("weaken"):
-				h.weaken_next += _enemy_face_value(e, f, "weaken")
+				h.weaken_next += enemy_face_value(e, f, "weaken")
 		# hero thorns retaliate (ignores enemy block)
 		if h.thorns > 0 and not e.dead:
 			e.hp -= h.thorns
@@ -1795,7 +1818,7 @@ func forecast_enemy(j: int) -> Array:
 		var row := {"die": d, "face": f, "done": bool(r.done),
 			"cancelled": bool(r.cancelled), "instant": bool(r.get("instant", false))}
 		if f.has("atk"):
-			var v := _enemy_face_value(e, f, "atk")
+			var v := enemy_face_value(e, f, "atk")
 			if f.get("pack_bonus", 0) and _wolf_attacked_before(j):
 				v += int(f.pack_bonus)
 			v += int(e.howl)
@@ -1810,7 +1833,7 @@ func forecast_enemy(j: int) -> Array:
 				combo += 1
 		for k in ["block", "heal"]:
 			if f.has(k):
-				row[k] = _enemy_face_value(e, f, k)
+				row[k] = enemy_face_value(e, f, k)
 		row["target"] = forecast_target(f)
 		out.append(row)
 	return out
@@ -1826,7 +1849,7 @@ func forecast_target(f: Dictionary) -> Dictionary:
 		return {"kind": "self", "hero": -1}
 	if f.get("aoe", false):
 		return {"kind": "aoe", "hero": -1}
-	for t in _alive_heroes():
+	for t in alive_heroes():
 		if s.heroes[t].taunt:
 			return {"kind": "taunt", "hero": t}
 	return {"kind": "random", "hero": -1}

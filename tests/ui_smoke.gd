@@ -164,7 +164,7 @@ func _t_tap_playthrough() -> void:
 				elif not spec.heroes.is_empty():
 					battle._on_hero_tapped(int(spec.heroes[0]))
 				elif bool(spec.enemy_dice):
-					var dice: Array = battle.bc._targetable_dice()
+					var dice: Array = battle.bc.targetable_dice()
 					if dice.is_empty():
 						battle._deselect()
 						battle._refresh()

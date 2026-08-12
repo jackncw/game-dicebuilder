@@ -179,10 +179,10 @@ func _t_all_faces_usable() -> void:
 			"ally":
 				params = {"target": 0}
 			"enemy_die":
-				var dice := bc._targetable_dice()
+				var dice := bc.targetable_dice()
 				# re-enable one die
 				bc.s.enemies[0].rolls[0].cancelled = false
-				dice = bc._targetable_dice()
+				dice = bc.targetable_dice()
 				if dice.is_empty():
 					_check(false, "no targetable die for %s" % fid)
 					continue

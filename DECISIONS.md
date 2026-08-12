@@ -1377,3 +1377,10 @@ n=300 覆核先算數。** `print_matrix` 已經對「驗收 band 邊緣」自�
 - **雙舞 Twin Dance(audit 發現,簡化)**:「使用後本回合可以再使用另一顆骰」,唔再要求另一顆骰釘住。同雙月徽記疊加嘅裁定改寫(舞完兩顆、徽記仲可以俾第二個英雄用兩顆)。
 - **其他清走嘅殘留**:glossary「鎖定」條目刪除;「每回合一次」「靈息重擲」措辭去鎖;賭徒之骨 vs 蓄力裁定改寫(層數跟面,重擲唔洗走);教學文案「另一顆即時鎖住」改「本回合就不能再用」;孤兒 string `ui_die_locked` 刪除;padlock glyph 留返俾 locked-out badge。
 - **Sim 誠實化**:`_manage_locks`(釘骰政策)退役;重擲政策唔再用「臨時釘住好面」呢招真人做唔到嘅嘢,改為「枱面有好骰未用就先行動、行完先擲」—— 同真人保面嘅方法一致。蓄力遙測改讀 per-slot 層數,「中途棄置」指標冇咗(新機制冇呢回事)。
+
+## 同權守衛:政策層同 UI 釘死喺同一個行動面(2026-08-12,第十輪補遺)
+- **點解要有**:第十輪發現 `toggle_lock` 喺引擎住咗四輪、UI 從未接線、唯一調用者係模擬器 —— BALANCE.md 一直度量緊一隊識做真人做唔到嘅動作嘅隊伍。呢類分歧唔可以靠下次好彩發現。
+- **做法**:`BattleCore.PLAYER_ACTIONS`(10 個改狀態行動)+ `PLAYER_QUERIES`(27 個只讀查詢)係正式嘅「玩家做得到嘅事」定義;`tests/api_parity_test.gd` 逐行掃 `sim_runner.gd` 同 `screen_battle.gd`,名單以外嘅 `bc.<method>(` 調用即紅,直接寫 `bc.s`(`=`/`+=`…)即紅;讀 state 允許(UI 顯示都係咁讀)。名單自己都受驗:唔准收留 underscore 私有名、逐個名要真係 BattleCore 嘅 func、行動/查詢唔准重疊。
+- **為咗令名單誠實,四個跨界私有查詢升做公開名**:`_enemy_face_value`→`enemy_face_value`、`_alive_enemies`→`alive_enemies`、`_alive_heroes`→`alive_heroes`、`_targetable_dice`→`targetable_dice`(純 rename,行為零改動)。
+- **負向驗證做咗兩層**:(1) 套件內置 fixture —— 掃描器對住摻咗 `bc.toggle_lock(0,0)` 同 `bc.s.mana += 5` 嘅樣本必須每句捉到、對乾淨樣本(白名單調用+state 讀+註釋)必須零誤報,守衛壞咗自己都會紅;(2) 真身演練 —— 臨時將呢兩句插入 `sim_runner.play_battle`,套件即紅並點名行號(line 768/769),移除後還原全綠。
+- **邊界**:tests/ 目錄刻意唔受管 —— 測試本來就要搣引擎內臟(craft rolls、直寫 state)先驗到規則。
