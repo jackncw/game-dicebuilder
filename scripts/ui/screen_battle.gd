@@ -189,6 +189,8 @@ func _ready() -> void:
 	_animate_roll()
 	if args.get("tutorial", false):
 		_show_tutorial(0)
+	if String(args.get("kind", "")) == "boss" and not instant_anim 			and DisplayServer.get_name() != "headless":
+		_boss_intro()
 
 
 ## Codex: everything the party meets is recorded the moment it appears, so a
@@ -557,8 +559,94 @@ func _refresh() -> void:
 	# the container sort was queued during this rebuild; a deferred call runs
 	# after it, so this is the one moment the new rects can be trusted
 	_capture_anchors.call_deferred()
+	_update_threat_pulse()
 	if bc.s.over and overlay == null:
 		_show_result()
+
+
+## While a boss's announced attack (怒濤連擊 / 滅世咒) is armed and this is the
+## turn it will land, the whole screen breathes red at the edges. Cancelling
+## it (stun) kills the pulse on the next refresh — relief you can see.
+var _threat_pulse: Panel = null
+
+
+func _update_threat_pulse() -> void:
+	var armed := false
+	if not bc.s.over:
+		for a in bc.s.announce:
+			if not bool(a.get("cancelled", false)) and not bool(a.get("done", false)):
+				armed = true
+				break
+	if armed and _threat_pulse == null and not Fx.reduced() 			and DisplayServer.get_name() != "headless":
+		var p := Panel.new()
+		var sb := StyleBoxFlat.new()
+		sb.draw_center = false
+		sb.border_color = Color(0.92, 0.15, 0.1)
+		sb.set_border_width_all(24)
+		sb.set_corner_radius_all(0)
+		p.add_theme_stylebox_override("panel", sb)
+		p.set_anchors_preset(Control.PRESET_FULL_RECT)
+		p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		p.modulate.a = 0.0
+		add_child(p)
+		var tw := p.create_tween().set_loops()
+		tw.tween_property(p, "modulate:a", 0.5, 0.6)
+		tw.tween_property(p, "modulate:a", 0.12, 0.6)
+		_threat_pulse = p
+		Sfx.play("boss_swell", 0.4)
+	elif not armed and _threat_pulse != null:
+		if is_instance_valid(_threat_pulse):
+			_threat_pulse.queue_free()
+		_threat_pulse = null
+
+
+## The boss deserves a door-kick: half a beat of black, the name in both
+## languages sliding in on a banner, corruption fog boiling along the top,
+## and the music turning over to the boss track — THEN the fight.
+func _boss_intro() -> void:
+	var boss := {}
+	for e in bc.s.enemies:
+		if String(e.kind) == "boss":
+			boss = e
+			break
+	if boss.is_empty():
+		return
+	var cover := ColorRect.new()
+	cover.color = Color(0.02, 0.0, 0.03, 1.0)
+	cover.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cover.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(cover)
+	Sfx.play("boss_swell")
+	await get_tree().create_timer(Fx.dur(0.45)).timeout
+	if not is_instance_valid(self) or not is_instance_valid(cover):
+		return
+	Music.play("boss", 1.0)
+	Sfx.play("boss")
+	Fx.vibrate(40)
+	var vp := get_viewport().get_visible_rect().size
+	var banner := VBoxContainer.new()
+	banner.add_theme_constant_override("separation", 4)
+	var zh := UIKit.title(String(boss.zh), 64, Color(0.98, 0.62, 0.95))
+	var en := UIKit.title(String(boss.en), UIKit.F_H2, UIKit.CREAM_DARK)
+	for l in [zh, en]:
+		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	banner.add_child(zh)
+	banner.add_child(en)
+	cover.add_child(banner)
+	banner.position = Vector2(vp.x, vp.y * 0.38)
+	banner.size.x = vp.x
+	# fog boiling out of the dark while the name crosses
+	for k in 5:
+		Fx.burst(cover, Vector2(vp.x * (0.1 + 0.2 * k), vp.y * 0.25),
+				Color(0.72, 0.2, 0.75, 0.5), 12, 130.0, 1.1, -120.0)
+	var tw := create_tween()
+	tw.tween_property(banner, "position:x", 0.0, Fx.dur(0.35)) 			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUINT)
+	tw.tween_interval(Fx.dur(0.9))
+	tw.tween_property(banner, "position:x", -vp.x, Fx.dur(0.3)) 			.set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUINT)
+	tw.parallel().tween_property(cover, "color:a", 0.0, Fx.dur(0.45))
+	await tw.finished
+	if is_instance_valid(cover):
+		cover.queue_free()
 
 
 func _clear_selection_if_stale() -> void:
@@ -985,6 +1073,7 @@ func _cast_font_for(txt: String) -> int:
 
 
 func _refresh_enemies() -> void:
+	_ghost_dead_cards()
 	for c in enemy_row.get_children():
 		c.queue_free()
 	enemy_cards = []
@@ -1001,6 +1090,39 @@ func _refresh_enemies() -> void:
 		enemy_widgets[j]["card"] = card
 		if _targeting() and not is_target:
 			card.modulate = Color(0.55, 0.55, 0.6, 0.85)
+
+
+## A dead enemy must not simply vanish in the rebuild. Its card is lifted out
+## of the enemy row BEFORE the row is cleared — same pixels, same place, now
+## parented to the float layer — and the corruption takes it from there:
+## rim flash, body fade, magenta motes streaming up (Fx.dissolve). The battle
+## state has already moved on; this is purely the body being seen out.
+func _ghost_dead_cards() -> void:
+	for j in enemy_widgets:
+		var w = enemy_widgets[j]
+		if w == null or not (w is Dictionary) or not w.has("card"):
+			continue
+		var card: Control = w.card
+		if not is_instance_valid(card) or not _laid_out(card):
+			continue
+		var e: Dictionary = bc.s.enemies[int(j)]
+		if not bool(e.dead):
+			continue
+		var gp := card.global_position
+		var gsize := card.size
+		enemy_row.remove_child(card)
+		float_layer.add_child(card)
+		card.global_position = gp
+		card.size = gsize
+		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		for c in card.find_children("*", "Control", true, false):
+			(c as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+		Sfx.play("death", 0.8, randf_range(0.92, 1.08))
+		Fx.vibrate(12)
+		var tw := Fx.dissolve(card)
+		tw.finished.connect(func() -> void:
+			if is_instance_valid(card):
+				card.queue_free())
 
 
 ## True while something is looking for a target (drag or tap selection).
@@ -2077,7 +2199,13 @@ func _do_use(i: int, d: int, params: Dictionary) -> void:
 	var base_id := String(_effective_face(i, d).get("id", ""))
 	var res := bc.use_face(i, d, params)
 	if res.ok:
-		Sfx.play("hit" if was_atk else "button")
+		# attacks are voiced per-hit in _spawn_floats, where the damage tier is
+		# known; a ≥3-cost Ritual is the party's big moment and washes the screen
+		if pre.ok and pre.face.has("spell") and bc.spell_cost(pre.face) >= 3:
+			Sfx.play("cast")
+			Fx.flash_screen(Color(0.45, 0.95, 0.85), 0.13, 0.5)
+		elif not was_atk:
+			Sfx.play("button")
 		Game.mark_face_used(base_id)
 	else:
 		Sfx.play("block", 0.5)
@@ -2091,7 +2219,6 @@ func _do_use(i: int, d: int, params: Dictionary) -> void:
 
 func _on_reroll() -> void:
 	if bc.reroll():
-		Sfx.play("roll")
 		_deselect()
 		_refresh()
 		_spawn_floats()
@@ -2179,7 +2306,6 @@ func _run_enemy_turn() -> void:
 	_set_controls_enabled(true)
 	_refresh()
 	if not bc.s.over:
-		Sfx.play("roll")
 		_animate_roll()
 
 
@@ -2289,6 +2415,7 @@ func _fly_chip(chip: Control, to: Vector2) -> void:
 ## the table reads as a handful of dice leaving a cup rather than eight
 ## synchronised flickers, and each lands with its own knock.
 func _animate_roll() -> void:
+	Sfx.play("roll")
 	var fast: bool = bool(Game.settings.get("fast_anim", false))
 	var dur := 0.30 if fast else 0.68
 	var spread := 0.06 if fast else 0.15
@@ -2297,20 +2424,28 @@ func _animate_roll() -> void:
 		var dv: Die3D = die_widgets[key]
 		if not is_instance_valid(dv) or not dv.interactive:
 			continue
-		if not dv.landed.is_connected(_on_die_landed):
-			dv.landed.connect(_on_die_landed)
+		if not dv.has_meta("land_wired"):
+			dv.set_meta("land_wired", true)
+			dv.landed.connect(_on_die_landed.bind(dv))
 		dv.throw(dv.shown, randf() * spread, dur)
 
 
 var _land_count := 0
 
 
-## One knock per die as it hits, quieter down the line, and a nudge of shake
-## for the first few only — eight dice each shaking the screen adds up to an
-## earthquake, which is exactly what a die landing should not feel like.
-func _on_die_landed() -> void:
+## One knock per die as it hits — quieter down the line and each at its own
+## pitch, so eight landings read as a handful of dice, not a machine gun —
+## plus a puff of floor dust under the die, and a nudge of shake for the
+## first few only (eight dice each shaking the screen adds up to an
+## earthquake, which is exactly what a die landing should not feel like).
+func _on_die_landed(dv: Die3D = null) -> void:
 	_land_count += 1
-	Sfx.play("die", clampf(0.75 - _land_count * 0.06, 0.28, 0.75))
+	Sfx.play("die", clampf(0.75 - _land_count * 0.06, 0.28, 0.75),
+			randf_range(0.88, 1.15))
+	if is_instance_valid(dv) and is_instance_valid(float_layer) and _laid_out(dv):
+		var r := dv.get_global_rect()
+		Fx.dust(float_layer, _to_float_space(Vector2(r.get_center().x,
+				r.position.y + r.size.y * 0.8)))
 	if _land_count <= 3:
 		_shake(2.5)
 
@@ -2336,10 +2471,26 @@ func _spawn_floats() -> void:
 			break
 		match String(e.t):
 			"hit":
-				_float_at_enemy(int(e.enemy), "-%d" % int(e.hp_loss), UIKit.RED)
+				# three felt tiers: a 7+ crunch stops time for a blink, a middling
+				# hit thumps, a chip taps. The float's size carries the same tier.
+				var loss := int(e.hp_loss)
+				_float_at_enemy(int(e.enemy), "-%d" % loss, UIKit.RED, _dmg_font(loss))
 				if int(e.src) < hero_arts.size() and is_instance_valid(hero_arts[int(e.src)]):
 					hero_arts[int(e.src)].play_attack()
-				_shake(4.0)
+				if loss >= 7:
+					Sfx.play("hit_heavy")
+					Fx.hit_stop(50)
+					Fx.burst(float_layer, _anchor_enemy.get(int(e.enemy),
+							_fallback_enemy(int(e.enemy))), Color(1.0, 0.62, 0.3), 16, 330.0)
+					Fx.vibrate(28)
+					_shake(11.0)
+				elif loss >= 4:
+					Sfx.play("hit")
+					Fx.vibrate(14)
+					_shake(5.0)
+				else:
+					Sfx.play("hit", 0.55, 1.12)
+					_shake(3.0)
 				shown += 1
 			"enemy_hit":
 				# what the shield ate and what got through are two different
@@ -2347,11 +2498,15 @@ func _spawn_floats() -> void:
 				# their block worked or the attack missed
 				var got_through := int(e.dmg) - int(e.blocked)
 				if int(e.blocked) > 0:
+					Sfx.play("block", 0.7)
 					_float_at_hero(int(e.hero), UIKit.glyph_n("block", int(e.blocked)),
 							UIKit.BLUE.lightened(0.25))
 					_flash_hero(int(e.hero), UIKit.BLUE.lightened(0.4))
 				if got_through > 0:
-					_float_at_hero(int(e.hero), "-%d" % got_through, UIKit.RED)
+					Sfx.play("hit", 0.85, 0.9)
+					Fx.vibrate(18)
+					_float_at_hero(int(e.hero), "-%d" % got_through, UIKit.RED,
+							_dmg_font(got_through))
 					_flash_hero(int(e.hero), UIKit.RED)
 					_recoil_hero(int(e.hero))
 				_shake(6.0 if got_through > 0 else 2.5)
@@ -2373,16 +2528,29 @@ func _spawn_floats() -> void:
 						UIKit.ORANGE)
 				shown += 1
 			"heal":
+				Sfx.play("heal", 0.7)
 				_float_at_hero(int(e.hero), "+%d" % int(e.amount), UIKit.GREEN)
 				shown += 1
 			"hero_hp_loss":
 				_float_at_hero(int(e.hero), "-%d" % int(e.amount), UIKit.ORANGE)
 				shown += 1
+			"hero_down":
+				Sfx.play("death", 0.7)
+				Fx.vibrate(35)
+				_shake(9.0)
+				shown += 1
 			"poison_tick":
 				if e.has("enemy"):
+					Sfx.play("poison", 0.55)
 					_float_at_enemy(int(e.enemy), UIKit.glyph_n("poison", int(e.dmg)), UIKit.PURPLE)
 					shown += 1
+			"burn_tick":
+				if e.has("enemy"):
+					Sfx.play("burn", 0.55)
+					_float_at_enemy(int(e.enemy), UIKit.glyph_n("burn", int(e.dmg)), UIKit.ORANGE)
+					shown += 1
 			"boss_phase", "boss_unarmored":
+				Sfx.play("boss_swell", 0.5)
 				_shake(10.0)
 				shown += 1
 
@@ -2473,12 +2641,25 @@ func _fallback_hero(i: int) -> Vector2:
 			ZONE_HERO_TOP + HERO_FLOAT_DROP)
 
 
-func _float_at_enemy(j: int, text: String, color: Color) -> void:
-	_float_text(_anchor_enemy.get(j, _fallback_enemy(j)) + _stack_offset("e%d" % j), text, color)
+func _float_at_enemy(j: int, text: String, color: Color, font := 34) -> void:
+	_float_text(_anchor_enemy.get(j, _fallback_enemy(j)) + _stack_offset("e%d" % j),
+			text, color, font)
 
 
-func _float_at_hero(i: int, text: String, color: Color) -> void:
-	_float_text(_anchor_hero.get(i, _fallback_hero(i)) + _stack_offset("h%d" % i), text, color)
+func _float_at_hero(i: int, text: String, color: Color, font := 34) -> void:
+	_float_text(_anchor_hero.get(i, _fallback_hero(i)) + _stack_offset("h%d" % i),
+			text, color, font)
+
+
+## Damage numbers come in three sizes and the size is the tier: a scratch, a
+## solid hit, a crunch. Thresholds match the sound/hit-stop tiers exactly so
+## the eye and the ear never disagree about how big a hit was.
+func _dmg_font(dmg: int) -> int:
+	if dmg >= 7:
+		return 50
+	if dmg >= 4:
+		return 40
+	return 30
 
 
 var _float_stack := {}    # target key → how many numbers already went up there
@@ -2495,7 +2676,7 @@ func _stack_offset(key: String) -> Vector2:
 
 
 ## Pooled floating damage/heal numbers (object pooling per spec).
-func _float_text(pos: Vector2, text: String, color: Color) -> void:
+func _float_text(pos: Vector2, text: String, color: Color, font := 34) -> void:
 	var l: Label = null
 	if not _float_pool.is_empty():
 		l = _float_pool.pop_back()
@@ -2508,6 +2689,7 @@ func _float_text(pos: Vector2, text: String, color: Color) -> void:
 		l.size = Vector2(120, 44)
 		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		float_layer.add_child(l)
+	l.add_theme_font_size_override("font_size", font)
 	l.text = text
 	l.add_theme_color_override("font_color", color)
 	l.visible = true
