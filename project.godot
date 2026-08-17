@@ -27,6 +27,7 @@ Data="*res://scripts/autoloads/data_hub.gd"
 Game="*res://scripts/autoloads/game_state.gd"
 Sfx="*res://scripts/autoloads/sfx.gd"
 Music="*res://scripts/autoloads/music.gd"
+Fx="*res://scripts/autoloads/fx.gd"
 Safe="*res://scripts/autoloads/safe_area.gd"
 
 [display]
