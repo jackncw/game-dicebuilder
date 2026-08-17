@@ -165,6 +165,7 @@ func _boot_direct(screen: String) -> void:
 
 
 func _on_goto(screen: String, args: Dictionary) -> void:
+	_set_music(screen, args)
 	if is_instance_valid(current):
 		current.queue_free()
 	var path := "res://scripts/ui/screen_%s.gd" % screen
@@ -177,3 +178,19 @@ func _on_goto(screen: String, args: Dictionary) -> void:
 	if current.has_method("setup"):
 		current.setup(args)
 	add_child(current)
+
+
+## The standing music policy, applied at every screen change. The one carve-out
+## is a boss battle: the screen's own entrance sequence owns that switch, so the
+## chapter track keeps playing under the black-out until the banner lands.
+func _set_music(screen: String, args: Dictionary) -> void:
+	if screen == "battle" and String(args.get("kind", "")) == "boss":
+		return
+	var chapter := 1
+	if not Game.run.is_empty():
+		chapter = int(Game.run.get("chapter", 1))
+	elif screen == "battle":
+		chapter = int((args.get("opts", {}) as Dictionary).get("chapter", 1))
+	var track := Music.track_for(screen, chapter)
+	if track != "":
+		Music.play(track)
