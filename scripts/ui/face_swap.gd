@@ -404,7 +404,7 @@ class _Screen:
 			var flash := create_tween()
 			flash.tween_property(d3, "modulate", Color(2.2, 2.2, 2.2), 0.08)
 			flash.tween_property(d3, "modulate", Color.WHITE, 0.28)
-		Sfx.play("win")
+		Sfx.play("levelup")
 		_prompt.text = "%s — %s" % [Data.t("ui_swap_done"), Data.face_name(new_fd)]
 		await get_tree().create_timer(0.5).timeout
 		if not is_instance_valid(self):

@@ -49,7 +49,7 @@ func _ready() -> void:
 		# the card is raised on pick-up here as well, so "what did I just get"
 		# has the same answer whichever way the relic arrived
 		take.pressed.connect(func() -> void:
-			Sfx.play("win")
+			Sfx.play("chest")
 			Game.add_relic(rid)
 			DetailCard.show_relic(self, rid, func() -> void: Game.node_completed()))
 		vb.add_child(UIKit.button_row([take]))
@@ -69,6 +69,43 @@ func _ready() -> void:
 		vb.add_child(UIKit.button_row([skip]))
 
 	add_child(RunWidgets.party_strip(1004.0, 156.0))
+
+	if DisplayServer.get_name() != "headless" and not Fx.reduced():
+		_reveal(vb)
+
+
+## Opening the chest is a moment, not a page load: the latch clacks, a column
+## of light stands up out of the dark, and the loot flips over into view.
+func _reveal(content: Control) -> void:
+	var scrim := ColorRect.new()
+	scrim.color = Color(0, 0, 0, 0.85)
+	scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scrim.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(scrim)
+	var vp := get_viewport().get_visible_rect().size
+	var beam := ColorRect.new()
+	beam.color = Color(1.0, 0.95, 0.7, 0.0)
+	beam.size = Vector2(210, vp.y)
+	beam.position = Vector2(vp.x * 0.5 - 105, 0)
+	beam.pivot_offset = Vector2(105, vp.y * 0.5)
+	beam.scale.x = 0.1
+	beam.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	scrim.add_child(beam)
+	content.modulate.a = 0.0
+	content.scale.x = 0.0
+	content.pivot_offset.x = 330.0
+	Sfx.play("chest")
+	var tw := create_tween()
+	tw.tween_property(beam, "color:a", 0.5, Fx.dur(0.22))
+	tw.parallel().tween_property(beam, "scale:x", 1.0, Fx.dur(0.3)) 			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	tw.tween_callback(func() -> void:
+		Fx.burst(scrim, Vector2(vp.x * 0.5, vp.y * 0.42), Color(1.0, 0.9, 0.55), 18, 300.0))
+	# the loot flips over into view while the beam fades
+	tw.tween_property(content, "modulate:a", 1.0, 0.05)
+	tw.parallel().tween_property(content, "scale:x", 1.0, Fx.dur(0.24)) 			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	tw.parallel().tween_property(beam, "color:a", 0.0, Fx.dur(0.4))
+	tw.parallel().tween_property(scrim, "color:a", 0.0, Fx.dur(0.45))
+	tw.tween_callback(scrim.queue_free)
 
 
 func _pick_slot_for(fid: String) -> void:

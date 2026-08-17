@@ -10,6 +10,9 @@ func setup(p_args: Dictionary) -> void:
 
 
 func _ready() -> void:
+	# the run is over: fade the boss track out under the win stinger
+	Music.stop(2.2)
+	Sfx.play("win")
 	add_child(UIKit.background(1, 132.0, 1030.0))
 
 	# 任務2 通用規則:內容(首爆機嗰陣有兩張解鎖卡)高過可視高度就捲動,
@@ -37,6 +40,12 @@ func _ready() -> void:
 	card.add_child(cv)
 	cv.add_child(UIKit.text_block("%s: %d" % [Data.bi("戰鬥", "Battles"),
 			int(stats.get("battles", 0))], UIKit.F_BODY, UIKit.CREAM, 600.0))
+	if int(stats.get("elites", 0)) > 0:
+		cv.add_child(UIKit.text_block("%s: %d" % [Data.bi("精英", "Elites"),
+				int(stats.get("elites", 0))], UIKit.F_BODY, UIKit.CREAM, 600.0))
+	if int(stats.get("nodes", 0)) > 0:
+		cv.add_child(UIKit.text_block("%s: %d" % [Data.bi("節點", "Nodes"),
+				int(stats.get("nodes", 0))], UIKit.F_BODY, UIKit.CREAM, 600.0))
 	cv.add_child(UIKit.text_block("%s: %02d:%02d" % [Data.bi("用時", "Time"),
 			dur / 60, dur % 60], UIKit.F_BODY, UIKit.CREAM, 600.0))
 	vb.add_child(card)
@@ -59,6 +68,17 @@ func _ready() -> void:
 		Sfx.play("button")
 		Game.goto("menu"))
 	tray.get_child(0).add_child(UIKit.button_row([b]))
+
+	# the tally walks in line by line rather than slapping down as one page
+	if DisplayServer.get_name() != "headless" and not Fx.reduced():
+		var delay := 0.15
+		for c in vb.get_children():
+			var ctrl := c as Control
+			ctrl.modulate.a = 0.0
+			var tw := create_tween()
+			tw.tween_interval(delay)
+			tw.tween_property(ctrl, "modulate:a", 1.0, Fx.dur(0.3))
+			delay += 0.12
 
 
 ## One selectable hero: portrait beside the name and passive, all wrapped —

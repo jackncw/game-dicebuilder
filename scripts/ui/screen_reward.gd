@@ -109,8 +109,9 @@ func _ready() -> void:
 	var money := HBoxContainer.new()
 	money.alignment = BoxContainer.ALIGNMENT_CENTER
 	money.add_theme_constant_override("separation", UIKit.S3)
-	money.add_child(UIKit.chip("%s +%d" % [Data.t("ui_gold_reward"), int(pr.gold)],
-			UIKit.YELLOW, UIKit.F_BODY, UIKit.S3))
+	var gold_chip := UIKit.chip("%s +%d" % [Data.t("ui_gold_reward"), int(pr.gold)],
+			UIKit.YELLOW, UIKit.F_BODY, UIKit.S3)
+	money.add_child(gold_chip)
 	money.add_child(UIKit.chip("XP +%d" % int(pr.get("xp_amount", 1)),
 			UIKit.BLUE, UIKit.F_BODY, UIKit.S3))
 	rv.add_child(money)
@@ -163,6 +164,37 @@ func _ready() -> void:
 	# ② the relics, over the top of all of it — one card each, confirmed in turn
 	_present_relics()
 
+	# 結算逐項彈入 + 金幣滾數 + 升級一聲。Headless 同「減少特效」照舊即現。
+	if DisplayServer.get_name() != "headless" and not Fx.reduced():
+		_animate_entrance(recap, gold_chip.get_child(0) as Label, int(pr.gold))
+		if not ups.is_empty():
+			Sfx.play("levelup")
+			Fx.burst(self, Vector2(360.0, 200.0), UITheme.CAT_ON_DARK.heal, 16, 260.0)
+
+
+## The spoils don't slap down as one wall: the recap lands first, then each
+## offer card follows a beat behind, while the gold number rolls up from zero.
+func _animate_entrance(recap: Control, gold_label: Label, gold: int) -> void:
+	var items: Array = [recap]
+	for c in _offer_box.get_children():
+		items.append(c)
+	var delay := 0.0
+	for c in items:
+		var ctrl := c as Control
+		ctrl.modulate.a = 0.0
+		var tw := create_tween()
+		tw.tween_interval(delay)
+		tw.tween_callback(func() -> void: Sfx.play("card", 0.4))
+		tw.tween_property(ctrl, "modulate:a", 1.0, Fx.dur(0.2))
+		delay += 0.09
+	if gold > 0 and is_instance_valid(gold_label):
+		var prefix: String = Data.t("ui_gold_reward")
+		var tg := create_tween()
+		tg.tween_method(func(v: float) -> void:
+			if is_instance_valid(gold_label):
+				gold_label.text = "%s +%d" % [prefix, int(v)],
+			0.0, float(gold), Fx.dur(0.7))
+
 
 # ============================================================ relics
 
@@ -181,7 +213,7 @@ func _show_next_relic(queue: Array, i: int) -> void:
 	if i >= queue.size():
 		_present_advanced_choice()
 		return
-	Sfx.play("win")
+	Sfx.play("chest")
 	DetailCard.show_relic(self, String(queue[i]),
 			func() -> void: _show_next_relic(queue, i + 1))
 
@@ -197,6 +229,9 @@ func _present_advanced_choice() -> void:
 	var root := Control.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(root)
+	# an Advanced pair arriving is the run's jackpot moment — gold light, not grey
+	Sfx.play("chest")
+	Fx.burst(root, Vector2(360.0, 420.0), UITheme.YELLOW, 22, 320.0)
 
 	var scrim := ColorRect.new()
 	scrim.color = Color(0, 0, 0, 0.72)
@@ -310,7 +345,7 @@ func _offer_card(offer: Dictionary) -> Control:
 						fid,
 						func(slot: int) -> void:
 							RunState.apply_face_swap(Game.run, hi, slot, fid)
-							Sfx.play("win")
+							Sfx.play("levelup")
 							Game.node_completed()),
 			Vector2(650, 200), -1, String(hero.id))
 	var sb: StyleBoxFlat = card.get_theme_stylebox("normal")

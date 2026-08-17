@@ -64,7 +64,7 @@ func _build() -> void:
 				Game.run.gold = int(Game.run.gold) - price2
 				Game.add_relic(rid)
 				stock.relic_bought = true
-				Sfx.play("win")
+				Sfx.play("buy")
 				DetailCard.show_relic(self, rid, _build)
 			else:
 				Sfx.play("block", 0.5))
@@ -116,7 +116,7 @@ func _build() -> void:
 					Game.run.gold = int(Game.run.gold) - fprice
 					RunState.forge_face(Game.run.team[hi], slot)
 					stock.forge_used = true
-					Sfx.play("win")
+					Sfx.play("buy")
 					_build(),
 				func(hero: Dictionary) -> Array:
 					return RunState.forgeable_slots(hero)))
@@ -144,5 +144,5 @@ func _buy_face(idx: int) -> void:
 			Game.run.gold = int(Game.run.gold) - price
 			RunState.apply_face_swap(Game.run, hi, slot, fid)
 			stock.faces_bought[idx] = true
-			Sfx.play("win")
+			Sfx.play("buy")
 			_build(), Callable(), fid)

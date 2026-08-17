@@ -72,6 +72,13 @@ func _ready() -> void:
 		var path := "res://assets/audio/sfx/%s.ogg" % ev
 		if ResourceLoader.exists(path):
 			_streams[ev] = load(path)
+	# the two stingers are composed with the music (same palette, same key)
+	# but fired like effects, so they live on the SFX bus and stay audible
+	# while the Music bus is busy fading the track that just ended
+	for ev in ["win", "lose"]:
+		var path := "res://assets/audio/bgm/%s.ogg" % ev
+		if ResourceLoader.exists(path):
+			_streams[ev] = load(path)
 	for i in POOL_SIZE:
 		var p := AudioStreamPlayer.new()
 		p.bus = "SFX"

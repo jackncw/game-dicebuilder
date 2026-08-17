@@ -431,8 +431,14 @@ func on_battle_finished(bc, kind: String) -> void:
 	# post-battle randomness continues from the run rng, not the battle rng
 	var rng := RunState.rng_of(run)
 	if not bc.s.victory:
+		# the defeat screen shows how far the run got; hand the numbers over
+		# before the run save is wiped (presentation only — nothing reads them back)
+		var toll := {
+			"chapter": int(run.get("chapter", 1)),
+			"stats": (run.get("stats", {}) as Dictionary).duplicate(),
+		}
 		clear_run()
-		goto("gameover")
+		goto("gameover", toll)
 		return
 	# sync team state back from battle
 	for i in run.team.size():

@@ -1,11 +1,21 @@
 extends Control
-## Run lost: all heroes down. Back to menu.
+## Run lost: all heroes down. No hard cut — the screen breathes in slowly,
+## says how far the run got, and puts "one more run" front and centre.
 
-func setup(_args: Dictionary) -> void:
-	pass
+var args := {}
+
+
+func setup(p_args: Dictionary) -> void:
+	args = p_args
 
 
 func _ready() -> void:
+	Music.stop(1.4)
+	Sfx.play("lose")
+	if DisplayServer.get_name() != "headless" and not Fx.reduced():
+		modulate.a = 0.0
+		var tw := create_tween()
+		tw.tween_property(self, "modulate:a", 1.0, Fx.dur(0.85))
 	var bg := ColorRect.new()
 	bg.color = UITheme.DANGER_BG
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -58,9 +68,16 @@ func _ready() -> void:
 	var tv := VBoxContainer.new()
 	tv.add_theme_constant_override("separation", UIKit.S2)
 	toll.add_child(tv)
-	var reached := int(Game.run.get("chapter", 1)) if Game.run is Dictionary else 1
-	tv.add_child(UIKit.text_block("%s %d" % [Data.t("ui_chapter"), reached],
-			UIKit.F_H2, UIKit.CREAM, 500.0))
+	# 安慰性統計:行到邊、打咗幾多場 — the run mattered even though it ended.
+	# The numbers ride in on the goto args; the run save is already gone.
+	var reached := int(args.get("chapter", Game.run.get("chapter", 1) if Game.run is Dictionary and not Game.run.is_empty() else 1))
+	var stats: Dictionary = args.get("stats", {})
+	var line := "%s %d" % [Data.t("ui_chapter"), reached]
+	if int(stats.get("battles", 0)) > 0:
+		line += "  ·  %s ×%d" % [Data.bi("戰鬥", "battles"), int(stats.get("battles", 0))]
+	if int(stats.get("nodes", 0)) > 0:
+		line += "  ·  %s ×%d" % [Data.bi("節點", "nodes"), int(stats.get("nodes", 0))]
+	tv.add_child(UIKit.text_block(line, UIKit.F_H2, UIKit.CREAM, 500.0))
 	tv.add_child(UIKit.text_block(
 			Data.bi("森林記住了你們。下次再來。", "The grove remembers. Come back stronger."),
 			UIKit.F_BODY_SM, UIKit.CREAM_DARK, 500.0))
@@ -70,9 +87,15 @@ func _ready() -> void:
 	var tsb: StyleBoxFlat = tray.get_theme_stylebox("panel")
 	tsb.bg_color = Color("140d0d")
 	add_child(tray)
-	var b := UIKit.button(Data.bi("返回主選單", "Back to Menu"), UIKit.CREAM,
-			UIKit.F_H2, Vector2(320, 76))
+	# 「再嚟一局」is the big one; the menu is the side door
+	var again := UIKit.button(Data.bi("再嚟一局", "One more run"),
+			UIKit.GREEN.lightened(0.3), UIKit.F_H2, Vector2(340, 78))
+	again.pressed.connect(func() -> void:
+		Sfx.play("button")
+		Game.goto("charselect"))
+	var b := UIKit.button(Data.bi("主選單", "Menu"), UIKit.CREAM_DARK,
+			UIKit.F_BODY, Vector2(220, 70))
 	b.pressed.connect(func() -> void:
 		Sfx.play("button")
 		Game.goto("menu"))
-	tray.get_child(0).add_child(UIKit.button_row([b]))
+	tray.get_child(0).add_child(UIKit.button_row([again, b]))

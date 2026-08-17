@@ -2718,7 +2718,12 @@ func _show_result() -> void:
 	var l := UIKit.label(msg, 60, UIKit.CREAM)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vb.add_child(l)
-	Sfx.play("win" if bc.s.victory else "lose")
+	# victory: stinger over ducked music. Defeat stays quiet here — the
+	# gameover screen sings the lament, and two overlapping 6s stingers is
+	# exactly the kind of mush a mixing rule exists to prevent.
+	if bc.s.victory:
+		Music.duck(-9.0, 2.2, 1.4)
+		Sfx.play("win")
 	var center := CenterContainer.new()
 	vb.add_child(center)
 	var b := UIKit.button(Data.t("ui_confirm"), UIKit.CREAM, 28, Vector2(260, 80))
