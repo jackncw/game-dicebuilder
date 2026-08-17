@@ -33,6 +33,9 @@ var _lp_timer: SceneTreeTimer = null
 var _tooltip: Control = null
 var _scroll: ScrollContainer = null
 var _avail_btns: Array = []
+var _marker: Node2D = null    # the party's pawn standing on the trail (PawnArt)
+var _moving := false          # a walk animation is in flight; taps wait
+var _bob: Tween = null        # the marker's idle bob; killed before a walk
 
 
 func setup(_args: Dictionary) -> void:
@@ -87,8 +90,10 @@ func _ready() -> void:
 			if is_avail:
 				_avail_btns.append(btn)
 				btn.pressed.connect(func() -> void:
+					if _moving:
+						return
 					Sfx.play("button")
-					Game.enter_node(rr, cc))
+					_walk_to(rr, cc))
 			else:
 				# 未去到(或者已經過咗)嘅節點:一撳彈類型名確認 —— 細螢幕下
 				# 靠注釋唔夠嘅後備通道
@@ -105,6 +110,17 @@ func _ready() -> void:
 			if is_past and not is_current:
 				lbl.modulate = Color(1, 1, 1, 0.5)
 			graph.add_child(lbl)
+
+	# 玩家標記:隊伍嘅先鋒企喺而家所在嘅空地,行去下一個節點會真係行過去
+	var lead := String(Game.run.team[0].id)
+	_marker = PawnArt.fitted(lead, Vector2(84, 84))
+	_marker.position = _marker_home()
+	graph.add_child(_marker)
+	if DisplayServer.get_name() != "headless" and not Fx.reduced():
+		# a soft idle bob so the trail reads as "someone standing here"
+		_bob = _marker.create_tween().set_loops()
+		_bob.tween_property(_marker, "position:y", _marker.position.y - 5.0, 1.1) 				.set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+		_bob.tween_property(_marker, "position:y", _marker.position.y, 1.1) 				.set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 
 	# 拉埋 topbar 先加,等佢浮喺 scroll 上面
 	add_child(RunWidgets.topbar())
@@ -130,6 +146,95 @@ func _ready() -> void:
 	if _scroll.get_v_scroll_bar() != null:
 		_scroll.get_v_scroll_bar().value_changed.connect(func(_v: float) -> void:
 			_publish_rects.call_deferred())
+
+	# 新章開幕:row == -1 即係啱啱踏入呢一章 —— 出章節 title 卡先
+	if int(Game.run.row) < 0 and DisplayServer.get_name() != "headless":
+		_chapter_card(chapter)
+
+
+## Where the marker stands right now: on the current node, or at the trailhead
+## below the first rung when the chapter has only just begun.
+func _marker_home() -> Vector2:
+	var r := int(Game.run.row)
+	if r < 0:
+		return Vector2(360.0, 1224.0)
+	var c := int(Game.run.col)
+	var node: Dictionary = Game.run.map.rows[r][c]
+	return node_pos(r, float(node.x)) - Vector2(0.0, NODE_R *
+			(1.35 if String(node.type) == "boss" else 1.0) - 10.0)
+
+
+## The walk: the pawn strolls the trail to the tapped clearing — footsteps and
+## all — and only when it arrives does the node actually open. Headless goes
+## straight in; fast_anim walks at double pace.
+func _walk_to(r: int, c: int) -> void:
+	if DisplayServer.get_name() == "headless" or _marker == null 			or not is_instance_valid(_marker):
+		Game.enter_node(r, c)
+		return
+	_moving = true
+	if _bob != null and _bob.is_valid():
+		_bob.kill()
+	var node: Dictionary = Game.run.map.rows[r][c]
+	var to := node_pos(r, float(node.x)) - Vector2(0.0, NODE_R *
+			(1.35 if String(node.type) == "boss" else 1.0) - 10.0)
+	var from := _marker.position
+	var t_walk := Fx.dur(0.42)
+	var tw := create_tween()
+	tw.tween_method(func(t: float) -> void:
+		if not is_instance_valid(_marker):
+			return
+		var p := from.lerp(to, t)
+		p.y -= sin(t * PI * 3.0) * 7.0  # three little hops along the trail
+		_marker.position = p,
+		0.0, 1.0, t_walk)
+	for k in 3:
+		get_tree().create_timer(t_walk * (0.12 + 0.3 * k)).timeout.connect(
+				func() -> void: Sfx.play("step", 0.7, randf_range(0.9, 1.12)))
+	tw.tween_callback(func() -> void:
+		Game.enter_node(r, c))
+
+
+## 章節 title 卡:章號 + 氛圍一句,揸 1.5 秒(或者一撳)就散。
+const CHAPTER_FLAVOR := {
+	1: ["林緣", "The Fringe",
+		"晨光仍然照得進來的邊界。", "Where morning light still reaches."],
+	2: ["深林", "The Deepwood",
+		"暮色滲進樹影,腐化的氣味越來越近。", "Dusk seeps in; the rot smells closer."],
+	3: ["病竈", "The Blight Heart",
+		"森林病得最重的地方,病源就在前面。", "The sickest reach of the wood. The source lies ahead."],
+}
+
+
+func _chapter_card(chapter: int) -> void:
+	var fl: Array = CHAPTER_FLAVOR.get(chapter, CHAPTER_FLAVOR[1])
+	var scrim := ColorRect.new()
+	scrim.color = Color(0.03, 0.04, 0.03, 0.0)
+	scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scrim.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(scrim)
+	var col := VBoxContainer.new()
+	col.set_anchors_preset(Control.PRESET_FULL_RECT)
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.add_theme_constant_override("separation", UIKit.S3)
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	scrim.add_child(col)
+	var head := UIKit.title("%s %d · %s" % [Data.t("ui_chapter"), chapter,
+			String(fl[0])], UIKit.F_DISPLAY, UIKit.CREAM)
+	head.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_child(head)
+	col.add_child(UIKit.text_block(String(fl[1]), UIKit.F_H2, UIKit.CREAM_DARK, 640.0))
+	col.add_child(UIKit.spacer(UIKit.S3))
+	col.add_child(UIKit.text_block(Data.bi(String(fl[2]), String(fl[3])),
+			UIKit.F_BODY, UIKit.CREAM, 620.0))
+	Sfx.play("swoosh", 0.7)
+	var tw := create_tween()
+	tw.tween_property(scrim, "color:a", 0.82, Fx.dur(0.3))
+	tw.tween_interval(Fx.dur(1.5))
+	tw.tween_property(scrim, "modulate:a", 0.0, Fx.dur(0.45))
+	tw.tween_callback(scrim.queue_free)
+	scrim.gui_input.connect(func(ev: InputEvent) -> void:
+		if (ev is InputEventMouseButton or ev is InputEventScreenTouch) and ev.pressed:
+			scrim.queue_free())
 
 
 ## 當前可去嘅節點自動捲入視野 —— run 開頭喺梯底,尾段喺梯頂,唔應該要玩家

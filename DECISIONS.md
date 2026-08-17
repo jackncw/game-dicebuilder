@@ -1384,3 +1384,25 @@ n=300 覆核先算數。** `print_matrix` 已經對「驗收 band 邊緣」自�
 - **為咗令名單誠實,四個跨界私有查詢升做公開名**:`_enemy_face_value`→`enemy_face_value`、`_alive_enemies`→`alive_enemies`、`_alive_heroes`→`alive_heroes`、`_targetable_dice`→`targetable_dice`(純 rename,行為零改動)。
 - **負向驗證做咗兩層**:(1) 套件內置 fixture —— 掃描器對住摻咗 `bc.toggle_lock(0,0)` 同 `bc.s.mana += 5` 嘅樣本必須每句捉到、對乾淨樣本(白名單調用+state 讀+註釋)必須零誤報,守衛壞咗自己都會紅;(2) 真身演練 —— 臨時將呢兩句插入 `sim_runner.play_battle`,套件即紅並點名行號(line 768/769),移除後還原全綠。
 - **邊界**:tests/ 目錄刻意唔受管 —— 測試本來就要搣引擎內臟(craft rolls、直寫 state)先驗到規則。
+
+# 第十一輪:大作感打磨(2026-08-17)
+
+## 授權紅線點守
+- **SFX 兩族制**:物理系(擲骰/打擊/金幣/揭卡/寶箱/UI/腳步)用 Kenney 四個 pack(全 CC0 1.0,zip URL 釘死喺 `tools/sfx_build.py`,cache 喺 tools/_sfx_cache/ 唔入 git);魔法系(治療/靈息/施法/毒/灼/升級)搵唔到貼切嘅現成聲,全部程序合成 —— 同 BGM 同一調色盤,反而令「物理=foley、魔法=合成」成為一條可讀嘅美學規則。逐項記入 CREDITS.md。
+- **BGM 零外來樣本**:試過 OpenGameArt 方向,但 CC0 音樂質素/氛圍對口嘅唔穩陣,而且逐首驗授權係持續負擔。決定成個配樂用 `tools/music_build.py` 程序作曲(numpy+soundfile→OGG):Karplus-Strong 撥弦做主音、detuned pad、FFT 上色風底、合成 kick/hat。七軌 2.7MB,遠低過 10MB budget。**Loop 無縫係構造出嚟嘅**:每軌事件 render 兩次取第二輪,結尾嘅衰減尾巴天然已經響喺開頭。
+- **libsndfile 陷阱(記低費事再踩)**:`sf.write()` 一次過寫幾分鐘 stereo vorbis 會 native crash(exit 127 無 traceback);逐秒 block write 就穩定。
+
+## 混音紀律
+- Master 下開 Music/SFX 兩條 bus(code 建,唔用 .tres —— export 漏咗 layout 檔會靜默 fallback 返 Master,滑桿變冇掣)。音量設定直接寫 bus;舊存檔單一 volume 遷移做兩個新 knob。
+- Win/lose stinger 用 BGM 調色盤作,但掛喺 SFX bus 出:Music bus 嗰陣正忙住 fade 舊 track,stinger 唔可以陪佢一齊瀡走。每場戰勝 stinger 用 `Music.duck(-9dB)` 壓低 BGM 再回升;戰內敗北唔出 stinger(gameover 畫面出),避免兩支 6 秒 stinger 疊埋一齊變漿糊。
+- Boss 戰音樂唔喺 goto 切,由 boss 登場演出自己 crossfade —— 黑幕下章節曲繼續行,橫幅落地一刻先轉,呢個時序係演出嘅一部分。
+
+## 轉場策略
+- 全部 screen 切換行「方向性 wipe 遮罩」:前進右入、返主選單左出、入戰鬥頂部直落;蓋住(0.10-0.13s)→ 背後換屏 → 反向揭開。**133ms 建屏 hitch 係 load 成本唔係 render 成本(第九輪已量),醫唔好就藏**:靜態遮罩下嘅長 frame 對眼睛係隱形嘅。
+- 轉場中途再嚟嘅 goto 用 pending retarget,唔會兩個轉場打架;headless(16 suites)同首屏照舊即時同步換,測試零改動。
+
+## 勝利畫面「XP 條動畫」點取捨
+規格寫「XP條動畫填充」。Meta XP 係逐英雄一條(四~六條),結算卡上塞六條 bar 會迫爆第十輪先修好嘅固定結構;改用「金幣數字由 0 滾上去 + XP chip 彈入 + 升級有聲有粒子」承載同一個「數字喺你眼前埋單」嘅感覺。如果之後想要真 bar,應該做喺 metaprogress 頁(嗰度本來就有空間)。
+
+## 敗北統計嘅資料通道
+`on_battle_finished` 敗北路線以前 `clear_run()` 先過 `goto("gameover")`,搞到敗北畫面讀唔返章節(永遠顯示第 1 章 —— 潛藏 bug)。而家戰報(章節/戰鬥/節點)喺 wipe 之前 duplicate 咗經 goto args 帶過去,純 presentation 通道,冇嘢會讀返佢寫嘢。

@@ -10,10 +10,10 @@ extends Node
 ## 10's sound rather than to silence.
 
 ## Every event that ships as a file. tools/sfx_build.py writes these.
-const FILE_EVENTS := ["roll", "die", "hit", "hit_heavy", "block", "pierce",
-	"heal", "essence", "cast", "stun", "buy", "card", "swoosh", "button",
-	"potion", "chest", "death", "boss", "boss_swell", "poison", "burn",
-	"levelup"]
+const FILE_EVENTS := ["roll", "die", "step", "hit", "hit_heavy", "block",
+	"pierce", "heal", "essence", "cast", "stun", "buy", "card", "swoosh",
+	"button", "potion", "chest", "death", "boss", "boss_swell", "poison",
+	"burn", "levelup"]
 
 const SAMPLE_RATE := 22050
 

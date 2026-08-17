@@ -39,6 +39,7 @@ PACKS = {
 PICKS = {
     "roll":   [("casino-audio", "Audio/dice-throw-1.ogg", 1.0, 1.0)],
     "die":    [("impact-sounds", "Audio/impactWood_light_000.ogg", 0.9, 1.0)],
+    "step":   [("impact-sounds", "Audio/footstep_grass_004.ogg", 0.8, 1.0)],
     "hit":    [("impact-sounds", "Audio/impactSoft_medium_001.ogg", 1.0, 1.0)],
     "hit_heavy": [("impact-sounds", "Audio/impactPunch_heavy_000.ogg", 1.0, 0.92),
                   ("impact-sounds", "Audio/impactWood_heavy_001.ogg", 0.5, 0.8)],

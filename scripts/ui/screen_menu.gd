@@ -26,6 +26,11 @@ func _ready() -> void:
 	var shafts := Forest.LightShafts.new()
 	shafts.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(shafts)
+	if DisplayServer.get_name() != "headless" and not Fx.reduced():
+		# the light through the canopy breathes — slow enough to be felt, not seen
+		var breathe := shafts.create_tween().set_loops()
+		breathe.tween_property(shafts, "modulate:a", 0.55, 3.4) 				.set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+		breathe.tween_property(shafts, "modulate:a", 1.0, 3.4) 				.set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 	_build_title()
 	_build_party()
 	_build_buttons()
@@ -62,9 +67,24 @@ func _build_title() -> void:
 	var t := UIKit.title("骰林", UIKit.F_DISPLAY + 16, UIKit.CREAM)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	bv.add_child(t)
-	var sub := UIKit.text_block("Dice Grove", UIKit.F_H2, UITheme.WOOD_TEXT, 0.0)
+	var sub := UIKit.text_block("DICE GROVE", UIKit.F_H2, UITheme.WOOD_TEXT, 0.0)
+	# spaced caps: the plank reads as a carved lockup, not a caption
+	sub.add_theme_constant_override("spacing_glyph", 6)
 	bv.add_child(sub)
 	plate.add_child(badge)
+
+	if DisplayServer.get_name() != "headless" and not Fx.reduced():
+		# the sign drops into place once, then hangs with the slightest sway
+		badge.pivot_offset = Vector2(200.0, 0.0)
+		badge.rotation = -0.05
+		badge.modulate.a = 0.0
+		var drop := create_tween()
+		drop.tween_property(badge, "modulate:a", 1.0, 0.25)
+		drop.parallel().tween_property(badge, "rotation", 0.012, 0.5) 				.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+		drop.tween_callback(func() -> void:
+			var sway := badge.create_tween().set_loops()
+			sway.tween_property(badge, "rotation", -0.008, 2.6) 					.set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+			sway.tween_property(badge, "rotation", 0.008, 2.6) 					.set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE))
 
 	head.add_child(UIKit.spacer(UIKit.S3))
 	head.add_child(UIKit.outlined(UIKit.text_block(
@@ -174,3 +194,14 @@ func _build_buttons() -> void:
 			Sfx.play("button")
 			Game.goto(dest))
 		col.add_child(b)
+
+	# the column walks in, one plank at a time
+	if DisplayServer.get_name() != "headless" and not Fx.reduced():
+		var delay := 0.12
+		for c in col.get_children():
+			var ctrl := c as Control
+			ctrl.modulate.a = 0.0
+			var tw := create_tween()
+			tw.tween_interval(delay)
+			tw.tween_property(ctrl, "modulate:a", 1.0, 0.22)
+			delay += 0.07
