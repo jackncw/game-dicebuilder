@@ -10,6 +10,40 @@ const POOL_SIZE := 8
 var _next_player := 0
 
 
+## The two mix buses. Created in code rather than a default_bus_layout.tres so
+## the headless test runs get exactly the same audio graph as the game — a
+## missing .tres on export would silently fall back to Master and the volume
+## sliders would rule nothing.
+func _enter_tree() -> void:
+	_ensure_bus("Music")
+	_ensure_bus("SFX")
+
+
+static func _ensure_bus(bus_name: String) -> void:
+	if AudioServer.get_bus_index(bus_name) != -1:
+		return
+	var i := AudioServer.bus_count
+	AudioServer.add_bus(i)
+	AudioServer.set_bus_name(i, bus_name)
+	AudioServer.set_bus_send(i, "Master")
+
+
+## Push the two volume settings onto the buses. Called at startup and by the
+## settings sliders; everything audible routes through one of these buses, so
+## this is the single point where the settings become loudness.
+func set_bus_volumes() -> void:
+	_apply_bus("Music", float(Game.settings.get("volume_music", 0.8)))
+	_apply_bus("SFX", float(Game.settings.get("volume_sfx", 0.8)))
+
+
+static func _apply_bus(bus_name: String, lin: float) -> void:
+	var i := AudioServer.get_bus_index(bus_name)
+	if i < 0:
+		return
+	# -80dB is Godot's silence floor; linear_to_db(0) is -inf and upsets the mixer
+	AudioServer.set_bus_volume_db(i, linear_to_db(clampf(lin, 0.0, 1.0)) if lin > 0.001 else -80.0)
+
+
 func _ready() -> void:
 	_streams["roll"] = _gen_noise_burst(0.12, 0.5)
 	_streams["hit"] = _gen_thud(0.15)
@@ -23,18 +57,21 @@ func _ready() -> void:
 	_streams["die"] = _gen_knock(0.07)
 	for i in POOL_SIZE:
 		var p := AudioStreamPlayer.new()
-		p.bus = "Master"
+		p.bus = "SFX"
 		add_child(p)
 		_players.append(p)
+	set_bus_volumes()
 
 
-func play(name: String, volume_scale := 1.0) -> void:
+func play(name: String, volume_scale := 1.0, pitch := 1.0) -> void:
 	if not _streams.has(name):
 		return
 	var p := _players[_next_player]
 	_next_player = (_next_player + 1) % POOL_SIZE
 	p.stream = _streams[name]
-	p.volume_db = linear_to_db(clampf(Game.settings.volume * volume_scale, 0.0, 1.0))
+	# the user's SFX volume lives on the bus; this is only the per-event trim
+	p.volume_db = linear_to_db(clampf(volume_scale, 0.001, 1.0))
+	p.pitch_scale = pitch
 	p.play()
 
 

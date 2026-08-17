@@ -26,22 +26,13 @@ func _build() -> void:
 	vb.add_child(UIKit.title(Data.t("ui_settings"), UIKit.F_H1))
 	vb.add_child(UIKit.spacer(UIKit.S2))
 
-	# --- volume
+	# --- volume: one knob each for music and effects, applied live to the bus
 	var vol_card := UIKit.card(1)
 	var vol_v := VBoxContainer.new()
 	vol_v.add_theme_constant_override("separation", UIKit.S3)
 	vol_card.add_child(vol_v)
-	var vol_l := UIKit.text_block("%s: %d%%" % [Data.t("ui_volume"),
-			int(Game.settings.volume * 100)], UIKit.F_H2, UIKit.CREAM, 600.0)
-	vol_v.add_child(vol_l)
-	var slider := UIKit.slider(Game.settings.volume * 100.0, 100.0, 560.0)
-	slider.value_changed.connect(func(v: float) -> void:
-		Game.settings.volume = v / 100.0
-		vol_l.text = "%s: %d%%" % [Data.t("ui_volume"), int(v)]
-		Game.save_settings())
-	var sc := CenterContainer.new()
-	sc.add_child(slider)
-	vol_v.add_child(sc)
+	_volume_row(vol_v, "volume_music", Data.bi("音樂", "Music"), false)
+	_volume_row(vol_v, "volume_sfx", Data.bi("音效", "Sound effects"), true)
 	vb.add_child(vol_card)
 
 	# --- language mode
@@ -79,10 +70,16 @@ func _build() -> void:
 	pv.add_child(UIKit.text_block(Data.bi("表現", "Presentation"), UIKit.F_H2, UIKit.CREAM, 600.0))
 	pv.add_child(_toggle("fast_anim",
 			Data.bi("快速動畫", "Fast animations"),
-			Data.bi("擲骰縮短到 0.3 秒", "Dice throws squeezed to 0.3s")))
+			Data.bi("擲骰同轉場都加速", "Dice throws and transitions sped up")))
 	pv.add_child(_toggle("particles",
 			Data.bi("環境粒子", "Ambient particles"),
 			Data.bi("螢火蟲、落葉、孢子", "Fireflies, falling leaves, spores")))
+	pv.add_child(_toggle("reduce_fx",
+			Data.bi("減少特效", "Reduce effects"),
+			Data.bi("關粒子爆發、凍幀、震屏", "No bursts, hit-stop or screenshake")))
+	pv.add_child(_toggle("haptics",
+			Data.bi("震動回饋", "Haptic feedback"),
+			Data.bi("命中/擲骰輕震(支援嘅手機)", "Light buzz on hits & rolls (phones)")))
 	vb.add_child(pres)
 
 	# --- reset data (double confirm)
@@ -109,6 +106,29 @@ func _build() -> void:
 		Sfx.play("button")
 		Game.goto("menu"))
 	tray.get_child(0).add_child(UIKit.button_row([back]))
+
+
+## One volume slider: label with a live percentage, writes straight onto the
+## bus so the player hears the new loudness while still dragging. The SFX row
+## also plays a blip on release — you cannot judge an effects volume you have
+## not heard an effect at.
+func _volume_row(into: VBoxContainer, key: String, label: String, blip: bool) -> void:
+	var l := UIKit.text_block("%s: %d%%" % [label,
+			int(float(Game.settings.get(key, 0.8)) * 100)], UIKit.F_H2, UIKit.CREAM, 600.0)
+	into.add_child(l)
+	var slider := UIKit.slider(float(Game.settings.get(key, 0.8)) * 100.0, 100.0, 560.0)
+	slider.value_changed.connect(func(v: float) -> void:
+		Game.settings[key] = v / 100.0
+		l.text = "%s: %d%%" % [label, int(v)]
+		Sfx.set_bus_volumes()
+		Game.save_settings())
+	if blip:
+		slider.drag_ended.connect(func(changed: bool) -> void:
+			if changed:
+				Sfx.play("button"))
+	var sc := CenterContainer.new()
+	sc.add_child(slider)
+	into.add_child(sc)
 
 
 ## One on/off row: label, one-line explanation, and a button whose colour and

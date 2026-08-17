@@ -9,10 +9,14 @@ const SETTINGS_PATH := "user://settings.json"
 
 var settings := {
 	"lang_mode": "both",   # both | zh | en
-	"volume": 0.8,
+	"volume": 0.8,         # legacy single knob — kept so old saves round-trip
+	"volume_music": 0.8,   # BGM bus (round 11 split the knob in two)
+	"volume_sfx": 0.8,     # SFX bus
 	"tutorial_done": false,
-	"fast_anim": false,    # dice throws squeezed to 0.3s, for repeat players
+	"fast_anim": false,    # dice throws + transitions squeezed, for repeat players
 	"particles": true,     # ambient forest motes / leaves / spores
+	"reduce_fx": false,    # kill particles / hit-stop / shake / vibration
+	"haptics": true,       # Web Vibration API pulses on hit & roll (phones)
 }
 
 var meta := {
@@ -79,6 +83,11 @@ func load_settings() -> void:
 	var d := _load_json(SETTINGS_PATH)
 	for k in d:
 		settings[k] = d[k]
+	# a save from before the music/SFX split carries one "volume" — seed both
+	# new knobs from it so nobody's chosen loudness jumps on update
+	if d.has("volume") and not d.has("volume_sfx"):
+		settings.volume_sfx = float(d.volume)
+		settings.volume_music = float(d.volume)
 
 
 func save_meta() -> void:
