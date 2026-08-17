@@ -1406,3 +1406,18 @@ n=300 覆核先算數。** `print_matrix` 已經對「驗收 band 邊緣」自�
 
 ## 敗北統計嘅資料通道
 `on_battle_finished` 敗北路線以前 `clear_run()` 先過 `goto("gameover")`,搞到敗北畫面讀唔返章節(永遠顯示第 1 章 —— 潛藏 bug)。而家戰報(章節/戰鬥/節點)喺 wipe 之前 duplicate 咗經 goto args 帶過去,純 presentation 通道,冇嘢會讀返佢寫嘢。
+
+## 效能:hitch 嘅兩個身位,一藏一斬,剩債記帳
+第九輪量到嘅 133ms worst frame 今輪拆開睇原來係兩樣嘢:
+1. **Screen 轉場嗰下嘅建屏成本** —— 唔醫,**藏**:wipe 遮罩全遮之下先換屏,
+   靜態畫面下一個長 frame 對眼睛係隱形嘅(見「轉場策略」)。
+2. **戰鬥內每一拍敵人行動嘅全量 declarative refresh** —— 真 GPU headed 實測
+   每拍 83-133ms,元兇係每次 refresh 重建晒 8 個 Die3D(每個一個 own_world_3d
+   嘅 SubViewport)。**Die3D 池化**(骰常駐、refresh 淨係 reparent+set_die)
+   將佢斬半:worst 133→67ms,fps 56.7→58.5。
+剩低嘅 50-67ms 係逐拍重建卡片/文字 shaping 嘅擴散成本,冇單一大件。真正解法
+係 diff-based refresh(只更新變咗嘅 rows),但嗰個係全 project 最複雜 screen
+嘅結構重構,唔應該喺打磨輪尾段冒呢個險 —— **記債**,perf spec
+(`round11perf.spec.js`)鎖住 58.5fps/67ms/7 條線,邊個回退邊個現形。
+順帶:perf 一定要 headed + 清走共用 config 嗰句 `--use-angle=swiftshader`,
+唔係量出嚟係 SwiftShader 嘅 29fps,同遊戲無關。

@@ -310,3 +310,77 @@ Deal 5 damage to the target (ignores Block).」而且個 5 係**計晒屏息被�
 - 四個動作掣喺 F_H2 之下加埋 749px > 720px canvas(新增咗靈息重擲掣),
   「結束回合」掛咗出右邊 → 降到 F_BODY,540 之下仍有 16.5 物理像素。
 - `layout_test` 由 90 個 assertion 升到 372 個(加咗四個裝置幾何)。
+
+# 第十一輪:大作感打磨(2026-08-17)
+
+驗收方式跟 spec:動效唔靠靜態圖 —— Playwright 對住 web build 錄 video
+(`web/tests/round11cap.spec.js`,`CAP=1` 先行),八段片收入 `qa/round11/*.webm`,
+逐個時刻自評「聲+光+動」三重齊唔齊。聲喺 video 度聽唔到,用兩個客觀代理:
+`window.__dgMusic` 探針(音樂真係開始咗先會寫)+ SFX 檔案接線由 16 suites 罩住。
+
+## 迭代一:首輪錄影自評
+
+| 時刻 | 光 | 動 | 聲(代理) | 判定 |
+|---|---|---|---|---|
+| 標題畫面 | 木牌 lockup+光柱呼吸+motes | 招牌落地微幌、選單梯次入場 | __dgMusic=title ✅ | ✅ |
+| 章節卡+地圖行進 | title 卡(章號+林緣+氛圍句) | 野豬 pawn 沿路三步小跳行到節點 | step×3 接線 | ✅ |
+| 入戰鬥轉場 | 頂部直落 wipe,換屏藏喺遮罩後 | 0.10s 落+0.10s 收 | swoosh | ✅ |
+| 擲骰 | 落地塵埃 puff | 8 骰 tumble 照舊 | 逐粒 knock+音高 jitter | ✅ |
+| Boss 登場 | 黑幕→magenta 中英橫幅→腐化霧 | 橫幅 QUINT 滑入滑出 | __dgMusic=boss ✅(crossfade) | ✅ |
+| 結算 | 摘要+三卡梯次彈入 | 金幣 0→23 滾數 | card×4 stagger | ✅ |
+| 開寶箱 | 黑幕光柱立起+金粒爆發 | 戰利品翻面現身 | chest(拍+creak) | ✅ |
+| 勝利(爆機) | 統計逐行行入 | Music.stop+win stinger | duck 接線 | ✅ |
+| 敗北 | 0.85s 慢 fade+安慰統計(章2·戰5·節7) | 「再嚟一局」綠色主掣 | lose stinger | ✅ |
+
+迭代一發現嘅兩個洞:
+1. **Boss 腐化霧太疏** —— 12 粒一排,喺黑幕上讀成散星唔係霧。
+2. **擊殺消散未上鏡** —— 首輪 battle 片三下攻擊殺唔死 15 HP 小怪,招牌時刻
+   得個代碼路徑冇片證。
+
+## 迭代二:修正
+- 霧改兩排(22+16 粒、更大更慢飄),讀成一浸腐化湧出嚟。
+- battle 錄影改三回合集火 enemy0,焗個 kill 出嚟俾消散上鏡(下表)。
+
+## 迭代二:結果
+
+- **擊殺消散上鏡**(確定性通道 `tools/dissolve_shots.sh`,有窗逐幀影):
+  尖牙鼠卡片 rim flash → 身體 5 幀淡出、magenta 孢子上飄 → 卡位讓返俾生還者。
+  九幀序列喺 `art_iterations/round11/dissolve_*.png`。
+- **Boss 霧加濃**:兩排 22+16 粒、更慢更大,黑幕上讀成湧出嚟嘅腐化,唔再係散星。
+- **battle 片**(`qa/round11/battle-hits.webm`):三回合集火,命中浮字/搖屏/
+  敵人回合逐拍 telegraph 全上鏡。
+
+## 效能(真 GPU headed,RTX 3070 laptop,540×960)
+
+`web/tests/round11perf.spec.js`(PERF=1 --headed;共用 config 強制 SwiftShader,
+perf spec 要自己清走 launch args,唔係量出嚟係 29fps 嘅 SwiftShader 數)。
+場面:結束回合×2 —— telegraph 飛行+敵人命中+搖屏+浮字+8骰重擲+塵埃。
+
+| 版本 | fps | worst | >33ms |
+|---|---|---|---|
+| 迭代一(全量 refresh 每拍重建 8 個 Die3D SubViewport) | 56.7 | 133ms | 7/600 |
+| 迭代二(**Die3D 池化**:骰過場 reparent,唔再重建) | 58.5 | **67ms** | 7/600 |
+
+結論:第九輪嗰個 133ms「轉場 hitch」有兩個身位 —— screen 轉場嗰下而家完全藏喺
+wipe 遮罩後面(靜態遮罩下長 frame 對眼睛隱形);戰鬥內每拍 refresh 嘅重建成本由
+Die3D 池化斬半(133→67ms),剩低 50-67ms 係逐拍全量重建嘅擴散成本(文字 shaping
++卡片重組),冇單一大件可斬 —— diff-based refresh 係下一步,but 喺打磨輪尾段
+唔應該掂全 project 最複雜嘅 screen,記入 DECISIONS 做已知債。perf spec 鎖住
+58.5fps/67ms/7 呢條線防回退。
+
+## 首載大細(實測 gzip)
+
+| 項 | 舊(第十輪) | 新 |
+|---|---|---|
+| wasm(gz) | 10.2MB | 10.1MB |
+| pck(gz) | 6.7MB | 7.2MB(SFX 163KB+字型+雜項) |
+| **首載合計** | ~17MB | **17.3MB** ✅(<18MB) |
+| BGM(lazy,唔阻首載) | — | 2.6MB(docs/bgm/,首次要嗰軌先揦) |
+
+中途量過一次 20.0MB(BGM 入 pck)超標 → 改行 spec 建議嘅 streaming 路線。
+
+## 聲音驗收註記
+
+Video 冇聲軌,音訊接線用三重代理驗:(1) `__dgMusic` 探針 —— title/ch1/boss
+三個 assert 過晒(即係 fetch→decode→play 全鏈真係行到);(2) 22 個 SFX 檔案
+接線由 Sfx 讀檔優先邏輯+16 suites 罩;(3) 上線後真耳驗(live 驗證步)。

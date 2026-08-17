@@ -647,10 +647,13 @@ func _boss_intro() -> void:
 	cover.add_child(banner)
 	banner.position = Vector2(vp.x, vp.y * 0.38)
 	banner.size.x = vp.x
-	# fog boiling out of the dark while the name crosses
+	# fog boiling out of the dark while the name crosses — two rows, dense
+	# enough to read as a bank of corruption rather than scattered sparks
 	for k in 5:
-		Fx.burst(cover, Vector2(vp.x * (0.1 + 0.2 * k), vp.y * 0.25),
-				Color(0.72, 0.2, 0.75, 0.5), 12, 130.0, 1.1, -120.0)
+		Fx.burst(cover, Vector2(vp.x * (0.1 + 0.2 * k), vp.y * 0.24),
+				Color(0.72, 0.2, 0.75, 0.6), 22, 150.0, 1.4, -140.0)
+		Fx.burst(cover, Vector2(vp.x * (0.2 + 0.2 * k), vp.y * 0.55),
+				Color(0.55, 0.16, 0.6, 0.5), 16, 110.0, 1.2, -100.0)
 	var tw := create_tween()
 	tw.tween_property(banner, "position:x", 0.0, Fx.dur(0.35)) 			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUINT)
 	tw.tween_interval(Fx.dur(0.9))
@@ -1622,16 +1625,37 @@ func _die_faces(i: int, d: int) -> Array:
 	return out
 
 
+## The eight Die3D cubes are POOLED across refreshes (round 11). Each one is a
+## SubViewport with its own 3D world, and rebuilding all eight on every
+## declarative refresh was the 83–133ms frame the web build hitched on during
+## every enemy beat. The cube nodes now live for the whole battle; a refresh
+## reparents them into the fresh columns and re-states their faces and flags.
+var _die_pool := {}   # "hero:die" → Die3D, persistent for the battle
+
+
 func _make_die(i: int, d: int, spec: Dictionary) -> Control:
 	var h: Dictionary = bc.s.heroes[i]
 	var slot: int = int(h.rolled[d])
 	var holder := Control.new()
 	holder.custom_minimum_size = Die3D.SIZE
-	var dv := Die3D.new()
-	dv.hero = i
-	dv.die = d
+	var key := "%d:%d" % [i, d]
+	var dv: Die3D = _die_pool.get(key)
+	if dv == null or not is_instance_valid(dv):
+		dv = Die3D.new()
+		dv.hero = i
+		dv.die = d
+		# wired once for the widget's whole life; `interactive` / `draggable`
+		# below stay the per-refresh gates on whether these ever fire
+		dv.pressed.connect(_on_die_pressed)
+		dv.long_pressed.connect(_on_die_long_pressed)
+		dv.drag_started.connect(_on_drag_started)
+		_die_pool[key] = dv
+	elif dv.get_parent() != null:
+		# the old column is queue_freed this frame; lift the cube out before
+		# it goes down with the ship
+		dv.get_parent().remove_child(dv)
 	holder.add_child(dv)
-	die_widgets["%d:%d" % [i, d]] = dv
+	die_widgets[key] = dv
 	var faces := _die_faces(i, d)
 
 	if slot < 0:
@@ -1639,6 +1663,7 @@ func _make_die(i: int, d: int, spec: Dictionary) -> Control:
 		# out of play, which reads better than an empty hole in the column
 		dv.set_die(faces, 0, true, false, true, false)
 		dv.interactive = false
+		dv.draggable = false
 		return holder
 
 	var usable := bc.can_use(i, d)
@@ -1660,9 +1685,6 @@ func _make_die(i: int, d: int, spec: Dictionary) -> Control:
 	# a spent, locked-out, blanked or unaffordable die still taps (for its
 	# "no" cue) and still long-presses for its detail card, but never lifts
 	dv.draggable = usable.ok
-	dv.pressed.connect(_on_die_pressed)
-	dv.long_pressed.connect(_on_die_long_pressed)
-	dv.drag_started.connect(_on_drag_started)
 	return holder
 
 

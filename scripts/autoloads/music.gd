@@ -81,7 +81,10 @@ func _fetch(track: String) -> void:
 		_cache[track] = stream
 		if current == track:
 			_start(stream, 1.2))
-	if req.request("bgm/%s.ogg" % track) != OK:
+	# HTTPRequest needs an absolute URL even on the web — resolve against the
+	# page so the same build works at / and under /game-dicebuilder/
+	var base := str(JavaScriptBridge.eval("new URL('bgm/', location.href).href", true))
+	if req.request(base + track + ".ogg") != OK:
 		req.queue_free()
 		_fetching.erase(track)
 

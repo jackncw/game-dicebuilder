@@ -18,7 +18,7 @@ test.skip(!process.env.CAP, 'capture run only (CAP=1)');
 test.use({
   // 540x960 = the 720x1280 design at exactly 0.75, so design coords map cleanly
   viewport: { width: 540, height: 960 },
-  video: { size: { width: 540, height: 960 } },
+  video: { mode: 'on', size: { width: 540, height: 960 } },
 });
 
 async function bootTo(page, url, hudKey) {
@@ -59,17 +59,21 @@ test.describe('round11 moment capture', () => {
     expect(await page.evaluate(() => window.__dgMusic)).toBe('ch1');
   });
 
-  test('battle: tap-attack hits, end turn, enemy beats', async ({ page }) => {
+  test('battle: tap-attack hits, end turn, enemy beats, a kill', async ({ page }) => {
     await bootTo(page, '/index.html?boot=battle', 'die0');
     await page.waitForTimeout(2_000);      // roll settles
-    for (let i = 0; i < 3; i++) {
-      await clickHud(page, 'die0');        // select the first die
-      await page.waitForTimeout(400);
-      await clickHud(page, 'enemy0');      // resolve onto the first enemy
-      await page.waitForTimeout(900);      // floats/shake/burst
+    // two player turns of focused fire on enemy0 — enough to kill it and put
+    // the corruption-dissolve on tape, not just in the code
+    for (let round = 0; round < 3; round++) {
+      for (let i = 0; i < 4; i++) {
+        await clickHud(page, 'die0');
+        await page.waitForTimeout(350);
+        await clickHud(page, 'enemy0');    // if die0 was self-target this no-ops
+        await page.waitForTimeout(700);
+      }
+      await clickHud(page, 'end_turn');
+      await page.waitForTimeout(5_500);    // telegraphs + enemy hits + reroll
     }
-    await clickHud(page, 'end_turn');
-    await page.waitForTimeout(6_000);      // telegraphs + enemy hits + reroll
   });
 
   test('boss: entrance banner, fog, music switch', async ({ page }) => {

@@ -23,6 +23,7 @@ OFL 全文喺 `assets/fonts/OFL.txt`。Subset 由 `tools/font_build.py` 產生�
 |---|---|---|---|
 | roll(擲骰) | Casino Audio — dice-throw-1 | Kenney (kenney.nl) | CC0 1.0 |
 | die(骰落地) | Impact Sounds — impactWood_light_000 | Kenney | CC0 1.0 |
+| step(地圖行進腳步) | Impact Sounds — footstep_grass_004 | Kenney | CC0 1.0 |
 | hit(輕命中) | Impact Sounds — impactSoft_medium_001 | Kenney | CC0 1.0 |
 | hit_heavy(重擊) | Impact Sounds — impactPunch_heavy_000 + impactWood_heavy_001 | Kenney | CC0 1.0 |
 | block(格擋) | Impact Sounds — impactPlate_light_001 | Kenney | CC0 1.0 |
