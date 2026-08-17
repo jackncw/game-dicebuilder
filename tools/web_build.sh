@@ -29,6 +29,12 @@ mkdir -p art_export docs
 sed -e 's/\r$//' "$LOG" | grep -iE "error|failed|missing" | head -20 || true
 ls -l docs/index.html docs/index.pck docs/index.wasm docs/index.js 2>&1
 
+# The five BGM loops are excluded from the pck (export_presets exclude_filter)
+# and served as loose files beside the page instead — Music fetches them
+# lazily, which is what keeps the first load under the 18MB line.
+mkdir -p docs/bgm
+cp assets/audio/bgm/*.ogg docs/bgm/
+
 # .nojekyll is not optional: GitHub Pages' legacy builder runs Jekyll over the
 # published folder by default, which rendered the repo README into a themed
 # index.html over the top of the game's, and dropped index.wasm / index.pck as

@@ -13,7 +13,7 @@ extends Node
 const FILE_EVENTS := ["roll", "die", "step", "hit", "hit_heavy", "block",
 	"pierce", "heal", "essence", "cast", "stun", "buy", "card", "swoosh",
 	"button", "potion", "chest", "death", "boss", "boss_swell", "poison",
-	"burn", "levelup"]
+	"burn", "levelup", "win", "lose"]
 
 const SAMPLE_RATE := 22050
 
@@ -68,15 +68,11 @@ func _ready() -> void:
 	_streams["potion"] = _gen_chime([392.0, 523.25], 0.09)
 	_streams["stun"] = _gen_blip(220.0, 0.15)
 	_streams["die"] = _gen_knock(0.07)
+	# win/lose are composed with the music (same palette, same key) but they
+	# are immediate feedback, so they ship in the pck and fire on the SFX bus —
+	# audible even while the Music bus is busy fading the track that just ended
 	for ev in FILE_EVENTS:
 		var path := "res://assets/audio/sfx/%s.ogg" % ev
-		if ResourceLoader.exists(path):
-			_streams[ev] = load(path)
-	# the two stingers are composed with the music (same palette, same key)
-	# but fired like effects, so they live on the SFX bus and stay audible
-	# while the Music bus is busy fading the track that just ended
-	for ev in ["win", "lose"]:
-		var path := "res://assets/audio/bgm/%s.ogg" % ev
 		if ResourceLoader.exists(path):
 			_streams[ev] = load(path)
 	for i in POOL_SIZE:

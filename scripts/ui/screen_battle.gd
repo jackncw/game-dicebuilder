@@ -526,6 +526,17 @@ func _publish_deferred() -> void:
 		Safe.publish_hud("tray", tray_panel.get_global_rect())
 	if essence_bar != null and is_instance_valid(essence_bar):
 		Safe.publish_hud("essence", essence_bar.get_global_rect())
+	# round 11: enough rects for the moment-capture spec to actually play a
+	# turn — first live die, first enemy card, and the End Turn button
+	if is_instance_valid(btn_end):
+		Safe.publish_hud("end_turn", btn_end.get_global_rect())
+	if not enemy_cards.is_empty() and is_instance_valid(enemy_cards[0]) 			and _laid_out(enemy_cards[0]):
+		Safe.publish_hud("enemy0", enemy_cards[0].get_global_rect())
+	for key in die_widgets:
+		var dv = die_widgets[key]
+		if is_instance_valid(dv) and _laid_out(dv):
+			Safe.publish_hud("die0", (dv as Control).get_global_rect())
+			break
 
 
 ## The arena: chapter sky, a dark canopy the enemies stand under, a horizon
@@ -560,6 +571,7 @@ func _refresh() -> void:
 	# after it, so this is the one moment the new rects can be trusted
 	_capture_anchors.call_deferred()
 	_update_threat_pulse()
+	_publish_hud_rects(0.0)   # no-op off web; keeps die0/enemy0 rects honest
 	if bc.s.over and overlay == null:
 		_show_result()
 

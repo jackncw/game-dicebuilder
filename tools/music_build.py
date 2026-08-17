@@ -371,13 +371,21 @@ TRACKS = {
 }
 
 
+# The two stingers ship INSIDE the pck (assets/audio/sfx/) because they are
+# immediate feedback; the five loop tracks stay out of the web pck entirely
+# (export exclude) and are fetched lazily from docs/bgm/ — that is what keeps
+# the first load under the 18MB line.
+SFX_OUT = os.path.join(ROOT, "assets", "audio", "sfx")
+STINGERS = {"win", "lose"}
+
+
 def main(argv):
     os.makedirs(OUT, exist_ok=True)
     names = argv or list(TRACKS)
     total = 0
     for name in names:
         x = TRACKS[name]()
-        path = os.path.join(OUT, name + ".ogg")
+        path = os.path.join(SFX_OUT if name in STINGERS else OUT, name + ".ogg")
         # one-shot sf.write() hard-crashes libsndfile's vorbis encoder on
         # multi-minute stereo buffers (Windows, soundfile 0.13) — block writes
         # of one second at a time are stable

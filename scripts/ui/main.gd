@@ -155,6 +155,22 @@ func _boot_direct(screen: String) -> void:
 			# 任務4 的 Playwright 幾何迴歸:新 run 嘅第一章地圖(可去節點喺梯底)
 			Game.run = RunState.new_run(GameData.starter_hero_ids(), 4242)
 			Game.goto("map")
+		"bossbattle":
+			# 第十一輪:boss 登場演出嘅錄影通道
+			var bteam := []
+			for id3 in GameData.starter_hero_ids():
+				bteam.append(GameData.new_hero(String(id3)))
+			Game.goto("battle", {"team": bteam, "enemies": ["B1"],
+				"opts": {"chapter": 1}, "battle_seed": 91117, "kind": "boss"})
+		"treasure", "shop", "rest", "event":
+			# 呢啲 screen 要有個 run 先企得住;canned run 就夠
+			Game.run = RunState.new_run(GameData.starter_hero_ids(), 4242)
+			Game.goto(screen)
+		"victory":
+			Game.goto("victory", {"stats": {"battles": 9, "elites": 2, "nodes": 14},
+				"duration": 1234})
+		"gameover":
+			Game.goto("gameover", {"chapter": 2, "stats": {"battles": 5, "nodes": 7}})
 		"reward":
 			# 任務2 的最壞情況:全隊四人同一場升級,加三張戰利品卡
 			Game.run = RunState.new_run(GameData.starter_hero_ids(), 4242)
