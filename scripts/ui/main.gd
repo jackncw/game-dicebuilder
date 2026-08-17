@@ -4,6 +4,14 @@ extends Node
 
 var current: Control = null
 
+## Transition state: a dark leaf-toned cover that slides over the old screen,
+## hides the swap (screen builds are the 133ms hitch — behind a static cover a
+## long frame is invisible), then slides off the other side.
+var _cover: ColorRect = null
+var _transitioning := false
+var _pending: Array = []   # [path, args] the in-flight transition should land on
+const COVER_COLOR := Color(0.055, 0.085, 0.055)
+
 
 func _ready() -> void:
 	# headless balance simulator:  godot --headless ... -- --sim 100 [seed]
@@ -166,18 +174,89 @@ func _boot_direct(screen: String) -> void:
 
 func _on_goto(screen: String, args: Dictionary) -> void:
 	_set_music(screen, args)
-	if is_instance_valid(current):
-		current.queue_free()
 	var path := "res://scripts/ui/screen_%s.gd" % screen
 	if not ResourceLoader.exists(path):
 		push_error("Unknown screen: " + screen)
 		return
+	# Headless (every test suite) and the very first screen take the old
+	# instant path — tests depend on the swap being synchronous.
+	if DisplayServer.get_name() == "headless" or current == null:
+		_swap(path, args)
+		return
+	# A goto arriving mid-transition (a tap slipping past a half-way cover)
+	# retargets the transition instead of racing it.
+	_pending = [path, args]
+	if not _transitioning:
+		_transition(_dir_for(screen))
+
+
+func _swap(path: String, args: Dictionary) -> void:
+	if is_instance_valid(current):
+		current.queue_free()
 	var script: GDScript = load(path)
 	current = script.new()
 	current.set_anchors_preset(Control.PRESET_FULL_RECT)
 	if current.has_method("setup"):
 		current.setup(args)
 	add_child(current)
+
+
+## Which way the cover travels. Forward motion enters from the right, going
+## back exits left, and entering a fight is a faster top-down slam.
+func _dir_for(screen: String) -> String:
+	match screen:
+		"battle":
+			return "battle"
+		"menu":
+			return "pop"
+	return "push"
+
+
+func _transition(dir: String) -> void:
+	_transitioning = true
+	var vp := get_viewport().get_visible_rect().size
+	if _cover == null:
+		var layer := CanvasLayer.new()
+		layer.layer = 95
+		add_child(layer)
+		_cover = ColorRect.new()
+		_cover.color = COVER_COLOR
+		_cover.mouse_filter = Control.MOUSE_FILTER_STOP  # eat taps mid-swap
+		layer.add_child(_cover)
+	_cover.size = vp
+	_cover.visible = true
+	var t_in := Fx.dur(0.10 if dir == "battle" else 0.13)
+	var from := Vector2(vp.x, 0)
+	var out_to := Vector2(-vp.x, 0)
+	if dir == "pop":
+		from = Vector2(-vp.x, 0)
+		out_to = Vector2(vp.x, 0)
+	elif dir == "battle":
+		from = Vector2(0, -vp.y)
+		out_to = Vector2(0, vp.y)
+	_cover.position = from
+	Sfx.play("swoosh", 0.8)
+	var tw := create_tween()
+	tw.tween_property(_cover, "position", Vector2.ZERO, t_in) 			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	await tw.finished
+	# fully covered: the expensive part happens where nobody can see a long
+	# frame. Whatever goto was asked for LAST is the one that lands.
+	while _pending.size() == 2:
+		var target: Array = _pending
+		_pending = []
+		_swap(target[0], target[1])
+		await get_tree().process_frame
+		await get_tree().process_frame
+	var tw2 := create_tween()
+	tw2.tween_property(_cover, "position", out_to, t_in) 			.set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_CUBIC)
+	await tw2.finished
+	_cover.visible = false
+	_transitioning = false
+	# a goto that landed during the reveal still has to happen
+	if _pending.size() == 2:
+		var target: Array = _pending
+		_pending = []
+		_swap(target[0], target[1])
 
 
 ## The standing music policy, applied at every screen change. The one carve-out
