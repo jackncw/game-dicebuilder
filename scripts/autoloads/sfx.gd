@@ -1,6 +1,19 @@
 extends Node
-## Autoload "Sfx": procedurally-synthesized sound effects (no asset files).
-## All sounds are generated once at startup into AudioStreamWAV objects.
+## Autoload "Sfx": the game's sound-effect voice.
+##
+## Round 11 split the set in two families on purpose: PHYSICAL events (dice,
+## impacts, coins, pages, chests, UI clicks) are Kenney CC0 foley shipped as
+## assets/audio/sfx/*.ogg, and MAGIC events (heal, essence, cast, poison,
+## burn, level-up) are synthesized by tools/sfx_build.py in the same palette
+## as the music. Anything without a file on disk falls back to the original
+## startup-synthesized AudioStreamWAV, so a missing asset degrades to round
+## 10's sound rather than to silence.
+
+## Every event that ships as a file. tools/sfx_build.py writes these.
+const FILE_EVENTS := ["roll", "die", "hit", "hit_heavy", "block", "pierce",
+	"heal", "essence", "cast", "stun", "buy", "card", "swoosh", "button",
+	"potion", "chest", "death", "boss", "boss_swell", "poison", "burn",
+	"levelup"]
 
 const SAMPLE_RATE := 22050
 
@@ -55,6 +68,10 @@ func _ready() -> void:
 	_streams["potion"] = _gen_chime([392.0, 523.25], 0.09)
 	_streams["stun"] = _gen_blip(220.0, 0.15)
 	_streams["die"] = _gen_knock(0.07)
+	for ev in FILE_EVENTS:
+		var path := "res://assets/audio/sfx/%s.ogg" % ev
+		if ResourceLoader.exists(path):
+			_streams[ev] = load(path)
 	for i in POOL_SIZE:
 		var p := AudioStreamPlayer.new()
 		p.bus = "SFX"
