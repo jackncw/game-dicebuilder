@@ -1268,6 +1268,10 @@ func _attack_enemies(i: int, fd: Dictionary, targets: Array, base_override := -1
 			if e.dead:
 				continue
 			var dmg := v
+			# 先手: the bonus only lands on an untouched target, so on a
+			# multi-hit face the first pass spends the condition for the rest
+			if fd.has("vs_full") and int(e.hp) >= int(e.max_hp):
+				dmg += int(fd.vs_full)
 			if e.expose:
 				dmg = int(ceil(dmg * 1.5))
 			var blocked := 0
@@ -2048,6 +2052,9 @@ func preview_attack(i: int, d: int, j: int) -> Dictionary:
 		return {"min": int(fd.random_atk[0]), "max": int(fd.random_atk[1])}
 	var e: Dictionary = s.enemies[j]
 	var dmg := v
+	# 先手 rides the base before expose multiplies, same as resolution
+	if fd.has("vs_full") and int(e.hp) >= int(e.max_hp):
+		dmg += int(fd.vs_full)
 	if e.expose:
 		dmg = int(ceil(dmg * 1.5))
 	# An "X×N" face previews the TOTAL it would land. Block is drained by the

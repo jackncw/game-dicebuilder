@@ -382,11 +382,16 @@ static func print_matrix(n := 150, seeds := ACCEPT_SEEDS, team := [], level := 1
 ## ever shipped was measured on the weakest version of the game.
 ##   godot --headless --path . -- --levels [n] [lvl,lvl,…]
 
-## How far the full-clear rate may move across the level sweep before it counts
-## as power creep rather than variety. Three points is this harness's own noise
-## floor (`BAND_EDGE_MARGIN`), so five is "moved further than noise, but not by
-## much".
-const LEVEL_CREEP_MAX := 5.0
+## The promise, as re-worded by the round-13 ruling: **解鎖唔加數值** — pure
+## numeric inflation is dead by construction (the value-band linter allows a
+## capstone +1~2 and nothing else), so any win-rate lift comes from synergy
+## and offer fit, and THAT is allowed a measured ceiling instead of zero:
+##   · total: the best level may sit at most 8pt of full-clear above level 1;
+##   · per level: no single level step may add more than 2pt (a gap of k
+##     levels gets a 2k allowance, so sparse sweeps stay judgeable).
+## Both lines are judged at the n=300 protocol like every other difference.
+const CREEP_TOTAL_MAX := 8.0
+const CREEP_PER_LEVEL_MAX := 2.0
 
 
 static func print_level_compare(n := 150, levels := [1, 5, 8], seeds := ACCEPT_SEEDS) -> Dictionary:
@@ -435,28 +440,38 @@ static func print_level_compare(n := 150, levels := [1, 5, 8], seeds := ACCEPT_S
 	var base := float(rows[0].wins)
 	var creep := hi - base      # how far ABOVE the unlevelled party the best level got
 	var drop := base - lo       # how far BELOW it the worst level got
+	# 逐級 line: each measured step against its 2pt-per-level allowance
+	var step_violations := []
+	for k in range(1, rows.size()):
+		var la: Dictionary = rows[k - 1]
+		var lb: Dictionary = rows[k]
+		var gap := float(int(lb.level) - int(la.level))
+		var step := float(lb.wins) - float(la.wins)
+		var allow := CREEP_PER_LEVEL_MAX * gap
+		print("  step L%d→L%d: %+.1fpt  (allowance %.1f = 2pt x %d levels)%s"
+				% [int(la.level), int(lb.level), step, allow, int(gap),
+				"  !! OVER" if step > allow else ""])
+		if step > allow:
+			step_violations.append("L%d→L%d %+.1fpt > %.1f" % [int(la.level), int(lb.level), step, allow])
 	print("")
-	print("full-clear spread across levels: %.1fpt  (design promise: <= %.1fpt)"
-			% [spread, LEVEL_CREEP_MAX])
-	print("  vs the level-%d baseline (%.1f%%):  best level %+.1fpt,  worst level %+.1fpt"
-			% [int(rows[0].level), base, creep, -drop])
-	if creep > LEVEL_CREEP_MAX:
-		print("VERDICT: POWER CREEP — levelling is worth %.1f points of full-clear "
-				% creep + "rate on top of the baseline. The usage table")
-		print("         names which faces are doing it. A design call, not a "
-				+ "number to quietly file down.")
-	elif drop > LEVEL_CREEP_MAX:
+	print("full-clear creep vs level-%d baseline: %+.1fpt  (ruling line: <= %.1fpt total, <= %.1fpt/level)"
+			% [int(rows[0].level), creep, CREEP_TOTAL_MAX, CREEP_PER_LEVEL_MAX])
+	print("  baseline %.1f%%, spread %.1fpt, worst level %+.1fpt" % [base, spread, -drop])
+	if creep > CREEP_TOTAL_MAX or not step_violations.is_empty():
+		print("VERDICT: POWER CREEP — over the round-13 ruling line ("
+				+ ("total %+.1fpt > %.1f" % [creep, CREEP_TOTAL_MAX] if creep > CREEP_TOTAL_MAX else "")
+				+ ("; " if creep > CREEP_TOTAL_MAX and not step_violations.is_empty() else "")
+				+ "; ".join(PackedStringArray(step_violations)) + ").")
+		print("         The usage table names which faces are doing it. A design "
+				+ "call, not a number to quietly file down.")
+	elif drop > CREEP_TOTAL_MAX:
 		print("VERDICT: NET DOWNGRADE — levelling costs %.1f points against the "
 				% drop + "baseline. Not power creep; the opposite. Most likely")
 		print("         the unlock offers are DISPLACING better shared-pool draws "
 				+ "rather than the faces being bad.")
-	elif spread > LEVEL_CREEP_MAX:
-		print("VERDICT: promise holds on the power axis (best level is only %+.1fpt), "
-				% creep + "but the sweep is not flat: %.1fpt between" % spread)
-		print("         the extremes, straddling the baseline. Read the per-level "
-				+ "rows, not the spread.")
 	else:
-		print("VERDICT: promise HOLDS — levelling reads as variety, not power.")
+		print("VERDICT: promise HOLDS — 解鎖唔加數值: within %.1fpt total and %.1fpt/level."
+				% [CREEP_TOTAL_MAX, CREEP_PER_LEVEL_MAX])
 	return {"rows": rows, "spread": spread, "creep": creep, "drop": drop}
 
 
@@ -467,9 +482,14 @@ static func print_unlock_usage(n := 150, level := 8, seeds := ACCEPT_SEEDS) -> v
 	GameData.load_all()
 	var team := GameData.starter_hero_ids()
 	face_tel_begin()
+	offer_tel = {}
+	offer_tel_on = true
 	for sd in seeds:
 		batch(n, int(sd), team, {"hero_level": level})
 	var t: Dictionary = face_tel.duplicate(true)
+	var offers_seen: Dictionary = offer_tel.duplicate(true)
+	offer_tel = {}
+	offer_tel_on = false
 	face_tel_end()
 	var rolled := {}
 	var used := {}
@@ -498,6 +518,23 @@ static func print_unlock_usage(n := 150, level := 8, seeds := ACCEPT_SEEDS) -> v
 	for row in rows:
 		print("%-22s %-8s %8d %8d %7.1f%% %8.1f" % [String(row.id), String(row.hero),
 				int(row.rolled), int(row.used), float(row.rate), float(row.pts)])
+	# Offer acceptance, per class face: of the times this face was on the
+	# post-battle offer card, how often the policy took it. The round-13 ruling
+	# watches 隕星雨 owl_meteor here — >90% re-opens the discussion next round.
+	print("")
+	print("=== OFFER ACCEPTANCE, class faces at level %d ===" % level)
+	print("%-22s %8s %8s %8s" % ["face", "offered", "taken", "rate"])
+	var arows := []
+	for fid_a in offers_seen:
+		var rec: Array = offers_seen[fid_a]
+		if String(GameData.faces.get(String(fid_a), {}).get("hero", "")) == "":
+			continue
+		arows.append({"id": String(fid_a), "offered": int(rec[0]), "taken": int(rec[1]),
+			"rate": 100.0 * float(rec[1]) / maxf(float(rec[0]), 1.0)})
+	arows.sort_custom(func(a, b): return float(a.rate) > float(b.rate))
+	for ar in arows:
+		print("%-22s %8d %8d %7.1f%%" % [String(ar.id), int(ar.offered), int(ar.taken),
+				float(ar.rate)])
 
 
 # ============================================================ zero-use audit
@@ -703,6 +740,13 @@ static func _do_battle(run: Dictionary, rng: RandomNumberGenerator, enemy_keys: 
 	# — see the offer-policy section near the bottom of this file.
 	var offers := RunState.gen_offers(run, rng, kind, _unlocked_map(run))
 	var take := _offer_pick(run, offers)
+	if offer_tel_on:
+		for o in offers:
+			var rec: Array = offer_tel.get(String(o.face), [0, 0])
+			rec[0] += 1
+			if not take.is_empty() and String(take.face) == String(o.face) 					and int(take.hero) == int(o.hero):
+				rec[1] += 1
+			offer_tel[String(o.face)] = rec
 	if take.is_empty():
 		run.gold = int(run.gold) + int(GameData.balance.offer_skip_gold)
 	else:
@@ -933,6 +977,11 @@ static func print_essence_report(n := 150, seed_v := 20260805) -> Dictionary:
 ##
 ## Off unless `face_tel_begin()` has been called.
 static var face_tel := {}
+
+## Offer-acceptance telemetry (round-13 ruling): face id → [offered, taken].
+## Armed by `print_unlock_usage`, recorded in `_do_battle`.
+static var offer_tel := {}
+static var offer_tel_on := false
 
 
 static func face_tel_begin() -> void:
@@ -1900,6 +1949,10 @@ static func _face_points(fid: String, mod := 0) -> float:
 		# 背水 replaces the printed number once you are at half HP. Half the
 		# gap: half a run is spent below that line, roughly.
 		pts += 0.5 * maxf(float(fd.low_hp_atk) - float(fd.get("atk", 0)), 0.0)
+	# 先手 only fires on an untouched target — the opening beat of a fight,
+	# roughly half the swings this greedy policy takes. Priced at half, same
+	# reasoning as 背水's half-gap.
+	pts += 0.5 * float(fd.get("vs_full", 0))
 	pts += PT_GUARDED * float(fd.get("atk_from_block", 0))
 	if fd.get("cleave", false) or fd.get("aoe", false):
 		pts *= 2.0     # the encounter tables run two to four enemies

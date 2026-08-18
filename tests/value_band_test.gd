@@ -51,7 +51,7 @@ const VALUES := {
 	"regen": 2.0, "poison": 1.5, "burn": 1.5,
 	"mana": 2.0, "rerolls": 4.0, "weaken": 2.0, "stun": 4.0,
 	"heal_on_hit": 1.0, "buff_next_atk": 1.0, "next_dice_boost": 2.0,
-	"echo": 1.0, "resonate": 0.5, "charge_up": 0.0,
+	"echo": 1.0, "resonate": 0.5, "charge_up": 0.0, "vs_full": 0.5,
 }
 
 ## Flat prices for boolean riders.

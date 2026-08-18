@@ -27,7 +27,7 @@ const ALIAS := {
 	"thorn_hold": "thorns", "thorns_double": "thorns", "atk_from_block": "block",
 	"block_from_mana": "mana", "twin_dance": "multi",
 	"self_atk_now": "charge", "heal_on_hit": "lifesteal",
-	"next_dice_boost": "chargeup", "low_hp_atk": "pain",
+	"next_dice_boost": "chargeup", "low_hp_atk": "pain", "vs_full": "expose",
 	"old_sergeant": "block", "quilled_hide": "block", "held_breath": "pierce",
 	"ancient_warden": "mana", "call_and_answer": "resonate", "cornered_fury": "pain",
 }

@@ -408,8 +408,8 @@
   "cat": "attack",
   "rarity": "R",
   "hero": "HARE",
-  "atk": 7,
-  "charge_up": 3,
+  "atk": 5,
+  "vs_full": 4,
   "target": "enemy"
  },
  "hare_pinning": {
@@ -448,8 +448,8 @@
   "cat": "attack",
   "rarity": "E",
   "hero": "HARE",
-  "atk": 8,
-  "charge_up": 2,
+  "atk": 6,
+  "vs_full": 5,
   "target": "enemy"
  },
  "hare_galestorm": {

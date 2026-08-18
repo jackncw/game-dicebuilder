@@ -615,5 +615,13 @@
   "hue": "resource",
   "d_zh": "任何時候可以用 2 點靈息換 1 次重擲,每回合限一次。買到嘅係「一次重擲」,幾時擲仍然由你決定——想保住好面,先用咗嗰位英雄再擲",
   "d_en": "Trade 2 Essence for one reroll, once a turn, at any point in your phase. It buys the throw — you still choose when to spend it, and acting with a hero first is how you keep their good face out of the shuffle"
+ },
+ "vs_full": {
+  "zh": "先手",
+  "en": "First Strike",
+  "glyph": "expose",
+  "hue": "attack",
+  "d_zh": "目標喺全滿 HP(未受過傷)時,呢一擊額外 +X",
+  "d_en": "Deals +X while the target is still at full HP"
  }
 }

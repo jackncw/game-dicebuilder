@@ -22,7 +22,7 @@ const MAIN_ORDER := ["atk", "random_atk", "atk_from_block", "block",
 	"expose", "taunt", "all_pierce", "twin_dance", "wild", "steal_die", "echo"]
 
 ## Modifiers, in the order they read on a tile and in a tooltip.
-const MOD_ORDER := ["pierce", "hits", "charge_up", "resonate", "resonate_req",
+const MOD_ORDER := ["pierce", "hits", "charge_up", "vs_full", "resonate", "resonate_req",
 	"cleave", "aoe", "combo", "lifesteal", "heal_on_hit", "poison",
 	"burn", "weaken", "expose", "taunt", "thorns", "thorn_hold", "stun",
 	"growth", "lucky", "low_hp_atk",
@@ -383,6 +383,9 @@ static func effect_sentence(fd: Dictionary) -> String:
 	if _is_on(fd, "low_hp_atk"):
 		tail_zh.append("HP 在 50%% 或以下時改為 %d" % int(fd.low_hp_atk))
 		tail_en.append("becomes %d at 50%% HP or less" % int(fd.low_hp_atk))
+	if _is_on(fd, "vs_full"):
+		tail_zh.append("先手:目標滿血時 +%d" % int(fd.vs_full))
+		tail_en.append("First Strike: +%d while the target is at full HP" % int(fd.vs_full))
 	if _is_on(fd, "heal_on_hit"):
 		tail_zh.append("真的扣到 HP 就回復 %d" % int(fd.heal_on_hit))
 		tail_en.append("heals %d if it actually took HP off" % int(fd.heal_on_hit))

@@ -179,6 +179,7 @@ func _ready() -> void:
 	_t_rampage()
 	_t_heal_on_hit()
 	_t_last_ditch()
+	_t_vs_full()
 	# ---- the six passives
 	_t_passive_old_sergeant()
 	_t_passive_held_breath()
@@ -1195,6 +1196,32 @@ func _t_last_ditch() -> void:
 	# 9 from the face, +2 from 背水之勢 which is live at the same threshold
 	_check(bc.attack_value(0, bc.hero_face(0, 0)) == 11, "cornered: 9 + fury 2 = 11, got %d"
 			% bc.attack_value(0, bc.hero_face(0, 0)))
+
+
+## 先手 vs_full (round 13 ruling): +X only while the target is untouched.
+func _t_vs_full() -> void:
+	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E01", "E01"])
+	_silence_enemies(bc)
+	for e in bc.s.enemies:
+		e.block = 0
+	_face(bc, 0, "hare_snipe6")                  # 攻5 先手+4 (round 13 rework)
+	var hp0: int = bc.s.enemies[0].hp
+	bc.use_face(0, 0, {"target": 0})
+	_check(bc.s.enemies[0].hp == hp0 - 9,
+			"先手 on a full target: 5 + 4 = 9, dealt %d" % (hp0 - bc.s.enemies[0].hp))
+	# same face on the now-hurt target: base only. The Owl carries it — her
+	# passive bonus needs Essence ≥ 6 and the battle opens at 3.
+	_face(bc, 2, "hare_snipe6")
+	var hp1: int = bc.s.enemies[0].hp
+	bc.use_face(2, 0, {"target": 0})
+	_check(bc.s.enemies[0].hp == hp1 - 5,
+			"先手 spent: hurt target takes the base 5, dealt %d" % (hp1 - bc.s.enemies[0].hp))
+	# the drop preview agrees with the engine, both ways
+	_face(bc, 3, "hare_snipe6")
+	var pv_hurt: Dictionary = bc.preview_attack(3, 0, 0)
+	var pv_full: Dictionary = bc.preview_attack(3, 0, 1)
+	_check(int(pv_hurt.get("dmg", -1)) == 5, "preview vs hurt reads 5, got %s" % str(pv_hurt))
+	_check(int(pv_full.get("dmg", -1)) == 9, "preview vs full reads 9, got %s" % str(pv_full))
 
 
 # ============================================================ passives
