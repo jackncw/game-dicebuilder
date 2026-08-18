@@ -384,3 +384,41 @@ Die3D 池化斬半(133→67ms),剩低 50-67ms 係逐拍全量重建嘅擴散成�
 Video 冇聲軌,音訊接線用三重代理驗:(1) `__dgMusic` 探針 —— title/ch1/boss
 三個 assert 過晒(即係 fetch→decode→play 全鏈真係行到);(2) 22 個 SFX 檔案
 接線由 Sfx 讀檔優先邏輯+16 suites 罩;(3) 上線後真耳驗(live 驗證步)。
+
+---
+
+# 第十三輪(2026-08-18):圖鑑捲動修復 + 骰面池全面重整
+
+## 任務A:手機圖鑑捲唔郁(bug)
+
+根因唔係估 —— headless repro 先行:FaceTile 同 UIKit.card 嘅 PanelContainer
+都係 `MOUSE_FILTER_STOP`,ScreenTouch/ScreenDrag 一落喺 tile/panel 度就被吞,
+ScrollContainer 根本收唔到;而且 FaceTile 冇 tap 距離門檻,拖 500px 放手照
+彈詳情卡(=真機上「捲唔郁仲成日彈卡」)。修法:FaceTile 轉 PASS + TAP_SLOP
+24px + NOTIFICATION_SCROLL_BEGIN 取消;codex/face_swap 加 scroll_deadzone +
+`UIKit.scroll_passthrough`。驗證三層:codex_scroll_test(headless 事件鏈)、
+round13codex.spec.js(390x664/360x640 CDP 真 touch,drag 捲得郁 + 唔誤開 +
+tap 開詳情)、同一 spec 用 LIVE_URL 對住上線 build 再跑一次 —— 全綠。
+註:headless 冇 touchscreen,ScrollContainer 嘅 drag 分支永遠唔會著,呢類
+bug 只有真 touch 先驗到 —— 已寫入 memory。
+
+## 任務B-F:池重整(詳見 BALANCE.md 第十三輪)
+
+- 數值帶 linter(第 17 套):eff = Σ價值 − 自損 − 2×靈術費,帶寬 ±1;
+  改前 118 違規 → 0(9 個 whitelist 連理由)。1 靈息 = +2 價值鐵律落地
+  (月癒 4→8、大治癒 6→12、血靈爆淨值 0→7)。
+- 六職業池各 14 面(L2-8 每級 2 面批次,舊面全部保級);通用池 58→12
+  (12.5%);offer/商店 70% 職業面,商店職業面綁角色+頭像+限購。
+- 靈息面 33/96(34.4%≥1/3);梟 8 面最多。U 稀有度退役;SAVE_VERSION 5
+  (27 隻被刪通用面經 ROUND13_FACE_MAP 保形遷移,寧鬆勿緊)。
+- 升級批量:勝利/獎勵畫面成批 show tile,圖鑑按批次分組。
+
+## 平衡重驗
+
+- 章節曲線(敵 HP 鈍刀三步:tier mult {1,0.95,0.85}、B1/B2 +5):
+  n300 中位 ch1 82 / ch2 61 / 全通 38 / 回合 4.22 —— 四項入任務帶。
+- 零使用審計 L1+L8 全清(預期嘅政策盲點冇出現);POLICY_BLIND 清空。
+- 靈息經濟:施放回合 22%→25%,U2 交易 14.5%→20.5%。
+- ⚠ creep:L1 38 → L8 45(n300,+7pt)超任務 ≤2pt 線 —— 按指示未 nerf,
+  元兇表+三個選項喺 BALANCE.md §7 等 Jack 裁。
+- 18 suites 全綠;web 重出;live URL 三重驗證(pck 對數/真 touch/console)。

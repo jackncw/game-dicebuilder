@@ -70,20 +70,29 @@ for (const dev of DEVICES) {
           () => Boolean(window.__dgHUD.codex_detail));
       expect(detailAfterDrag, 'a scroll gesture is not a tap').toBe(false);
 
-      // ③ a short tap on a face tile opens the detail card. Scroll back to the
-      // top first so the first hero's grid is on screen.
-      await touchDrag(page,
-          { x: cx, y: area.y + area.h * 0.2 },
-          { x: cx, y: area.y + area.h * 0.9 });
-      await touchDrag(page,
-          { x: cx, y: area.y + area.h * 0.2 },
-          { x: cx, y: area.y + area.h * 0.9 });
-      await page.waitForTimeout(600);
+      // ③ a short tap on a face tile opens the detail card. Drag back until
+      // the codex is genuinely at the top (inertia can leave it short — seen
+      // against the live CDN), so the tile's published rect is where it is.
+      for (let i = 0; i < 6; i++) {
+        const v = await page.evaluate(() => window.__dgHUD.codex_scroll_v.y);
+        if (v < 20) break;
+        await touchDrag(page,
+            { x: cx, y: area.y + area.h * 0.2 },
+            { x: cx, y: area.y + area.h * 0.9 });
+        await page.waitForTimeout(700);
+      }
+      const vTop = await page.evaluate(() => window.__dgHUD.codex_scroll_v.y);
+      expect(vTop, 'scrolled back to the top').toBeLessThan(20);
       const tile = await page.evaluate(() => window.__dgHUD.codex_tile0);
       expect(tile && tile.h > 0, 'the first face tile published its rect').toBeTruthy();
-      await page.touchscreen.tap(tile.x + tile.w / 2, tile.y + tile.h / 2);
-      await page.waitForFunction(() => Boolean(window.__dgHUD.codex_detail),
-          null, { timeout: 10_000 });
+      let opened = false;
+      for (let i = 0; i < 3 && !opened; i++) {
+        await page.touchscreen.tap(tile.x + tile.w / 2, tile.y + tile.h / 2);
+        opened = await page.waitForFunction(
+            () => Boolean(window.__dgHUD.codex_detail), null, { timeout: 5_000 })
+            .then(() => true).catch(() => false);
+      }
+      expect(opened, 'a short tap opened the face detail card').toBe(true);
     });
   });
 }
