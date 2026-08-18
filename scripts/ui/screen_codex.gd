@@ -96,10 +96,13 @@ func _build() -> void:
 	_publish_probes.call_deferred()
 
 
-## Web-only: the first tappable tile's rect, once the containers have sorted.
+## Web-only: the scroll area and the first tappable tile's rect, once the
+## containers have sorted (their rects are (0,0) until then).
 func _publish_probes() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
+	if is_instance_valid(scroll):
+		Safe.publish_hud("codex_scroll", scroll.get_global_rect())
 	if is_instance_valid(_first_tile):
 		Safe.publish_hud("codex_tile0", _first_tile.get_global_rect())
 

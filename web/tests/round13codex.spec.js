@@ -46,7 +46,9 @@ for (const dev of DEVICES) {
     });
 
     test('finger scroll works, and a tap still opens the detail card', async ({ page }) => {
-      await page.goto('/index.html?boot=codex');
+      // LIVE_URL=https://… reruns this against the deployed Pages build —
+      // the round-13 standing check that the fix reached the thing people play
+      await page.goto((process.env.LIVE_URL || '') + '/index.html?boot=codex');
       await page.waitForFunction(
           () => window.__dgHUD && window.__dgHUD.codex_scroll
               && window.__dgHUD.codex_scroll.h > 0,
