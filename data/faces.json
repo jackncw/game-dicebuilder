@@ -1,5 +1,5 @@
 {
- "_comment": "Every die face in the game. `hero` binds a face to one character (starting twelve + that hero's six XP-pool unlocks); faces without it are the shared pool the shop, chests and offers draw from. `die` is documentary only — a face id may sit on either die, and several do. Rarity: S starting, U hero XP unlock, C/R/E shared pool. 2026-08-06: the six hero face sets were rebuilt from scratch for the character overhaul; the shared pool was audited against them rather than replaced.",
+ "_comment": "Every die face in the game. `hero` binds a face to one character; a hero-bound face with rarity C/R/E is that hero's CLASS POOL and is reachable only through the unlock batches in heroes.json (2 faces per level 2-8, 14 per hero). Faces without `hero` are the small UNIVERSAL pool (12 faces) the shop/chests/offers mix in at 30%. Rarity: S starting, C/R/E acquirable. Round 13 (2026-08-18): value bands enforced by tests/value_band_test.gd — effective value = Σ(component points) − pain − 2×spell must sit in the category band (attack C5-7/R6-8/E7-9, heal C4-5/R5-6/E6-7, …); the 2×spell term is the essence exchange rate. `die` is documentary only.",
  "blank": {
   "zh": "空白",
   "en": "Blank",
@@ -7,6 +7,7 @@
   "rarity": "S",
   "target": "none"
  },
+
  "bdg_chop2": {
   "zh": "劈砍",
   "en": "Chop",
@@ -73,62 +74,155 @@
   "heal": 2,
   "target": "ally"
  },
+ "bdg_essenceguard": {
+  "zh": "靈甲",
+  "en": "Essence Guard",
+  "cat": "defense",
+  "rarity": "S",
+  "hero": "BADGER",
+  "die": "B",
+  "block": 3,
+  "mana": 1,
+  "target": "self"
+ },
  "bdg_heavy5": {
   "zh": "重劈",
   "en": "Heavy Chop",
   "cat": "attack",
-  "rarity": "U",
+  "rarity": "C",
   "hero": "BADGER",
-  "atk": 5,
+  "atk": 6,
   "target": "enemy"
+ },
+ "sp_focus": {
+  "zh": "凝神",
+  "en": "Focus",
+  "cat": "defense",
+  "rarity": "C",
+  "hero": "BADGER",
+  "block": 4,
+  "buff_next_atk": 2,
+  "target": "self"
  },
  "bdg_chop3guard3": {
   "zh": "劈擋",
   "en": "Chop and Guard",
   "cat": "attack",
-  "rarity": "U",
+  "rarity": "C",
   "hero": "BADGER",
   "atk": 3,
   "block": 3,
   "target": "enemy"
  },
+ "sp_sweep_cut": {
+  "zh": "掃擊",
+  "en": "Sweep Cut",
+  "cat": "attack",
+  "rarity": "C",
+  "hero": "BADGER",
+  "atk": 4,
+  "cleave": true,
+  "target": "enemy"
+ },
+ "bdg_infusedsmash": {
+  "zh": "灌注猛擊",
+  "en": "Infused Smash",
+  "cat": "attack",
+  "rarity": "R",
+  "hero": "BADGER",
+  "atk": 11,
+  "spell": 2,
+  "target": "enemy"
+ },
+ "bdg_spiritshield": {
+  "zh": "靈盾",
+  "en": "Spirit Shield",
+  "cat": "defense",
+  "rarity": "R",
+  "hero": "BADGER",
+  "block": 5,
+  "mana": 1,
+  "target": "self"
+ },
  "bdg_heal3": {
   "zh": "療傷",
   "en": "Tend Wounds",
   "cat": "heal",
-  "rarity": "U",
+  "rarity": "R",
   "hero": "BADGER",
-  "heal": 3,
+  "heal": 5,
   "target": "ally"
+ },
+ "bdg_essenceaxe": {
+  "zh": "靈斧",
+  "en": "Essence Axe",
+  "cat": "attack",
+  "rarity": "R",
+  "hero": "BADGER",
+  "atk": 5,
+  "mana": 1,
+  "target": "enemy"
  },
  "bdg_smash6": {
   "zh": "猛劈",
   "en": "Great Cleave",
   "cat": "attack",
-  "rarity": "U",
+  "rarity": "R",
   "hero": "BADGER",
-  "atk": 6,
+  "atk": 7,
   "target": "enemy"
+ },
+ "bdg_rally": {
+  "zh": "呼喝",
+  "en": "Rally",
+  "cat": "defense",
+  "rarity": "R",
+  "hero": "BADGER",
+  "team_block": 2,
+  "mana": 1,
+  "target": "none"
  },
  "bdg_guard4thorn": {
   "zh": "釘盾",
   "en": "Studded Guard",
   "cat": "defense",
-  "rarity": "U",
+  "rarity": "E",
   "hero": "BADGER",
-  "block": 4,
-  "thorns": 1,
+  "block": 6,
+  "thorns": 2,
   "target": "self"
+ },
+ "bdg_oakheart": {
+  "zh": "橡心",
+  "en": "Oakheart",
+  "cat": "heal",
+  "rarity": "E",
+  "hero": "BADGER",
+  "heal": 3,
+  "regen": 2,
+  "target": "ally"
  },
  "bdg_warcry": {
   "zh": "戰吼",
   "en": "War Cry",
-  "cat": "special",
-  "rarity": "U",
+  "cat": "defense",
+  "rarity": "E",
   "hero": "BADGER",
-  "team_atk": 1,
+  "team_atk": 2,
+  "team_block": 1,
   "target": "none"
  },
+ "bdg_essencebulwark": {
+  "zh": "靈甲陣",
+  "en": "Essence Phalanx",
+  "cat": "defense",
+  "rarity": "E",
+  "hero": "BADGER",
+  "team_block": 3,
+  "spell": 1,
+  "target": "none"
+ },
+
  "hare_quick2": {
   "zh": "速射",
   "en": "Quick Shot",
@@ -218,64 +312,158 @@
   "block": 3,
   "target": "self"
  },
+ "hare_essencearrow": {
+  "zh": "凝靈箭",
+  "en": "Essence Arrow",
+  "cat": "attack",
+  "rarity": "S",
+  "hero": "HARE",
+  "die": "B",
+  "atk": 5,
+  "pierce": true,
+  "spell": 1,
+  "target": "enemy"
+ },
  "hare_pierce3": {
   "zh": "貫穿",
   "en": "Punch Through",
   "cat": "attack",
-  "rarity": "U",
+  "rarity": "C",
   "hero": "HARE",
   "atk": 4,
   "pierce": true,
   "target": "enemy"
  },
+ "hare_longshot": {
+  "zh": "遠射",
+  "en": "Long Shot",
+  "cat": "attack",
+  "rarity": "C",
+  "hero": "HARE",
+  "atk": 6,
+  "target": "enemy"
+ },
+ "sp_charged_shot": {
+  "zh": "蓄勢箭",
+  "en": "Charged Shot",
+  "cat": "attack",
+  "rarity": "C",
+  "hero": "HARE",
+  "atk": 5,
+  "charge_up": 2,
+  "target": "enemy"
+ },
+ "hare_attunedaim": {
+  "zh": "引靈瞄準",
+  "en": "Attuned Aim",
+  "cat": "resource",
+  "rarity": "C",
+  "hero": "HARE",
+  "mana": 2,
+  "charge_up": 1,
+  "target": "none"
+ },
  "hare_guard3": {
   "zh": "格擋",
   "en": "Guard",
   "cat": "defense",
-  "rarity": "U",
+  "rarity": "R",
   "hero": "HARE",
-  "block": 3,
+  "block": 6,
   "target": "self"
+ },
+ "hare_hawkfeather": {
+  "zh": "鷹羽靈箭",
+  "en": "Hawk-feather Arrow",
+  "cat": "attack",
+  "rarity": "R",
+  "hero": "HARE",
+  "atk": 5,
+  "mana": 1,
+  "target": "enemy"
  },
  "hare_volley": {
   "zh": "連珠",
   "en": "Rapid Volley",
   "cat": "attack",
-  "rarity": "U",
+  "rarity": "R",
   "hero": "HARE",
-  "atk": 2,
+  "atk": 3,
   "hits": 2,
+  "target": "enemy"
+ },
+ "hare_windarrow": {
+  "zh": "御風箭",
+  "en": "Gale Arrow",
+  "cat": "attack",
+  "rarity": "R",
+  "hero": "HARE",
+  "atk": 9,
+  "spell": 1,
   "target": "enemy"
  },
  "hare_snipe6": {
   "zh": "狙殺",
   "en": "Snipe",
   "cat": "attack",
-  "rarity": "U",
+  "rarity": "R",
   "hero": "HARE",
   "atk": 7,
   "charge_up": 3,
+  "target": "enemy"
+ },
+ "hare_pinning": {
+  "zh": "標靈箭",
+  "en": "Marking Shot",
+  "cat": "attack",
+  "rarity": "R",
+  "hero": "HARE",
+  "atk": 3,
+  "expose": true,
+  "mana": 1,
   "target": "enemy"
  },
  "hare_hawkeye": {
   "zh": "鷹眼",
   "en": "Hawkeye",
   "cat": "special",
-  "rarity": "U",
+  "rarity": "E",
   "hero": "HARE",
   "all_pierce": true,
   "target": "none"
+ },
+ "hare_moonpiercer": {
+  "zh": "穿雲月箭",
+  "en": "Moon Piercer",
+  "cat": "attack",
+  "rarity": "E",
+  "hero": "HARE",
+  "atk": 7,
+  "pierce": true,
+  "target": "enemy"
  },
  "hare_deadly7": {
   "zh": "致命箭",
   "en": "Killing Arrow",
   "cat": "attack",
-  "rarity": "U",
+  "rarity": "E",
   "hero": "HARE",
   "atk": 8,
   "charge_up": 2,
   "target": "enemy"
  },
+ "hare_galestorm": {
+  "zh": "破空靈嵐",
+  "en": "Spirit Gale",
+  "cat": "attack",
+  "rarity": "E",
+  "hero": "HARE",
+  "atk": 10,
+  "pierce": true,
+  "spell": 2,
+  "target": "enemy"
+ },
+
  "hedge_guard3": {
   "zh": "格擋",
   "en": "Guard",
@@ -363,63 +551,163 @@
   "thorns": 1,
   "target": "enemy"
  },
+ "hedge_quilldraw": {
+  "zh": "棘息",
+  "en": "Quill Draw",
+  "cat": "defense",
+  "rarity": "S",
+  "hero": "HEDGE",
+  "die": "B",
+  "block": 2,
+  "thorns": 1,
+  "mana": 1,
+  "target": "self"
+ },
  "hedge_guard5": {
   "zh": "格擋",
   "en": "Guard",
   "cat": "defense",
-  "rarity": "U",
+  "rarity": "C",
   "hero": "HEDGE",
-  "block": 5,
+  "block": 6,
+  "target": "self"
+ },
+ "sp_thorn_shield": {
+  "zh": "棘盾",
+  "en": "Thorn Shield",
+  "cat": "defense",
+  "rarity": "C",
+  "hero": "HEDGE",
+  "block": 3,
+  "thorns": 3,
   "target": "self"
  },
  "hedge_thorns3": {
   "zh": "豎棘",
   "en": "Raise Quills",
   "cat": "defense",
-  "rarity": "U",
+  "rarity": "C",
   "hero": "HEDGE",
   "thorns": 3,
+  "block": 2,
   "target": "self"
+ },
+ "hedge_quillvolley": {
+  "zh": "射棘",
+  "en": "Quill Volley",
+  "cat": "attack",
+  "rarity": "C",
+  "hero": "HEDGE",
+  "atk": 3,
+  "thorns": 2,
+  "target": "enemy"
  },
  "hedge_recoil4": {
   "zh": "反震錘",
   "en": "Recoil Mace",
   "cat": "attack",
-  "rarity": "U",
+  "rarity": "R",
   "hero": "HEDGE",
   "atk": 5,
   "resonate": 2,
   "resonate_cat": "block",
   "target": "enemy"
  },
+ "sp_protect": {
+  "zh": "守護",
+  "en": "Protect",
+  "cat": "defense",
+  "rarity": "R",
+  "hero": "HEDGE",
+  "taunt": true,
+  "block": 6,
+  "target": "self"
+ },
+ "hedge_essencebloom": {
+  "zh": "靈棘綻放",
+  "en": "Essence Bloom",
+  "cat": "defense",
+  "rarity": "R",
+  "hero": "HEDGE",
+  "team_thorns": 2,
+  "team_block": 2,
+  "spell": 2,
+  "target": "none"
+ },
+ "hedge_quillsurge": {
+  "zh": "棘息蜷防",
+  "en": "Quilled Respite",
+  "cat": "defense",
+  "rarity": "R",
+  "hero": "HEDGE",
+  "block": 3,
+  "thorns": 1,
+  "cleanse_self": true,
+  "mana": 1,
+  "target": "self"
+ },
  "hedge_guard4thorn2": {
   "zh": "棘擋",
   "en": "Barbed Guard",
   "cat": "defense",
-  "rarity": "U",
+  "rarity": "R",
   "hero": "HEDGE",
-  "block": 4,
+  "block": 5,
   "thorns": 2,
+  "target": "self"
+ },
+ "sp_briar_mail": {
+  "zh": "荊棘鎧",
+  "en": "Briar Mail",
+  "cat": "defense",
+  "rarity": "R",
+  "hero": "HEDGE",
+  "block": 5,
+  "thorns": 3,
   "target": "self"
  },
  "hedge_bristle": {
   "zh": "豎刺",
   "en": "Bristle",
   "cat": "defense",
-  "rarity": "U",
+  "rarity": "E",
   "hero": "HEDGE",
   "thorns_double": 4,
+  "target": "self"
+ },
+ "hedge_ironquills": {
+  "zh": "鐵棘靈甲",
+  "en": "Iron Quills",
+  "cat": "defense",
+  "rarity": "E",
+  "hero": "HEDGE",
+  "block": 4,
+  "thorns": 2,
+  "taunt": true,
+  "mana": 1,
   "target": "self"
  },
  "hedge_shieldbash": {
   "zh": "盾擊",
   "en": "Shield Bash",
   "cat": "attack",
-  "rarity": "U",
+  "rarity": "E",
   "hero": "HEDGE",
   "atk_from_block": 6,
   "target": "enemy"
  },
+ "hedge_thornaegis": {
+  "zh": "靈棘聖壁",
+  "en": "Thorn Aegis",
+  "cat": "defense",
+  "rarity": "E",
+  "hero": "HEDGE",
+  "team_block": 2,
+  "team_thorns": 2,
+  "spell": 2,
+  "target": "none"
+ },
+
  "owl_bolt2": {
   "zh": "秘法彈",
   "en": "Arcane Bolt",
@@ -454,7 +742,7 @@
   "cat": "attack",
   "rarity": "S",
   "hero": "OWL",
-  "atk": 7,
+  "atk": 11,
   "spell": 3,
   "target": "enemy"
  },
@@ -464,7 +752,7 @@
   "cat": "defense",
   "rarity": "S",
   "hero": "OWL",
-  "block": 4,
+  "block": 7,
   "spell": 1,
   "target": "self"
  },
@@ -495,7 +783,7 @@
   "rarity": "S",
   "hero": "OWL",
   "die": "B",
-  "heal": 4,
+  "heal": 8,
   "spell": 2,
   "target": "ally"
  },
@@ -524,59 +812,140 @@
   "zh": "聚靈",
   "en": "Gather Essence",
   "cat": "resource",
-  "rarity": "U",
+  "rarity": "C",
   "hero": "OWL",
   "mana": 3,
   "target": "none"
+ },
+ "owl_moonbeam": {
+  "zh": "月光束",
+  "en": "Moonbeam",
+  "cat": "attack",
+  "rarity": "C",
+  "hero": "OWL",
+  "atk": 4,
+  "mana": 1,
+  "target": "enemy"
  },
  "owl_bolt4": {
   "zh": "秘法彈",
   "en": "Arcane Bolt",
   "cat": "attack",
-  "rarity": "U",
+  "rarity": "C",
   "hero": "OWL",
   "atk": 5,
   "target": "enemy"
+ },
+ "owl_blessing": {
+  "zh": "祝禱",
+  "en": "Blessing",
+  "cat": "heal",
+  "rarity": "C",
+  "hero": "OWL",
+  "heal": 3,
+  "mana": 1,
+  "target": "ally"
  },
  "owl_meditate": {
   "zh": "冥想",
   "en": "Meditate",
   "cat": "resource",
-  "rarity": "U",
+  "rarity": "R",
   "hero": "OWL",
   "rerolls": 2,
   "target": "none"
+ },
+ "sp_regenerate": {
+  "zh": "再生術",
+  "en": "Regenerate",
+  "cat": "heal",
+  "rarity": "R",
+  "hero": "OWL",
+  "regen": 3,
+  "target": "ally"
  },
  "owl_greatheal": {
   "zh": "大治癒",
   "en": "Greater Mend",
   "cat": "heal",
-  "rarity": "U",
+  "rarity": "R",
   "hero": "OWL",
-  "heal": 6,
+  "heal": 12,
   "spell": 3,
   "target": "ally"
+ },
+ "sp_mass_mend": {
+  "zh": "群體治癒",
+  "en": "Mass Mend",
+  "cat": "heal",
+  "rarity": "R",
+  "hero": "OWL",
+  "team_heal": 2,
+  "target": "none"
  },
  "owl_essenceward": {
   "zh": "靈息護體",
   "en": "Essence Aegis",
   "cat": "defense",
-  "rarity": "U",
+  "rarity": "R",
   "hero": "OWL",
   "block_from_mana": 6,
   "target": "self"
+ },
+ "sp_freeze": {
+  "zh": "冰凍",
+  "en": "Freeze",
+  "cat": "control",
+  "rarity": "R",
+  "hero": "OWL",
+  "stun": 1,
+  "weaken": 2,
+  "spell": 1,
+  "target": "enemy_die"
+ },
+ "owl_starshower": {
+  "zh": "星落",
+  "en": "Starfall",
+  "cat": "attack",
+  "rarity": "E",
+  "hero": "OWL",
+  "atk": 8,
+  "aoe": true,
+  "spell": 4,
+  "target": "none"
+ },
+ "sp_echo_crystal": {
+  "zh": "迴響水晶",
+  "en": "Reverb Crystal",
+  "cat": "heal",
+  "rarity": "E",
+  "hero": "OWL",
+  "heal": 6,
+  "echo": 2,
+  "spell": 1,
+  "target": "ally"
  },
  "owl_meteor": {
   "zh": "隕星雨",
   "en": "Meteor Shower",
   "cat": "attack",
-  "rarity": "U",
+  "rarity": "E",
   "hero": "OWL",
-  "atk": 4,
-  "hits": 2,
+  "atk": 6,
+  "hits": 3,
   "spell": 5,
   "target": "enemy"
  },
+ "sp_time_stop": {
+  "zh": "時停",
+  "en": "Time Stop",
+  "cat": "control",
+  "rarity": "E",
+  "hero": "OWL",
+  "stun": 2,
+  "target": "enemy_die"
+ },
+
  "fox_stab2": {
   "zh": "刺擊",
   "en": "Jab",
@@ -659,66 +1028,165 @@
   "rerolls": 1,
   "target": "enemy"
  },
+ "fox_siphonstep": {
+  "zh": "攝靈",
+  "en": "Siphon Step",
+  "cat": "attack",
+  "rarity": "S",
+  "hero": "FOX",
+  "die": "B",
+  "atk": 3,
+  "mana": 1,
+  "target": "enemy"
+ },
  "fox_stab2x2": {
   "zh": "連刺",
   "en": "Double Jab",
   "cat": "attack",
-  "rarity": "U",
+  "rarity": "C",
   "hero": "FOX",
   "atk": 2,
   "hits": 2,
+  "combo": true,
+  "target": "enemy"
+ },
+ "sp_echo_cut": {
+  "zh": "呼應斬",
+  "en": "Echo Cut",
+  "cat": "attack",
+  "rarity": "C",
+  "hero": "FOX",
+  "atk": 4,
+  "resonate": 2,
+  "resonate_cat": "attack",
   "target": "enemy"
  },
  "fox_guard3": {
-  "zh": "格擋",
-  "en": "Guard",
+  "zh": "迴身格擋",
+  "en": "Turning Guard",
   "cat": "defense",
-  "rarity": "U",
+  "rarity": "C",
   "hero": "FOX",
-  "block": 3,
+  "block": 4,
+  "resonate": 2,
+  "resonate_cat": "attack",
   "target": "self"
+ },
+ "sp_trickery": {
+  "zh": "詭計",
+  "en": "Trickery",
+  "cat": "control",
+  "rarity": "C",
+  "hero": "FOX",
+  "stun": 1,
+  "target": "enemy_die"
  },
  "fox_echo4": {
   "zh": "呼應刺",
   "en": "Echo Jab",
   "cat": "attack",
-  "rarity": "U",
+  "rarity": "R",
   "hero": "FOX",
   "atk": 5,
   "resonate": 3,
   "resonate_cat": "attack",
   "target": "enemy"
  },
+ "fox_essencefeint": {
+  "zh": "攝靈連步",
+  "en": "Essence Feint",
+  "cat": "attack",
+  "rarity": "R",
+  "hero": "FOX",
+  "atk": 3,
+  "combo": true,
+  "mana": 1,
+  "target": "enemy"
+ },
+ "fox_essencewaltz": {
+  "zh": "靈息雙舞",
+  "en": "Essence Waltz",
+  "cat": "attack",
+  "rarity": "R",
+  "hero": "FOX",
+  "atk": 8,
+  "combo": true,
+  "spell": 2,
+  "target": "enemy"
+ },
+ "sp_chain_strike": {
+  "zh": "連環擊",
+  "en": "Chain Strike",
+  "cat": "attack",
+  "rarity": "R",
+  "hero": "FOX",
+  "atk": 5,
+  "combo": true,
+  "target": "enemy"
+ },
  "fox_shadow3": {
   "zh": "影襲",
   "en": "Shadow Strike",
   "cat": "attack",
-  "rarity": "U",
+  "rarity": "R",
   "hero": "FOX",
   "atk": 4,
   "pierce": true,
   "target": "enemy"
  },
+ "fox_crossparry": {
+  "zh": "攝靈迴防",
+  "en": "Spirit Parry",
+  "cat": "defense",
+  "rarity": "R",
+  "hero": "FOX",
+  "block": 4,
+  "resonate": 2,
+  "resonate_cat": "attack",
+  "mana": 1,
+  "target": "self"
+ },
  "fox_twindance": {
   "zh": "雙舞",
   "en": "Twin Dance",
   "cat": "special",
-  "rarity": "U",
+  "rarity": "E",
   "hero": "FOX",
   "twin_dance": true,
   "target": "none"
+ },
+ "sp_die_theft": {
+  "zh": "奪骰",
+  "en": "Die Theft",
+  "cat": "special",
+  "rarity": "E",
+  "hero": "FOX",
+  "steal_die": true,
+  "target": "enemy_die"
  },
  "fox_phantom": {
   "zh": "絕影",
   "en": "Phantom Flurry",
   "cat": "attack",
-  "rarity": "U",
+  "rarity": "E",
   "hero": "FOX",
   "atk": 1,
   "hits": 4,
   "resonate_req": "attack",
   "target": "enemy"
  },
+ "fox_spiritwaltz": {
+  "zh": "靈魂圓舞",
+  "en": "Spirit Waltz",
+  "cat": "attack",
+  "rarity": "E",
+  "hero": "FOX",
+  "atk": 3,
+  "combo": true,
+  "mana": 2,
+  "target": "enemy"
+ },
+
  "boar_smash4": {
   "zh": "猛擊",
   "en": "Smash",
@@ -810,675 +1278,6 @@
   "next_dice_boost": 2,
   "target": "none"
  },
- "boar_smash6": {
-  "zh": "猛擊",
-  "en": "Smash",
-  "cat": "attack",
-  "rarity": "U",
-  "hero": "BOAR",
-  "atk": 6,
-  "pain": 1,
-  "target": "enemy"
- },
- "boar_ironhide": {
-  "zh": "鐵皮",
-  "en": "Iron Hide",
-  "cat": "defense",
-  "rarity": "U",
-  "hero": "BOAR",
-  "block": 4,
-  "thorns": 1,
-  "target": "self"
- },
- "boar_bloodhit5": {
-  "zh": "嗜血擊",
-  "en": "Bloodthirst",
-  "cat": "attack",
-  "rarity": "U",
-  "hero": "BOAR",
-  "atk": 5,
-  "heal_on_hit": 2,
-  "target": "enemy"
- },
- "boar_lastditch": {
-  "zh": "背水",
-  "en": "Last Ditch",
-  "cat": "attack",
-  "rarity": "U",
-  "hero": "BOAR",
-  "atk": 4,
-  "low_hp_atk": 7,
-  "target": "enemy"
- },
- "boar_avalanche8": {
-  "zh": "崩山",
-  "en": "Avalanche",
-  "cat": "attack",
-  "rarity": "U",
-  "hero": "BOAR",
-  "atk": 8,
-  "pain": 3,
-  "target": "enemy"
- },
- "boar_finale10": {
-  "zh": "終焉",
-  "en": "Finale",
-  "cat": "attack",
-  "rarity": "U",
-  "hero": "BOAR",
-  "atk": 10,
-  "pain": 4,
-  "target": "enemy"
- },
- "sp_heavy_blow": {
-  "zh": "重擊",
-  "en": "Heavy Blow",
-  "cat": "attack",
-  "rarity": "C",
-  "atk": 7,
-  "target": "enemy"
- },
- "sp_quick_jab": {
-  "zh": "快擊",
-  "en": "Quick Jab",
-  "cat": "attack",
-  "rarity": "C",
-  "atk": 4,
-  "combo": true,
-  "target": "enemy"
- },
- "sp_armor_break": {
-  "zh": "破甲擊",
-  "en": "Armor Break",
-  "cat": "attack",
-  "rarity": "C",
-  "atk": 4,
-  "pierce": true,
-  "target": "enemy"
- },
- "sp_sweep_cut": {
-  "zh": "掃擊",
-  "en": "Sweep Cut",
-  "cat": "attack",
-  "rarity": "C",
-  "atk": 3,
-  "cleave": true,
-  "target": "enemy"
- },
- "sp_venom_knife": {
-  "zh": "毒匕",
-  "en": "Venom Knife",
-  "cat": "attack",
-  "rarity": "C",
-  "atk": 3,
-  "poison": 2,
-  "target": "enemy"
- },
- "sp_reckless": {
-  "zh": "豁命揮擊",
-  "en": "Reckless Swing",
-  "cat": "attack",
-  "rarity": "C",
-  "atk": 9,
-  "pain": 3,
-  "target": "enemy"
- },
- "sp_torch": {
-  "zh": "火把",
-  "en": "Torch",
-  "cat": "attack",
-  "rarity": "C",
-  "atk": 3,
-  "burn": 2,
-  "target": "enemy"
- },
- "sp_keen": {
-  "zh": "精準",
-  "en": "Keen Strike",
-  "cat": "attack",
-  "rarity": "C",
-  "atk": 5,
-  "lucky": true,
-  "target": "enemy"
- },
- "sp_charged_shot": {
-  "zh": "蓄勢箭",
-  "en": "Charged Shot",
-  "cat": "attack",
-  "rarity": "C",
-  "atk": 3,
-  "charge_up": 2,
-  "target": "enemy"
- },
- "sp_echo_cut": {
-  "zh": "呼應斬",
-  "en": "Echo Cut",
-  "cat": "attack",
-  "rarity": "C",
-  "atk": 3,
-  "resonate": 2,
-  "resonate_cat": "attack",
-  "target": "enemy"
- },
- "sp_great_blade": {
-  "zh": "巨刃",
-  "en": "Great Blade",
-  "cat": "attack",
-  "rarity": "R",
-  "atk": 10,
-  "pain": 2,
-  "target": "enemy"
- },
- "sp_lance": {
-  "zh": "長矛突刺",
-  "en": "Lance Thrust",
-  "cat": "attack",
-  "rarity": "R",
-  "atk": 6,
-  "pierce": true,
-  "target": "enemy"
- },
- "sp_whirl_blade": {
-  "zh": "迴旋刃",
-  "en": "Whirl Blade",
-  "cat": "attack",
-  "rarity": "R",
-  "atk": 5,
-  "cleave": true,
-  "target": "enemy"
- },
- "sp_viper_needle": {
-  "zh": "猛毒針",
-  "en": "Viper Needle",
-  "cat": "attack",
-  "rarity": "R",
-  "atk": 4,
-  "poison": 4,
-  "target": "enemy"
- },
- "sp_leech_bite": {
-  "zh": "吸血咬",
-  "en": "Leech Bite",
-  "cat": "attack",
-  "rarity": "R",
-  "atk": 5,
-  "lifesteal": true,
-  "target": "enemy"
- },
- "sp_chain_strike": {
-  "zh": "連環擊",
-  "en": "Chain Strike",
-  "cat": "attack",
-  "rarity": "R",
-  "atk": 5,
-  "combo": true,
-  "target": "enemy"
- },
- "sp_flame_strike": {
-  "zh": "烈焰擊",
-  "en": "Flame Strike",
-  "cat": "attack",
-  "rarity": "R",
-  "atk": 5,
-  "burn": 4,
-  "target": "enemy"
- },
- "sp_scatter": {
-  "zh": "亂射",
-  "en": "Scatter Shot",
-  "cat": "attack",
-  "rarity": "R",
-  "atk": 2,
-  "aoe": true,
-  "target": "none"
- },
- "sp_twin_strike": {
-  "zh": "雙擊",
-  "en": "Twin Strike",
-  "cat": "attack",
-  "rarity": "R",
-  "atk": 3,
-  "hits": 2,
-  "target": "enemy"
- },
- "sp_annihilate": {
-  "zh": "殲滅",
-  "en": "Annihilate",
-  "cat": "attack",
-  "rarity": "E",
-  "atk": 13,
-  "pain": 4,
-  "target": "enemy"
- },
- "sp_godpierce": {
-  "zh": "神穿",
-  "en": "Godpierce",
-  "cat": "attack",
-  "rarity": "E",
-  "atk": 8,
-  "pierce": true,
-  "target": "enemy"
- },
- "sp_reaper": {
-  "zh": "死亡鐮",
-  "en": "Reaper Scythe",
-  "cat": "attack",
-  "rarity": "E",
-  "atk": 6,
-  "aoe": true,
-  "pain": 3,
-  "target": "none"
- },
- "sp_plague": {
-  "zh": "疫病爆發",
-  "en": "Plague Burst",
-  "cat": "attack",
-  "rarity": "E",
-  "poison": 3,
-  "aoe": true,
-  "target": "none"
- },
- "sp_dragon_breath": {
-  "zh": "龍息",
-  "en": "Dragon Breath",
-  "cat": "attack",
-  "rarity": "E",
-  "atk": 4,
-  "aoe": true,
-  "burn": 2,
-  "target": "none"
- },
- "sp_focus": {
-  "zh": "凝神",
-  "en": "Focus",
-  "cat": "defense",
-  "rarity": "C",
-  "block": 3,
-  "buff_next_atk": 2,
-  "target": "self"
- },
- "sp_shield_wall": {
-  "zh": "盾牆",
-  "en": "Shield Wall",
-  "cat": "defense",
-  "rarity": "C",
-  "block": 7,
-  "target": "self"
- },
- "sp_thorn_shield": {
-  "zh": "棘盾",
-  "en": "Thorn Shield",
-  "cat": "defense",
-  "rarity": "C",
-  "block": 3,
-  "thorns": 3,
-  "target": "self"
- },
- "sp_protect": {
-  "zh": "守護",
-  "en": "Protect",
-  "cat": "defense",
-  "rarity": "C",
-  "taunt": true,
-  "block": 5,
-  "target": "self"
- },
- "sp_cleansing_shield": {
-  "zh": "淨盾",
-  "en": "Cleansing Shield",
-  "cat": "defense",
-  "rarity": "C",
-  "block": 4,
-  "cleanse_self": true,
-  "target": "self"
- },
- "sp_great_wall": {
-  "zh": "巨壁",
-  "en": "Great Wall",
-  "cat": "defense",
-  "rarity": "R",
-  "block": 10,
-  "target": "self"
- },
- "sp_briar_mail": {
-  "zh": "荊棘鎧",
-  "en": "Briar Mail",
-  "cat": "defense",
-  "rarity": "R",
-  "block": 5,
-  "thorns": 5,
-  "target": "self"
- },
- "sp_aegis": {
-  "zh": "聖盾",
-  "en": "Aegis",
-  "cat": "defense",
-  "rarity": "R",
-  "team_block": 2,
-  "target": "none"
- },
- "sp_absolute_guard": {
-  "zh": "絕對防禦",
-  "en": "Absolute Guard",
-  "cat": "defense",
-  "rarity": "E",
-  "block": 8,
-  "taunt": true,
-  "thorns": 3,
-  "target": "self"
- },
- "sp_citadel": {
-  "zh": "城塞",
-  "en": "Citadel",
-  "cat": "defense",
-  "rarity": "E",
-  "team_block": 4,
-  "target": "none"
- },
- "sp_cure": {
-  "zh": "治癒",
-  "en": "Cure",
-  "cat": "heal",
-  "rarity": "C",
-  "heal": 6,
-  "target": "ally"
- },
- "sp_first_aid": {
-  "zh": "急救",
-  "en": "First Aid",
-  "cat": "heal",
-  "rarity": "C",
-  "heal": 4,
-  "cleanse_target": true,
-  "target": "ally"
- },
- "sp_greater_cure": {
-  "zh": "厚生術",
-  "en": "Restoration",
-  "cat": "heal",
-  "rarity": "R",
-  "heal": 9,
-  "target": "ally"
- },
- "sp_mass_mend": {
-  "zh": "群體治癒",
-  "en": "Mass Mend",
-  "cat": "heal",
-  "rarity": "R",
-  "team_heal": 3,
-  "target": "none"
- },
- "sp_regenerate": {
-  "zh": "再生術",
-  "en": "Regenerate",
-  "cat": "heal",
-  "rarity": "R",
-  "regen": 3,
-  "target": "ally"
- },
- "sp_life_bloom": {
-  "zh": "生命綻放",
-  "en": "Life Bloom",
-  "cat": "heal",
-  "rarity": "E",
-  "team_heal": 4,
-  "target": "none"
- },
- "sp_miracle": {
-  "zh": "奇蹟",
-  "en": "Miracle",
-  "cat": "heal",
-  "rarity": "E",
-  "heal": 12,
-  "target": "ally"
- },
- "sp_channel": {
-  "zh": "汲靈",
-  "en": "Draw Essence",
-  "cat": "resource",
-  "rarity": "C",
-  "mana": 2,
-  "target": "none"
- },
- "sp_trickery": {
-  "zh": "詭計",
-  "en": "Trickery",
-  "cat": "control",
-  "rarity": "C",
-  "stun": 1,
-  "target": "enemy_die"
- },
- "sp_sap": {
-  "zh": "削弱",
-  "en": "Sap",
-  "cat": "control",
-  "rarity": "C",
-  "weaken": 2,
-  "target": "enemy"
- },
- "sp_mark": {
-  "zh": "標記",
-  "en": "Mark",
-  "cat": "control",
-  "rarity": "C",
-  "expose": true,
-  "target": "enemy"
- },
- "sp_insight": {
-  "zh": "洞察",
-  "en": "Insight",
-  "cat": "resource",
-  "rarity": "C",
-  "rerolls": 1,
-  "target": "none"
- },
- "sp_deep_channel": {
-  "zh": "深汲",
-  "en": "Deep Draw",
-  "cat": "resource",
-  "rarity": "R",
-  "mana": 4,
-  "target": "none"
- },
- "sp_freeze": {
-  "zh": "冰凍",
-  "en": "Freeze",
-  "cat": "control",
-  "rarity": "R",
-  "stun": 1,
-  "weaken": 1,
-  "target": "enemy_die"
- },
- "sp_evil_eye": {
-  "zh": "詛咒之眼",
-  "en": "Evil Eye",
-  "cat": "control",
-  "rarity": "R",
-  "expose": true,
-  "weaken": 2,
-  "target": "enemy"
- },
- "sp_chaos": {
-  "zh": "混沌",
-  "en": "Chaos",
-  "cat": "special",
-  "rarity": "R",
-  "wild": true,
-  "target": "wild"
- },
- "sp_time_stop": {
-  "zh": "時停",
-  "en": "Time Stop",
-  "cat": "control",
-  "rarity": "E",
-  "stun": 2,
-  "target": "enemy_die"
- },
- "sp_die_theft": {
-  "zh": "奪骰",
-  "en": "Die Theft",
-  "cat": "special",
-  "rarity": "E",
-  "steal_die": true,
-  "target": "enemy_die"
- },
- "sp_seed_blade": {
-  "zh": "成長之刃",
-  "en": "Seed Blade",
-  "cat": "attack",
-  "rarity": "R",
-  "atk": 3,
-  "growth": true,
-  "target": "enemy"
- },
- "sp_seed_shield": {
-  "zh": "成長之盾",
-  "en": "Seed Shield",
-  "cat": "defense",
-  "rarity": "R",
-  "block": 3,
-  "growth": true,
-  "target": "self"
- },
- "sp_gambit": {
-  "zh": "賭命",
-  "en": "Gambit",
-  "cat": "attack",
-  "rarity": "R",
-  "random_atk": [
-   1,
-   12
-  ],
-  "target": "enemy"
- },
- "sp_stasis": {
-  "zh": "靜滯場",
-  "en": "Stasis Field",
-  "cat": "control",
-  "rarity": "R",
-  "weaken": 2,
-  "aoe": true,
-  "spell": 2,
-  "target": "none"
- },
- "sp_arcane_blast": {
-  "zh": "奧術爆",
-  "en": "Arcane Blast",
-  "cat": "attack",
-  "rarity": "E",
-  "atk": 6,
-  "aoe": true,
-  "spell": 3,
-  "target": "none"
- },
- "sp_echo_crystal": {
-  "zh": "迴響水晶",
-  "en": "Reverb Crystal",
-  "cat": "heal",
-  "rarity": "E",
-  "heal": 4,
-  "echo": 2,
-  "target": "ally"
- },
- "bdg_essenceguard": {
-  "zh": "靈甲",
-  "en": "Essence Guard",
-  "cat": "defense",
-  "rarity": "S",
-  "hero": "BADGER",
-  "die": "B",
-  "block": 3,
-  "mana": 1,
-  "target": "self"
- },
- "bdg_infusedsmash": {
-  "zh": "灌注猛擊",
-  "en": "Infused Smash",
-  "cat": "attack",
-  "rarity": "U",
-  "hero": "BADGER",
-  "atk": 6,
-  "spell": 2,
-  "target": "enemy"
- },
- "hedge_quilldraw": {
-  "zh": "棘息",
-  "en": "Quill Draw",
-  "cat": "defense",
-  "rarity": "S",
-  "hero": "HEDGE",
-  "die": "B",
-  "block": 2,
-  "thorns": 1,
-  "mana": 1,
-  "target": "self"
- },
- "hedge_essencebloom": {
-  "zh": "靈棘綻放",
-  "en": "Essence Bloom",
-  "cat": "defense",
-  "rarity": "U",
-  "hero": "HEDGE",
-  "team_thorns": 2,
-  "team_block": 2,
-  "spell": 2,
-  "target": "none"
- },
- "owl_starshower": {
-  "zh": "星落",
-  "en": "Starfall",
-  "cat": "attack",
-  "rarity": "U",
-  "hero": "OWL",
-  "atk": 5,
-  "aoe": true,
-  "spell": 4,
-  "target": "none"
- },
- "hare_essencearrow": {
-  "zh": "凝靈箭",
-  "en": "Essence Arrow",
-  "cat": "attack",
-  "rarity": "S",
-  "hero": "HARE",
-  "die": "B",
-  "atk": 4,
-  "pierce": true,
-  "spell": 1,
-  "target": "enemy"
- },
- "hare_attunedaim": {
-  "zh": "引靈瞄準",
-  "en": "Attuned Aim",
-  "cat": "resource",
-  "rarity": "U",
-  "hero": "HARE",
-  "mana": 1,
-  "charge_up": 1,
-  "target": "none"
- },
- "fox_siphonstep": {
-  "zh": "攝靈",
-  "en": "Siphon Step",
-  "cat": "attack",
-  "rarity": "S",
-  "hero": "FOX",
-  "die": "B",
-  "atk": 3,
-  "mana": 1,
-  "target": "enemy"
- },
- "fox_essencewaltz": {
-  "zh": "靈息雙舞",
-  "en": "Essence Waltz",
-  "cat": "attack",
-  "rarity": "U",
-  "hero": "FOX",
-  "atk": 4,
-  "combo": true,
-  "spell": 2,
-  "target": "enemy"
- },
  "boar_bloodtithe": {
   "zh": "以血引靈",
   "en": "Blood Tithe",
@@ -1489,15 +1288,254 @@
   "mana": 3,
   "target": "none"
  },
+ "boar_smash6": {
+  "zh": "猛擊",
+  "en": "Smash",
+  "cat": "attack",
+  "rarity": "C",
+  "hero": "BOAR",
+  "atk": 7,
+  "pain": 1,
+  "target": "enemy"
+ },
+ "sp_reckless": {
+  "zh": "豁命揮擊",
+  "en": "Reckless Swing",
+  "cat": "attack",
+  "rarity": "C",
+  "hero": "BOAR",
+  "atk": 9,
+  "pain": 3,
+  "target": "enemy"
+ },
+ "boar_ironhide": {
+  "zh": "鐵皮",
+  "en": "Iron Hide",
+  "cat": "defense",
+  "rarity": "C",
+  "hero": "BOAR",
+  "block": 5,
+  "thorns": 1,
+  "target": "self"
+ },
+ "sp_leech_bite": {
+  "zh": "吸血咬",
+  "en": "Leech Bite",
+  "cat": "attack",
+  "rarity": "C",
+  "hero": "BOAR",
+  "atk": 4,
+  "lifesteal": true,
+  "target": "enemy"
+ },
+ "boar_bloodhit5": {
+  "zh": "嗜血擊",
+  "en": "Bloodthirst",
+  "cat": "attack",
+  "rarity": "R",
+  "hero": "BOAR",
+  "atk": 5,
+  "heal_on_hit": 2,
+  "target": "enemy"
+ },
+ "boar_painbrew": {
+  "zh": "熬血引靈",
+  "en": "Blood Brew",
+  "cat": "resource",
+  "rarity": "R",
+  "hero": "BOAR",
+  "pain": 2,
+  "mana": 4,
+  "target": "none"
+ },
  "boar_bloodsurge": {
   "zh": "血靈爆",
   "en": "Blood Surge",
   "cat": "attack",
-  "rarity": "U",
+  "rarity": "R",
   "hero": "BOAR",
-  "atk": 8,
+  "atk": 13,
   "pain": 2,
+  "spell": 2,
+  "target": "enemy"
+ },
+ "sp_great_blade": {
+  "zh": "巨刃",
+  "en": "Great Blade",
+  "cat": "attack",
+  "rarity": "R",
+  "hero": "BOAR",
+  "atk": 10,
+  "pain": 2,
+  "target": "enemy"
+ },
+ "boar_lastditch": {
+  "zh": "背水",
+  "en": "Last Ditch",
+  "cat": "attack",
+  "rarity": "R",
+  "hero": "BOAR",
+  "atk": 5,
+  "low_hp_atk": 9,
+  "target": "enemy"
+ },
+ "sp_gambit": {
+  "zh": "賭命",
+  "en": "Gambit",
+  "cat": "attack",
+  "rarity": "R",
+  "hero": "BOAR",
+  "random_atk": [
+   1,
+   12
+  ],
+  "target": "enemy"
+ },
+ "boar_avalanche8": {
+  "zh": "崩山",
+  "en": "Avalanche",
+  "cat": "attack",
+  "rarity": "E",
+  "hero": "BOAR",
+  "atk": 11,
+  "pain": 3,
+  "target": "enemy"
+ },
+ "boar_frenzy": {
+  "zh": "狂亂血祭",
+  "en": "Blood Frenzy",
+  "cat": "attack",
+  "rarity": "E",
+  "hero": "BOAR",
+  "atk": 4,
+  "hits": 2,
+  "pain": 2,
+  "mana": 1,
+  "target": "enemy"
+ },
+ "boar_finale10": {
+  "zh": "終焉",
+  "en": "Finale",
+  "cat": "attack",
+  "rarity": "E",
+  "hero": "BOAR",
+  "atk": 12,
+  "pain": 4,
+  "target": "enemy"
+ },
+ "boar_worldbreaker": {
+  "zh": "碎世血嵐",
+  "en": "Worldbreaker",
+  "cat": "attack",
+  "rarity": "E",
+  "hero": "BOAR",
+  "atk": 16,
+  "pain": 3,
   "spell": 3,
   "target": "enemy"
+ },
+
+ "sp_venom_knife": {
+  "zh": "毒匕",
+  "en": "Venom Knife",
+  "cat": "attack",
+  "rarity": "C",
+  "atk": 3,
+  "poison": 2,
+  "target": "enemy"
+ },
+ "sp_torch": {
+  "zh": "火把",
+  "en": "Torch",
+  "cat": "attack",
+  "rarity": "C",
+  "atk": 4,
+  "burn": 2,
+  "target": "enemy"
+ },
+ "sp_shield_wall": {
+  "zh": "盾牆",
+  "en": "Shield Wall",
+  "cat": "defense",
+  "rarity": "C",
+  "block": 7,
+  "target": "self"
+ },
+ "sp_first_aid": {
+  "zh": "急救",
+  "en": "First Aid",
+  "cat": "heal",
+  "rarity": "C",
+  "heal": 4,
+  "cleanse_target": true,
+  "target": "ally"
+ },
+ "sp_channel": {
+  "zh": "汲靈",
+  "en": "Draw Essence",
+  "cat": "resource",
+  "rarity": "C",
+  "mana": 2,
+  "target": "none"
+ },
+ "sp_insight": {
+  "zh": "洞察",
+  "en": "Insight",
+  "cat": "resource",
+  "rarity": "C",
+  "rerolls": 1,
+  "target": "none"
+ },
+ "sp_lance": {
+  "zh": "長矛突刺",
+  "en": "Lance Thrust",
+  "cat": "attack",
+  "rarity": "R",
+  "atk": 6,
+  "pierce": true,
+  "target": "enemy"
+ },
+ "sp_great_wall": {
+  "zh": "巨壁",
+  "en": "Great Wall",
+  "cat": "defense",
+  "rarity": "R",
+  "block": 8,
+  "target": "self"
+ },
+ "sp_greater_cure": {
+  "zh": "厚生術",
+  "en": "Restoration",
+  "cat": "heal",
+  "rarity": "R",
+  "heal": 6,
+  "target": "ally"
+ },
+ "sp_deep_channel": {
+  "zh": "深汲",
+  "en": "Deep Draw",
+  "cat": "resource",
+  "rarity": "R",
+  "mana": 4,
+  "target": "none"
+ },
+ "sp_annihilate": {
+  "zh": "殲滅",
+  "en": "Annihilate",
+  "cat": "attack",
+  "rarity": "E",
+  "atk": 12,
+  "pain": 4,
+  "target": "enemy"
+ },
+ "sp_miracle": {
+  "zh": "奇蹟",
+  "en": "Miracle",
+  "cat": "heal",
+  "rarity": "E",
+  "heal": 4,
+  "cleanse_target": true,
+  "regen": 1,
+  "target": "ally"
  }
 }

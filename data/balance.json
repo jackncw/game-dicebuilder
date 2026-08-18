@@ -65,7 +65,7 @@
  },
  "boss_advanced_picks": 2,
  "offer_skip_gold": 5,
- "hero_face_offer_chance": 30,
+ "hero_face_offer_chance": 70,
  "elite_hp_mult": 1.5,
  "map_rows": 9,
  "node_weights": {

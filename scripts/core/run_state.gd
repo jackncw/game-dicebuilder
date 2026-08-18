@@ -213,8 +213,10 @@ static func available_nodes(run: Dictionary) -> Array:
 
 ## 3 post-battle offers: [{hero: idx, face: id}] bound to distinct heroes;
 ## rarity per the node kind's table ("battle" C70/R25/E5, "elite" C25/R60/E15,
-## "boss" R60/E40); 30% hero-specific override. Which of the hero's 12 faces
-## gets replaced is the player's choice at redemption time.
+## "boss" R60/E40). Round 13: `hero_face_offer_chance` (70) is the weight of
+## the hero's own CLASS pool — most of what a character is offered is theirs;
+## the small universal pool fills the other 30%. Which of the hero's 12 faces
+## an offer replaces is the player's choice at redemption time.
 static func gen_offers(run: Dictionary, rng: RandomNumberGenerator, kind: String, unlocked_by_hero: Dictionary) -> Array:
 	var hero_idx := []
 	for i in run.team.size():
@@ -226,29 +228,51 @@ static func gen_offers(run: Dictionary, rng: RandomNumberGenerator, kind: String
 		var hero: Dictionary = run.team[hi]
 		var face_id := ""
 		var unlocked: Array = unlocked_by_hero.get(hero.id, [])
-		if unlocked.size() > 0 and rng.randi_range(1, 100) <= int(GameData.balance.hero_face_offer_chance):
-			face_id = unlocked[rng.randi_range(0, unlocked.size() - 1)]
-		else:
+		if rng.randi_range(1, 100) <= int(GameData.balance.hero_face_offer_chance):
+			face_id = _roll_class_face(rng, kind, unlocked)
+		if face_id == "":
 			face_id = _roll_shared_face(rng, kind)
 		offers.append({"hero": hi, "face": face_id})
 	return offers
 
 
+## The node kind's rarity table, rolled once.
+static func _roll_rarity(rng: RandomNumberGenerator, kind := "battle") -> String:
+	var roll := rng.randi_range(1, 100)
+	if kind == "boss":
+		return "R" if roll <= int(GameData.balance.offer_rarity_boss.R) else "E"
+	var w: Dictionary = GameData.balance.offer_rarity_elite if kind == "elite" 			else GameData.balance.offer_rarity
+	if roll <= int(w.C):
+		return "C"
+	elif roll <= int(w.C) + int(w.R):
+		return "R"
+	return "E"
+
+
+## A face from `unlocked` (one hero's reachable class pool), respecting the
+## node kind's rarity table. If the rolled rarity has no unlocked candidate
+## the roll degrades to the nearest tier rather than failing — a level-2 hero
+## on a boss node still gets a class face, just a common one. Returns "" only
+## when the pool itself is empty (level 1).
+static func _roll_class_face(rng: RandomNumberGenerator, kind: String, unlocked: Array) -> String:
+	if unlocked.is_empty():
+		return ""
+	var order := []
+	match _roll_rarity(rng, kind):
+		"E": order = ["E", "R", "C"]
+		"R": order = ["R", "C", "E"]
+		_: order = ["C", "R", "E"]
+	for r in order:
+		var cands := unlocked.filter(func(fid: String) -> bool:
+			return String(GameData.faces.get(fid, {}).get("rarity", "")) == r)
+		if not cands.is_empty():
+			return cands[rng.randi_range(0, cands.size() - 1)]
+	return unlocked[rng.randi_range(0, unlocked.size() - 1)]
+
+
 ## `kind` is the node the loot came from: "battle", "elite" or "boss".
 static func _roll_shared_face(rng: RandomNumberGenerator, kind := "battle") -> String:
-	var roll := rng.randi_range(1, 100)
-	var rarity := "C"
-	if kind == "boss":
-		rarity = "R" if roll <= int(GameData.balance.offer_rarity_boss.R) else "E"
-	else:
-		var w: Dictionary = GameData.balance.offer_rarity_elite if kind == "elite" 				else GameData.balance.offer_rarity
-		if roll <= int(w.C):
-			rarity = "C"
-		elif roll <= int(w.C) + int(w.R):
-			rarity = "R"
-		else:
-			rarity = "E"
-	var pool := GameData.shared_pool(rarity)
+	var pool := GameData.shared_pool(_roll_rarity(rng, kind))
 	return pool[rng.randi_range(0, pool.size() - 1)]
 
 
@@ -301,12 +325,36 @@ static func gold_for_battle(run: Dictionary, rng: RandomNumberGenerator, kind: S
 
 # ============================================================ shop
 
+## Round 13: the shop mixes the same 70/30 class/universal weight the offers
+## use. A class face on the shelf is bound to the party member it belongs to
+## (`face_heroes[i]` = team index, -1 for a universal face) — the card shows
+## that character's portrait and only their dice can receive it.
 static func gen_shop(run: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
 	var faces := []
-	# at least 1 R-or-above among 4
-	faces.append(_roll_shared_face_min_r(rng))
-	for i in 3:
-		faces.append(_roll_shared_face(rng))
+	var face_heroes := []
+	for i in 4:
+		var hero_i := -1
+		var fid := ""
+		# slot 0 is the guaranteed R-or-above shelf
+		if rng.randi_range(1, 100) <= int(GameData.balance.hero_face_offer_chance):
+			var order := []
+			for j in run.team.size():
+				order.append(j)
+			_shuffle(order, rng)
+			for hi in order:
+				var h: Dictionary = run.team[hi]
+				var unlocked := GameData.unlocked_faces_at(String(h.id), int(h.get("level", 1)))
+				if i == 0:
+					unlocked = unlocked.filter(func(f: String) -> bool:
+						return String(GameData.faces.get(f, {}).get("rarity", "")) in ["R", "E"])
+				if not unlocked.is_empty():
+					fid = _roll_class_face(rng, "elite" if i == 0 else "battle", unlocked)
+					hero_i = hi
+					break
+		if fid == "":
+			fid = _roll_shared_face_min_r(rng) if i == 0 else _roll_shared_face(rng)
+		faces.append(fid)
+		face_heroes.append(hero_i)
 	# the shop only ever stocks Common relics — Advanced ones are boss loot
 	var relic := roll_relic(run, rng, "common")
 	var potion_ids := GameData.potions.keys()
@@ -314,7 +362,8 @@ static func gen_shop(run: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
 	var potions := [potion_ids[rng.randi_range(0, potion_ids.size() - 1)],
 			potion_ids[rng.randi_range(0, potion_ids.size() - 1)]]
 	return {
-		"faces": faces, "faces_bought": [false, false, false, false],
+		"faces": faces, "face_heroes": face_heroes,
+		"faces_bought": [false, false, false, false],
 		"relic": relic, "relic_bought": false,
 		"potions": potions, "potions_bought": [false, false],
 		"forge_used": false,

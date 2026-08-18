@@ -38,7 +38,7 @@ func _t_xp_levels() -> void:
 	_check(Game.hero_level("BADGER") == 1, "H2 still level 1 at 3 XP")
 	Game.grant_xp(["HARE"], 24)   # 28 total → level 5
 	_check(Game.hero_level("HARE") == 5, "level 5 at 28 XP")
-	_check(Game.unlocked_faces("HARE").size() == 4, "all 4 unlock faces at level 5")
+	_check(Game.unlocked_faces("HARE").size() == 8, "all 8 unlock faces at level 5 (2-per-level batches)")
 	_check("hare_pierce3" in Game.unlocked_faces("HARE"), "Lv2 face unlocked")
 	# persists across reload (simulating cross-run)
 	Game.load_meta()
@@ -48,7 +48,7 @@ func _t_xp_levels() -> void:
 func _t_unlocked_faces_in_offers() -> void:
 	var run := RunState.new_run(["HARE", "BADGER", "OWL", "HEDGE"], 999)
 	var rng := RunState.rng_of(run)
-	var unlocked := {"HARE": ["hare_pierce3", "sp_scatter"]}
+	var unlocked := {"HARE": ["hare_pierce3", "hare_longshot"]}
 	var hero_face_hits := 0
 	for k in 300:
 		var offers := RunState.gen_offers(run, rng, "battle", unlocked)

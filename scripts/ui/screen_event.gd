@@ -173,7 +173,7 @@ func _resolve(opt: Dictionary) -> void:
 					var hero: Dictionary = Game.run.team[hi]
 					var cur_r: String = GameData.faces[hero.faces[slot]].get("rarity", "C")
 					var target_r := "R"
-					if cur_r == "R" or cur_r == "E" or cur_r == "U":
+					if cur_r == "R" or cur_r == "E":
 						target_r = "E"
 					var pool := GameData.shared_pool(target_r)
 					var nf: String = pool[rng2.randi_range(0, pool.size() - 1)]

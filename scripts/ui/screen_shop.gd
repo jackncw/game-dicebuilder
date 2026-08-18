@@ -38,7 +38,8 @@ func _build() -> void:
 
 	list_vb.add_child(UIKit.title(Data.t("ui_shop"), UIKit.F_H1))
 
-	# faces
+	# faces — a class face is bound to the party member it belongs to: the card
+	# carries their portrait (face_card reads fd.hero) and only they can buy it
 	for i in stock.faces.size():
 		if stock.faces_bought[i]:
 			continue
@@ -139,10 +140,16 @@ func _buy_face(idx: int) -> void:
 	if int(Game.run.gold) < price:
 		Sfx.play("block", 0.5)
 		return
-	RunWidgets.pick_team_face(self, Data.t("ui_pick_replace"),
-		func(hi: int, slot: int) -> void:
-			Game.run.gold = int(Game.run.gold) - price
-			RunState.apply_face_swap(Game.run, hi, slot, fid)
-			stock.faces_bought[idx] = true
-			Sfx.play("buy")
-			_build(), Callable(), fid)
+	var hero_i := int(stock.get("face_heroes", [])[idx]) if idx < stock.get("face_heroes", []).size() else -1
+	var settle := func(hi: int, slot: int) -> void:
+		Game.run.gold = int(Game.run.gold) - price
+		RunState.apply_face_swap(Game.run, hi, slot, fid)
+		stock.faces_bought[idx] = true
+		Sfx.play("buy")
+		_build()
+	if hero_i >= 0:
+		# class face: it belongs to this character, so the swap opens on them
+		RunWidgets.pick_hero_face(self, Game.run.team[hero_i], Data.t("ui_pick_replace"),
+				fid, func(slot: int) -> void: settle.call(hero_i, slot))
+	else:
+		RunWidgets.pick_team_face(self, Data.t("ui_pick_replace"), settle, Callable(), fid)

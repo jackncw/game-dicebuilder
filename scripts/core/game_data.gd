@@ -193,7 +193,36 @@ static func unlocked_faces_at(id: String, level: int) -> Array:
 	lvls.sort_custom(func(a, b): return int(a) < int(b))
 	for l in lvls:
 		if int(l) <= level:
-			out.append(String(unlocks[l]))
+			out.append_array(unlock_batch(id, String(l)))
+	return out
+
+
+## One level's unlock batch as an Array (round 13 made batches 2-3 faces; a
+## lone String from older data still reads as a batch of one).
+static func unlock_batch(id: String, level_key: String) -> Array:
+	load_all()
+	var entry = heroes.get(id, {}).get("unlocks", {}).get(level_key, [])
+	if entry is Array:
+		var out := []
+		for fid in entry:
+			out.append(String(fid))
+		return out
+	return [String(entry)] if String(entry) != "" else []
+
+
+## A hero's whole class pool: every face its unlock table can ever hand out,
+## in batch order. This IS the acquirable hero-bound pool — the value-band
+## suite asserts the two stay identical.
+static func class_pool(id: String) -> Array:
+	load_all()
+	var out := []
+	var unlocks: Dictionary = heroes.get(id, {}).get("unlocks", {})
+	var lvls: Array = unlocks.keys()
+	lvls.sort_custom(func(a, b): return int(a) < int(b))
+	for l in lvls:
+		for fid in unlock_batch(id, String(l)):
+			if fid not in out:
+				out.append(fid)
 	return out
 
 

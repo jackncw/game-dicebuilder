@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://codexscroll001"]
+
+[ext_resource type="Script" path="res://tests/codex_scroll_test.gd" id="1"]
+
+[node name="CodexScrollTest" type="Node"]
+script = ExtResource("1")

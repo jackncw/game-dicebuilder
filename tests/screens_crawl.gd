@@ -79,7 +79,7 @@ func _ready() -> void:
 			await get_tree().process_frame
 		# exercise the modal face pickers the run screens open
 		if name in ["reward", "shop", "treasure"]:
-			RunWidgets.pick_hero_face(inst, Game.run.team[0], "pick", "sp_heavy_blow",
+			RunWidgets.pick_hero_face(inst, Game.run.team[0], "pick", "sp_lance",
 					func(_slot: int) -> void: pass)
 			await get_tree().process_frame
 			RunWidgets.pick_team_face(inst, "pick", func(_hi: int, _slot: int) -> void: pass)

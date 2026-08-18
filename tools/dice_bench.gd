@@ -140,9 +140,9 @@ func _sheet_tiles() -> void:
 	grid.position = Vector2(20, 70)
 	root.add_child(grid)
 	var picks := ["hare_quick3", "sp_great_blade", "owl_starfall", "hedge_guard4thorn2",
-			"sp_reaper", "sp_plague", "sp_annihilate", "sp_die_theft",
-			"sp_chaos", "sp_focus", "sp_echo_crystal", "sp_gambit",
-			"sp_seed_blade", "sp_keen", "sp_stasis", "sp_citadel",
+			"owl_starshower", "sp_venom_knife", "sp_annihilate", "sp_die_theft",
+			"sp_torch", "sp_focus", "sp_echo_crystal", "sp_gambit",
+			"hare_galestorm", "boar_worldbreaker", "sp_freeze", "sp_great_wall",
 			"sp_first_aid", "blank"]
 	for fid in picks:
 		var fd: Dictionary = GameData.faces[fid].duplicate()

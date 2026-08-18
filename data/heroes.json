@@ -1,5 +1,5 @@
 {
- "_comment": "The six militia of the Grove (2026-08-06 character overhaul). `order` drives every list in the UI — nothing enumerates hero ids by hand any more. `passive` is the key BattleCore switches on; the id itself is never tested. Six XP-pool unlocks per hero, one per level 2-7.",
+ "_comment": "The six militia of the Grove (2026-08-06 character overhaul). `order` drives every list in the UI — nothing enumerates hero ids by hand any more. `passive` is the key BattleCore switches on; the id itself is never tested. Round 13: `unlocks` is the hero's CLASS POOL — a 2-face batch per level 2-8 (14 faces), early batches are class-core commons, late batches are build capstones. Every face that appeared in the old one-per-level table kept its old level, so no save can regress.",
  "BADGER": {
   "order": 1,
   "zh": "獾斧衛士",
@@ -32,13 +32,34 @@
   "die_b_zh": "行囊骰",
   "die_b_en": "Satchel Die",
   "unlocks": {
-   "2": "bdg_heavy5",
-   "3": "bdg_chop3guard3",
-   "4": "bdg_infusedsmash",
-   "5": "bdg_heal3",
-   "6": "bdg_smash6",
-   "7": "bdg_guard4thorn",
-   "8": "bdg_warcry"
+   "2": [
+    "bdg_heavy5",
+    "sp_focus"
+   ],
+   "3": [
+    "bdg_chop3guard3",
+    "sp_sweep_cut"
+   ],
+   "4": [
+    "bdg_infusedsmash",
+    "bdg_spiritshield"
+   ],
+   "5": [
+    "bdg_heal3",
+    "bdg_essenceaxe"
+   ],
+   "6": [
+    "bdg_smash6",
+    "bdg_rally"
+   ],
+   "7": [
+    "bdg_guard4thorn",
+    "bdg_oakheart"
+   ],
+   "8": [
+    "bdg_warcry",
+    "bdg_essencebulwark"
+   ]
   },
   "color": "#a87c4a",
   "starter": true
@@ -75,13 +96,34 @@
   "die_b_zh": "箭袋骰",
   "die_b_en": "Quiver Die",
   "unlocks": {
-   "2": "hare_pierce3",
-   "3": "hare_attunedaim",
-   "4": "hare_guard3",
-   "5": "hare_volley",
-   "6": "hare_snipe6",
-   "7": "hare_hawkeye",
-   "8": "hare_deadly7"
+   "2": [
+    "hare_pierce3",
+    "hare_longshot"
+   ],
+   "3": [
+    "hare_attunedaim",
+    "sp_charged_shot"
+   ],
+   "4": [
+    "hare_guard3",
+    "hare_hawkfeather"
+   ],
+   "5": [
+    "hare_volley",
+    "hare_windarrow"
+   ],
+   "6": [
+    "hare_snipe6",
+    "hare_pinning"
+   ],
+   "7": [
+    "hare_hawkeye",
+    "hare_moonpiercer"
+   ],
+   "8": [
+    "hare_deadly7",
+    "hare_galestorm"
+   ]
   },
   "color": "#6aa84f",
   "starter": true
@@ -118,13 +160,34 @@
   "die_b_zh": "短錘骰",
   "die_b_en": "Mace Die",
   "unlocks": {
-   "2": "hedge_guard5",
-   "3": "hedge_thorns3",
-   "4": "hedge_recoil4",
-   "5": "hedge_essencebloom",
-   "6": "hedge_guard4thorn2",
-   "7": "hedge_bristle",
-   "8": "hedge_shieldbash"
+   "2": [
+    "hedge_guard5",
+    "sp_thorn_shield"
+   ],
+   "3": [
+    "hedge_thorns3",
+    "hedge_quillvolley"
+   ],
+   "4": [
+    "hedge_recoil4",
+    "sp_protect"
+   ],
+   "5": [
+    "hedge_essencebloom",
+    "hedge_quillsurge"
+   ],
+   "6": [
+    "hedge_guard4thorn2",
+    "sp_briar_mail"
+   ],
+   "7": [
+    "hedge_bristle",
+    "hedge_ironquills"
+   ],
+   "8": [
+    "hedge_shieldbash",
+    "hedge_thornaegis"
+   ]
   },
   "color": "#7f94a8",
   "starter": true
@@ -161,13 +224,34 @@
   "die_b_zh": "圖騰骰",
   "die_b_en": "Totem Die",
   "unlocks": {
-   "2": "owl_gather3",
-   "3": "owl_bolt4",
-   "4": "owl_meditate",
-   "5": "owl_greatheal",
-   "6": "owl_essenceward",
-   "7": "owl_starshower",
-   "8": "owl_meteor"
+   "2": [
+    "owl_gather3",
+    "owl_moonbeam"
+   ],
+   "3": [
+    "owl_bolt4",
+    "owl_blessing"
+   ],
+   "4": [
+    "owl_meditate",
+    "sp_regenerate"
+   ],
+   "5": [
+    "owl_greatheal",
+    "sp_mass_mend"
+   ],
+   "6": [
+    "owl_essenceward",
+    "sp_freeze"
+   ],
+   "7": [
+    "owl_starshower",
+    "sp_echo_crystal"
+   ],
+   "8": [
+    "owl_meteor",
+    "sp_time_stop"
+   ]
   },
   "color": "#e0a33c",
   "starter": true
@@ -204,13 +288,34 @@
   "die_b_zh": "右刃骰",
   "die_b_en": "Right Blade Die",
   "unlocks": {
-   "2": "fox_stab2x2",
-   "3": "fox_guard3",
-   "4": "fox_echo4",
-   "5": "fox_essencewaltz",
-   "6": "fox_shadow3",
-   "7": "fox_twindance",
-   "8": "fox_phantom"
+   "2": [
+    "fox_stab2x2",
+    "sp_echo_cut"
+   ],
+   "3": [
+    "fox_guard3",
+    "sp_trickery"
+   ],
+   "4": [
+    "fox_echo4",
+    "fox_essencefeint"
+   ],
+   "5": [
+    "fox_essencewaltz",
+    "sp_chain_strike"
+   ],
+   "6": [
+    "fox_shadow3",
+    "fox_crossparry"
+   ],
+   "7": [
+    "fox_twindance",
+    "sp_die_theft"
+   ],
+   "8": [
+    "fox_phantom",
+    "fox_spiritwaltz"
+   ]
   },
   "color": "#e2703a",
   "starter": false
@@ -247,13 +352,34 @@
   "die_b_zh": "蠻勇骰",
   "die_b_en": "Fury Die",
   "unlocks": {
-   "2": "boar_smash6",
-   "3": "boar_ironhide",
-   "4": "boar_bloodhit5",
-   "5": "boar_bloodsurge",
-   "6": "boar_lastditch",
-   "7": "boar_avalanche8",
-   "8": "boar_finale10"
+   "2": [
+    "boar_smash6",
+    "sp_reckless"
+   ],
+   "3": [
+    "boar_ironhide",
+    "sp_leech_bite"
+   ],
+   "4": [
+    "boar_bloodhit5",
+    "boar_painbrew"
+   ],
+   "5": [
+    "boar_bloodsurge",
+    "sp_great_blade"
+   ],
+   "6": [
+    "boar_lastditch",
+    "sp_gambit"
+   ],
+   "7": [
+    "boar_avalanche8",
+    "boar_frenzy"
+   ],
+   "8": [
+    "boar_finale10",
+    "boar_worldbreaker"
+   ]
   },
   "color": "#a83b52",
   "starter": false

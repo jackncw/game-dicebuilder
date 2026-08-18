@@ -124,6 +124,8 @@ class _Screen:
 		scroll.offset_right = -UITheme.S3
 		scroll.offset_bottom = -TRAY_H
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		# same finger contract as the codex: scroll from anywhere, tap = choose
+		scroll.scroll_deadzone = UIKit.SCROLL_DEADZONE
 		add_child(scroll)
 		_body = VBoxContainer.new()
 		_body.add_theme_constant_override("separation", UITheme.S3)
@@ -136,6 +138,7 @@ class _Screen:
 		_body.add_child(_who_block())
 		for die in GameData.DICE_PER_HERO:
 			_body.add_child(_die_block(die))
+		UIKit.scroll_passthrough(_body)
 
 		add_child(_tray())
 

@@ -216,13 +216,13 @@ func _case_self(mode: String) -> void:
 
 func _case_ally(mode: String) -> void:
 	var b := await _new_battle()
-	b.bc.s.heroes[0].hp = b.bc.s.heroes[0].max_hp - 6
-	await _force(b, 2, 0, "owlb_moonheal")            # 療4,目標=隊友
+	b.bc.s.heroes[0].hp = b.bc.s.heroes[0].max_hp - 10
+	await _force(b, 2, 0, "owlb_moonheal")            # 療8靈術2(round 13),目標=隊友
 	var hp0: int = b.bc.s.heroes[0].hp
 	await _drag_begin(mode, _die_center(b, 2, 0), _hero_center(b, 0))
 	_check(b._drop_spec().heroes.size() == 4, "[%s] ally: the whole party highlights" % mode)
 	await _drag_end(mode, _hero_center(b, 0))
-	_check(b.bc.s.heroes[0].hp == hp0 + 4,
+	_check(b.bc.s.heroes[0].hp == hp0 + 8,
 			"[%s] ally: drop healed hero 0 (%d -> %d)" % [mode, hp0, b.bc.s.heroes[0].hp])
 	_check(b.drag.is_empty(), "[%s] ally: drag state cleared" % mode)
 

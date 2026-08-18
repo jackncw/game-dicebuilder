@@ -100,11 +100,13 @@ func _t_face_map_covers_the_old_roster() -> void:
 							% [fid, target, SaveMigrate.HERO_MAP[old_id]])
 	# XP-pool faces map by POOL INDEX, per the brief
 	var pool_map := SaveMigrate.face_map()
-	var hare_pool: Dictionary = GameData.heroes.HARE.unlocks
-	_check(String(pool_map["moss_pierce"]) == String(hare_pool["2"]),
-			"old pool slot 1 → new pool slot 1")
-	_check(String(pool_map["moss_volley"]) == String(hare_pool["5"]),
-			"old pool slot 4 → new pool slot 4")
+	# unlock batches since round 13: the old pool maps onto the FLATTENED batch
+	# order (L2 face a, L2 face b, L3 face a, …)
+	var hare_pool := GameData.class_pool("HARE")
+	_check(String(pool_map["moss_pierce"]) == String(hare_pool[0]),
+			"old pool slot 1 → first face of the L2 batch")
+	_check(String(pool_map["moss_volley"]) == String(hare_pool[3]),
+			"old pool slot 4 → fourth face in batch order")
 
 
 func _t_meta_migration() -> void:
@@ -145,8 +147,10 @@ func _t_meta_migration() -> void:
 			"an earned pool face stayed seen through the remap")
 	_check(String(SaveMigrate.face_map()["vex_drink"]) in meta.used_face_ids,
 			"the Boar inherited Vex's codex entry")
-	for f in ["sp_heavy_blow", "sp_cure", "sp_gambit"]:
-		_check(f in meta.used_face_ids, "shared-pool face %s is untouched" % f)
+	# round 13 retired 重擊/治癒 — their codex flags follow the successor faces;
+	# 賭命 survives (now the Boar's class face)
+	for f in ["sp_torch", "sp_first_aid", "sp_gambit"]:
+		_check(f in meta.used_face_ids, "shared-pool face flag landed on %s" % f)
 	for f2 in meta.used_face_ids:
 		_check(GameData.faces.has(String(f2)), "no dead face id left in the codex (%s)" % f2)
 
@@ -239,10 +243,15 @@ func _t_run_migration() -> void:
 func _t_run_keeps_shared_pool_faces() -> void:
 	var run := _legacy_run()
 	SaveMigrate.migrate_run(run)
-	_check(String(run.team[0].faces[2]) == "sp_heavy_blow",
-			"a bought shared face stayed in its slot, got %s" % run.team[0].faces[2])
-	_check(String(run.team[0].faces[7]) == "sp_cure", "…on the B die too")
-	_check(String(run.team[1].faces[4]) == "sp_gambit", "…and on another hero")
+	# round 13: the bought faces were retired, so the slots keep their SHAPE
+	# through ROUND13_FACE_MAP rather than the exact id
+	_check(String(run.team[0].faces[2]) == "sp_torch",
+			"a bought shared face mapped to its successor, got %s" % run.team[0].faces[2])
+	_check(String(run.team[0].faces[7]) == "sp_first_aid", "…on the B die too")
+	# 賭命 became a Boar class face; on a legacy (v3) team it re-seats like any
+	# other hero-bound face — v4 saves never hit this branch and keep it
+	_check(String(run.team[1].faces[4]) == String(GameData.heroes.BADGER.start[4]),
+			"a now-class-bound face re-seated on the legacy path, got %s" % run.team[1].faces[4])
 	# the hero-bound slots around them were re-seated from the new character
 	_check(String(run.team[0].faces[0]) == String(GameData.heroes.HARE.start[0]),
 			"slot 0 took the Hare's first starting face")
@@ -302,7 +311,7 @@ func _t_round_trip_through_game_state() -> void:
 			% Game.hero_level("BOAR"))
 	# the pool faces that level had earned are still earned
 	var earned := Game.unlocked_faces("HARE")
-	_check(earned.size() == 4, "level 5 still unlocks four pool faces, got %d" % earned.size())
+	_check(earned.size() == 8, "level 5 unlocks the four 2-face batches, got %d" % earned.size())
 	for fid in earned:
 		_check(GameData.faces.has(String(fid)), "unlocked face %s exists" % fid)
 	# a second launch must not touch it again

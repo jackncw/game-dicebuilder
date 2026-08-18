@@ -151,7 +151,8 @@ func _t_every_face_has_a_way_in() -> void:
 			_note_path(paths, String(fid), "%s start" % hid)
 		var unlocks: Dictionary = hd.get("unlocks", {})
 		for lvl in unlocks:
-			_note_path(paths, String(unlocks[lvl]), "%s L%s" % [hid, String(lvl)])
+			for fid_u in GameData.unlock_batch(String(hid), String(lvl)):
+				_note_path(paths, fid_u, "%s L%s" % [hid, String(lvl)])
 	# the shared pool, asked of the same function the drop tables ask
 	for fid2 in GameData.shared_pool():
 		_note_path(paths, String(fid2), "shared pool")

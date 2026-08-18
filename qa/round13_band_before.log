@@ -1,0 +1,130 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+  FAIL: bdg_heavy5: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: bdg_chop3guard3: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: bdg_heal3: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: bdg_smash6: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: bdg_guard4thorn: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: bdg_warcry: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: hare_pierce3: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: hare_guard3: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: hare_volley: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: hare_snipe6: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: hare_deadly7: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: hedge_guard5: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: hedge_thorns3: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: hedge_recoil4: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: hedge_guard4thorn2: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: owl_starfall (S, spell 3) eff 1.0 < C floor 5.0 — 匯率倒掛:付費面弱過免費帶
+  FAIL: owl_wardshield (S, spell 1) eff 2.0 < C floor 5.0 — 匯率倒掛:付費面弱過免費帶
+  FAIL: owlb_moonheal (S, spell 2) eff 0.0 < C floor 4.0 — 匯率倒掛:付費面弱過免費帶
+  FAIL: owl_bolt4: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: owl_meditate: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: owl_greatheal: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: owl_meteor: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: fox_stab2x2: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: fox_guard3: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: fox_echo4: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: fox_shadow3: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: boar_smash6: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: boar_ironhide: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: boar_bloodhit5: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: boar_avalanche8: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: boar_finale10: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: sp_charged_shot (蓄勢箭 attack C) eff 3.0 outside band [5, 7]
+  FAIL: sp_echo_cut (呼應斬 attack C) eff 4.0 outside band [5, 7]
+  FAIL: sp_viper_needle (猛毒針 attack R) eff 10.0 outside band [6, 8]
+  FAIL: sp_flame_strike (烈焰擊 attack R) eff 11.0 outside band [6, 8]
+  FAIL: sp_scatter (亂射 attack R) eff 4.0 outside band [6, 8]
+  FAIL: sp_godpierce (神穿 attack E) eff 10.0 outside band [7, 9]
+  FAIL: sp_plague (疫病爆發 attack E) eff 4.5 outside band [7, 9]
+  FAIL: sp_dragon_breath (龍息 attack E) eff 11.0 outside band [7, 9]
+  FAIL: sp_great_wall (巨壁 defense R) eff 10.0 outside band [6, 8]
+  FAIL: sp_briar_mail (荊棘鎧 defense R) eff 10.0 outside band [6, 8]
+  FAIL: sp_absolute_guard (絕對防禦 defense E) eff 12.0 outside band [7, 9]
+  FAIL: sp_citadel (城塞 defense E) eff 12.0 outside band [7, 9]
+  FAIL: sp_cure (治癒 heal C) eff 6.0 outside band [4, 5]
+  FAIL: sp_greater_cure (厚生術 heal R) eff 9.0 outside band [5, 6]
+  FAIL: sp_mass_mend (群體治癒 heal R) eff 9.0 outside band [5, 6]
+  FAIL: sp_life_bloom (生命綻放 heal E) eff 12.0 outside band [6, 7]
+  FAIL: sp_miracle (奇蹟 heal E) eff 12.0 outside band [6, 7]
+  FAIL: sp_chaos carries unpriced key(s) ["wild"] — whitelist it with a reason
+  FAIL: sp_die_theft carries unpriced key(s) ["steal_die"] — whitelist it with a reason
+  FAIL: sp_seed_blade (成長之刃 attack R) eff 5.0 outside band [6, 8]
+  FAIL: sp_seed_shield (成長之盾 defense R) eff 5.0 outside band [6, 8]
+  FAIL: sp_stasis (靜滯場 control R) eff 0.0 outside band [6, 8]
+  FAIL: sp_arcane_blast (奧術爆 attack E) eff 6.0 outside band [7, 9]
+  FAIL: bdg_infusedsmash: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: hedge_essencebloom: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: owl_starshower: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: hare_essencearrow (S, spell 1) eff 4.0 < C floor 5.0 — 匯率倒掛:付費面弱過免費帶
+  FAIL: hare_attunedaim: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: fox_essencewaltz: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: boar_bloodsurge: rarity 'U' — U 已退役,可獲得面只准 C/R/E
+  FAIL: universal pool is 58 faces, want 10-12
+  FAIL: BADGER class pool is 7 faces, want 10-14
+  FAIL: BADGER class pool has 1 essence faces, want ≥3
+  FAIL: BADGER L2 batch is bdg_heavy5 — want an array of 2-3 faces
+  FAIL: BADGER L3 batch is bdg_chop3guard3 — want an array of 2-3 faces
+  FAIL: BADGER L4 batch is bdg_infusedsmash — want an array of 2-3 faces
+  FAIL: BADGER L5 batch is bdg_heal3 — want an array of 2-3 faces
+  FAIL: BADGER L6 batch is bdg_smash6 — want an array of 2-3 faces
+  FAIL: BADGER L7 batch is bdg_guard4thorn — want an array of 2-3 faces
+  FAIL: BADGER L8 batch is bdg_warcry — want an array of 2-3 faces
+  FAIL: HARE class pool is 7 faces, want 10-14
+  FAIL: HARE class pool has 1 essence faces, want ≥3
+  FAIL: HARE L2 batch is hare_pierce3 — want an array of 2-3 faces
+  FAIL: HARE L3 batch is hare_attunedaim — want an array of 2-3 faces
+  FAIL: HARE L4 batch is hare_guard3 — want an array of 2-3 faces
+  FAIL: HARE L5 batch is hare_volley — want an array of 2-3 faces
+  FAIL: HARE L6 batch is hare_snipe6 — want an array of 2-3 faces
+  FAIL: HARE L7 batch is hare_hawkeye — want an array of 2-3 faces
+  FAIL: HARE L8 batch is hare_deadly7 — want an array of 2-3 faces
+  FAIL: HEDGE class pool is 7 faces, want 10-14
+  FAIL: HEDGE class pool has 1 essence faces, want ≥3
+  FAIL: HEDGE L2 batch is hedge_guard5 — want an array of 2-3 faces
+  FAIL: HEDGE L3 batch is hedge_thorns3 — want an array of 2-3 faces
+  FAIL: HEDGE L4 batch is hedge_recoil4 — want an array of 2-3 faces
+  FAIL: HEDGE L5 batch is hedge_essencebloom — want an array of 2-3 faces
+  FAIL: HEDGE L6 batch is hedge_guard4thorn2 — want an array of 2-3 faces
+  FAIL: HEDGE L7 batch is hedge_bristle — want an array of 2-3 faces
+  FAIL: HEDGE L8 batch is hedge_shieldbash — want an array of 2-3 faces
+  FAIL: OWL class pool is 7 faces, want 10-14
+  FAIL: OWL L2 batch is owl_gather3 — want an array of 2-3 faces
+  FAIL: OWL L3 batch is owl_bolt4 — want an array of 2-3 faces
+  FAIL: OWL L4 batch is owl_meditate — want an array of 2-3 faces
+  FAIL: OWL L5 batch is owl_greatheal — want an array of 2-3 faces
+  FAIL: OWL L6 batch is owl_essenceward — want an array of 2-3 faces
+  FAIL: OWL L7 batch is owl_starshower — want an array of 2-3 faces
+  FAIL: OWL L8 batch is owl_meteor — want an array of 2-3 faces
+  FAIL: FOX class pool is 7 faces, want 10-14
+  FAIL: FOX class pool has 1 essence faces, want ≥3
+  FAIL: FOX L2 batch is fox_stab2x2 — want an array of 2-3 faces
+  FAIL: FOX L3 batch is fox_guard3 — want an array of 2-3 faces
+  FAIL: FOX L4 batch is fox_echo4 — want an array of 2-3 faces
+  FAIL: FOX L5 batch is fox_essencewaltz — want an array of 2-3 faces
+  FAIL: FOX L6 batch is fox_shadow3 — want an array of 2-3 faces
+  FAIL: FOX L7 batch is fox_twindance — want an array of 2-3 faces
+  FAIL: FOX L8 batch is fox_phantom — want an array of 2-3 faces
+  FAIL: BOAR class pool is 7 faces, want 10-14
+  FAIL: BOAR class pool has 1 essence faces, want ≥3
+  FAIL: BOAR L2 batch is boar_smash6 — want an array of 2-3 faces
+  FAIL: BOAR L3 batch is boar_ironhide — want an array of 2-3 faces
+  FAIL: BOAR L4 batch is boar_bloodhit5 — want an array of 2-3 faces
+  FAIL: BOAR L5 batch is boar_bloodsurge — want an array of 2-3 faces
+  FAIL: BOAR L6 batch is boar_lastditch — want an array of 2-3 faces
+  FAIL: BOAR L7 batch is boar_avalanche8 — want an array of 2-3 faces
+  FAIL: BOAR L8 batch is boar_finale10 — want an array of 2-3 faces
+  FAIL: universal pool is 58.0% of the acquirable pool, want <15%
+  FAIL: essence faces are 13 of 100 acquirable (13.0%), want ≥1/3
+value_band_test: 370 checks, 117 failed (whitelisted: 9)
+  越帶白名單 hare_hawkeye         L7 capstone:全隊穿透係行動經濟,唔係數值
+  越帶白名單 hedge_bristle        L7 capstone:荊棘翻倍係引擎面,價值隨局面複利
+  越帶白名單 hedge_shieldbash     L8 capstone:傷害=當前格擋,上限6,由格擋池定價
+  越帶白名單 owl_gather3          梟 brief:最深靈息引擎,純資源面容許 C 帶 +1
+  越帶白名單 owl_essenceward      條件面:格擋=靈息×2(上限6),價值隨池深浮動
+  越帶白名單 fox_twindance        L7 capstone:雙舞係行動經濟,唔係數值
+  越帶白名單 fox_phantom          L8 capstone:呼應條件先開火,1×4 食盡平加成
+  越帶白名單 boar_lastditch       背水條件面:半血以下先值 9,半血以上收 5
+  越帶白名單 sp_gambit            賭命 1-12 均值 6.5 喺 R 帶內,方差就係佢嘅定位
+VALUEBAND FAIL

@@ -330,6 +330,29 @@ static func mouse_passthrough(node: Control) -> void:
 			mouse_passthrough(ctrl)
 
 
+## The finger-scroll twin of `mouse_passthrough`. Content inside a
+## ScrollContainer must not STOP events — a STOP panel or tile eats the
+## ScreenTouch/ScreenDrag pair the container scrolls by, which is exactly how
+## the codex ended up un-scrollable on a phone. Everything non-interactive
+## becomes PASS (NOT ignore — tiles still want their tap); buttons keep STOP
+## and are expected to cancel on NOTIFICATION_SCROLL_BEGIN.
+static func scroll_passthrough(node: Control) -> void:
+	if node is BaseButton:
+		return
+	if node.mouse_filter == Control.MOUSE_FILTER_STOP:
+		node.mouse_filter = Control.MOUSE_FILTER_PASS
+	for c in node.get_children():
+		var ctrl := c as Control
+		if ctrl:
+			scroll_passthrough(ctrl)
+
+
+## How far a finger may wander (canvas px) before a hold stops being a tap and
+## the ScrollContainer takes the gesture. One number shared by the tiles'
+## TAP_SLOP and every scrolling list screen.
+const SCROLL_DEADZONE := 24
+
+
 static func spacer(h := float(UITheme.S3)) -> Control:
 	var c := Control.new()
 	c.custom_minimum_size = Vector2(0, h)

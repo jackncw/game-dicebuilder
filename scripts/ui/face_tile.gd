@@ -17,6 +17,9 @@ signal long_pressed()
 ## name over the English one, and clipping the second was worse than nothing.
 const NAME_H := 42.0
 const LONG_PRESS := 0.45
+## A press that travels further than this (canvas px, summed) is a scroll or a
+## drag, not a tap. Matches the ScrollContainer deadzone the list screens use.
+const TAP_SLOP := 24.0
 
 var fd := {}                 # a resolved face dict (see BattleCore.hero_face)
 var tile := 92.0             # side of the square part
@@ -28,6 +31,7 @@ var interactive := true
 var _num: Label
 var _name: Label
 var _pressing := false
+var _press_at := Vector2.ZERO
 var _lp_token: SceneTreeTimer = null
 
 
@@ -36,7 +40,10 @@ func _init(p_fd := {}, p_tile := 92.0, p_show_name := true) -> void:
 	tile = p_tile
 	show_name = p_show_name
 	_resize()
-	mouse_filter = Control.MOUSE_FILTER_STOP
+	# PASS, not STOP: tiles live inside ScrollContainers (codex, face swap), and
+	# a STOP tile eats the ScreenDrag the container needs for touch scrolling.
+	# The tile still gets the event first; it just lets it travel on upward.
+	mouse_filter = Control.MOUSE_FILTER_PASS
 
 
 func _resize() -> void:
@@ -180,10 +187,19 @@ func _draw() -> void:
 func _gui_input(event: InputEvent) -> void:
 	if not interactive:
 		return
+	if event is InputEventMouseMotion or event is InputEventScreenDrag:
+		# position, not relative: relative is unreliable across synthetic and
+		# emulated event streams, the distance from the press point is not
+		if _pressing and (event.position as Vector2).distance_to(_press_at) > TAP_SLOP:
+			cancel_press()
+		return
 	if not (event is InputEventMouseButton or event is InputEventScreenTouch):
+		return
+	if event is InputEventMouseButton and event.button_index != MOUSE_BUTTON_LEFT:
 		return
 	if event.pressed:
 		_pressing = true
+		_press_at = event.position
 		var t := get_tree().create_timer(LONG_PRESS)
 		_lp_token = t
 		t.timeout.connect(func() -> void:
@@ -195,6 +211,13 @@ func _gui_input(event: InputEvent) -> void:
 		if _pressing:
 			_pressing = false
 			pressed.emit()
+
+
+## The containing ScrollContainer has decided the finger is scrolling; whatever
+## press we were sitting on is not a tap.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_SCROLL_BEGIN:
+		cancel_press()
 
 
 func cancel_press() -> void:

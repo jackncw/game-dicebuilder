@@ -58,10 +58,7 @@ func _show_levelups(ups: Dictionary) -> void:
 	panel.add_child(pv)
 	pv.add_child(UIKit.text_block(Data.bi("升級", "Level-ups"), UIKit.F_H2, UITheme.INK, 560.0))
 	for id in ups:
-		var hdef: Dictionary = GameData.heroes[id]
-		pv.add_child(UIKit.text_block(Data.bi("%s 升級了!新骰面已加入獎勵池" % hdef.zh,
-				"%s levelled up! New face added to pools" % hdef.en),
-				UIKit.F_BODY_SM, UITheme.INK, 560.0, HORIZONTAL_ALIGNMENT_LEFT))
+		pv.add_child(_levelup_block(String(id), ups[id], 560.0))
 	var cc := CenterContainer.new()
 	cc.add_child(panel)
 	col.add_child(cc)
@@ -75,6 +72,38 @@ func _show_levelups(ups: Dictionary) -> void:
 	scrim.gui_input.connect(func(ev: InputEvent) -> void:
 		if (ev is InputEventMouseButton or ev is InputEventScreenTouch) and ev.pressed:
 			root.queue_free())
+
+
+## The tiles of every batch `levels` just opened for hero `id`, in one row.
+## Tapping a tile opens the standard detail card — the popup a new player
+## needs most at exactly this moment.
+func _batch_tiles(id: String, levels: Array) -> Control:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", UIKit.S2)
+	for lvl in levels:
+		for fid in GameData.unlock_batch(id, str(int(lvl))):
+			var fd: Dictionary = GameData.faces[fid].duplicate(true)
+			fd["id"] = fid
+			var tile := FaceTile.new(fd, 76.0, true)
+			tile.pressed.connect(func() -> void: DetailCard.show_face(self, fd))
+			tile.long_pressed.connect(func() -> void: DetailCard.show_face(self, fd))
+			row.add_child(tile)
+	var cc := CenterContainer.new()
+	cc.add_child(row)
+	return cc
+
+
+## One hero's level-up entry in the folded popup: the line, then the batch.
+func _levelup_block(id: String, levels: Array, width: float) -> Control:
+	var hdef: Dictionary = GameData.heroes[id]
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", UIKit.S1)
+	vb.add_child(UIKit.text_block(Data.bi("%s 升級了!新骰面:" % hdef.zh,
+			"%s levelled up! New faces:" % hdef.en),
+			UIKit.F_BODY_SM, UITheme.INK, width, HORIZONTAL_ALIGNMENT_LEFT))
+	vb.add_child(_batch_tiles(id, levels))
+	return vb
 
 
 func setup(_args: Dictionary) -> void:
@@ -119,11 +148,14 @@ func _ready() -> void:
 	# 升四級嗰陣戰利品卡曾經被四行 levelled-up 推到睇唔到(真人試玩)
 	var ups: Dictionary = pr.get("xp_ups", {})
 	if ups.size() <= 2:
+		# the whole unlock batch lands as tiles, not a grey sentence — a level
+		# is 2 concrete new faces, so show the two faces (round 13, task F)
 		for id in ups:
 			var hdef: Dictionary = GameData.heroes[id]
-			rv.add_child(UIKit.text_block(Data.bi("%s 升級了!新骰面已加入獎勵池" % hdef.zh,
-					"%s levelled up! New face added to pools" % hdef.en),
+			rv.add_child(UIKit.text_block(Data.bi("%s 升級了!新骰面加入佢嘅獎勵池:" % hdef.zh,
+					"%s levelled up! New faces join their pool:" % hdef.en),
 					UIKit.F_BODY_SM, UITheme.CAT_ON_DARK.heal, 600.0))
+			rv.add_child(_batch_tiles(String(id), ups[id]))
 	else:
 		var fold := UIKit.button("★ " + Data.bi("%d 位英雄升級了 — 點開查看" % ups.size(),
 				"%d heroes levelled up — tap to view" % ups.size()),

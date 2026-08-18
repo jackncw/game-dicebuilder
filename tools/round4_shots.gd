@@ -68,7 +68,7 @@ func _battle_shots() -> void:
 	for i in dry.bc.s.heroes.size():
 		for slot in 12:
 			if dry.bc.s.heroes[i].faces[slot] in ["owl_gather2", "sp_channel"]:
-				dry.bc.s.heroes[i].faces[slot] = "sp_heavy_blow"
+				dry.bc.s.heroes[i].faces[slot] = "sp_lance"
 	dry.essence_bar.visible = dry._party_uses_essence()
 	dry._refresh()
 	await _settle()

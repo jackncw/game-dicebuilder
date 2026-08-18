@@ -46,6 +46,9 @@ func _ready() -> void:
 
 	scroll = ScrollContainer.new()
 	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# a finger must be able to start a scroll ON a tile or a panel; the tiles
+	# arm their tap inside this same deadzone (FaceTile.TAP_SLOP)
+	scroll.scroll_deadzone = UIKit.SCROLL_DEADZONE
 	Safe.pin_top(scroll, 150)
 	scroll.offset_left = UIKit.S4
 	scroll.offset_right = -UIKit.S4
@@ -78,6 +81,9 @@ func _build() -> void:
 		_build_chars()
 	else:
 		_build_mobs()
+	# panels and art holders are STOP by default and would eat the touch drag
+	# the ScrollContainer scrolls by — see the codex_scroll_test
+	UIKit.scroll_passthrough(body)
 
 
 # ============================================================ shared bits
@@ -177,39 +183,42 @@ func _build_chars() -> void:
 				for fid in start:
 					pairs.append([String(fid), true])
 				rows.append(_face_grid(pairs))
-			# everything else this hero can pick up; the undiscovered ones would
-			# otherwise be forty identical "???" tiles, so they collapse to a count
+			# the class pool, grouped by unlock batch (round 13, task F): each
+			# level is a themed pair of faces, and the codex shows the ladder —
+			# what this character has opened, and which rung opens next
 			rows.append(_line(Data.t("ui_all_faces"), UIKit.F_BODY, UITheme.CAT_ON_DARK.control))
-			var seen_pairs := []
-			var hidden := 0
-			for fid2 in _obtainable_faces(id):
-				if Game.face_seen(fid2):
-					seen_pairs.append([fid2, true])
-				else:
-					hidden += 1
-			if not seen_pairs.is_empty():
-				rows.append(_face_grid(seen_pairs))
-			if hidden > 0:
-				rows.append(_line("??? ×%d   %s" % [hidden,
-						Data.bi("(用過一次就會解鎖)", "(unlocked once used)")],
-						UIKit.F_BODY_SM, UIKit.CREAM_DARK))
+			var lvl_now := Game.hero_level(id)
+			var batch_lvls: Array = GameData.heroes[id].get("unlocks", {}).keys()
+			batch_lvls.sort_custom(func(a, b): return int(a) < int(b))
+			for bl in batch_lvls:
+				var batch := GameData.unlock_batch(id, String(bl))
+				if batch.is_empty():
+					continue
+				var opened: bool = lvl_now >= int(bl)
+				rows.append(_line("Lv%s  %s" % [bl, Data.bi("已解鎖", "unlocked") if opened
+						else Data.bi("未解鎖", "locked")], UIKit.F_BODY_SM,
+						UIKit.YELLOW.lightened(0.3) if opened else UIKit.CREAM_DARK))
+				var pairs2 := []
+				for fid2 in batch:
+					pairs2.append([fid2, Game.face_seen(fid2)])
+				rows.append(_face_grid(pairs2))
 		body.add_child(_panel(rows, Color(def.color) if unlocked else UIKit.OUTLINE))
+	body.add_child(_universal_panel())
 
 
-## XP-unlock faces for this hero plus the shared pool everyone draws from.
-func _obtainable_faces(id: String) -> Array:
-	var out := []
-	var start: Array = GameData.heroes[id].start.duplicate()
-	start.append_array(GameData.heroes[id].start_b)
-	var unlocks: Dictionary = GameData.heroes[id].unlocks
-	for lvl in unlocks:
-		var fid := String(unlocks[lvl])
-		if fid not in start and fid not in out:
-			out.append(fid)
-	for fid2 in GameData.shared_pool():
-		if fid2 not in out:
-			out.append(fid2)
-	return out
+## The small universal pool, once at the foot of the tab — every hero draws
+## from the same twelve, so printing it per character was six copies of noise.
+func _universal_panel() -> Control:
+	var rows := []
+	rows.append(_line(Data.bi("通用骰面(所有角色可得)", "Universal faces (anyone can take these)"),
+			24, UIKit.YELLOW.lightened(0.3)))
+	var pairs := []
+	for fid in GameData.shared_pool():
+		pairs.append([fid, Game.face_seen(fid)])
+	rows.append(_face_grid(pairs))
+	rows.append(_line(Data.bi("(未用過嘅面顯示為 ???,用過一次就會解鎖)",
+			"(??? until used once)"), UIKit.F_BODY_SM, UIKit.CREAM_DARK))
+	return _panel(rows)
 
 
 # ============================================================ monsters

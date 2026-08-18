@@ -23,8 +23,30 @@ extends RefCounted
 ## the slot-order fallback the brief asks for produces the same table.
 
 ## Bumped whenever a save needs work on load. 1 = pre-B-die, 2 = dual dice,
-## 3 = the character overhaul, 4 = faces deleted from the data (round 8).
-const SAVE_VERSION := 4
+## 3 = the character overhaul, 4 = faces deleted from the data (round 8),
+## 5 = the round-13 pool restructure (class pools + unlock batches).
+const SAVE_VERSION := 5
+
+## Round 13 retired most of the old universal pool. Everything a save could be
+## holding maps to its nearest surviving universal face — a die keeps a face
+## of the same shape rather than being reseated to a starting face, and a
+## codex flag lands on the successor. 寧鬆勿緊:錯就錯在畀多咗,唔好收走。
+const ROUND13_FACE_MAP := {
+	"sp_heavy_blow": "sp_torch", "sp_quick_jab": "sp_venom_knife",
+	"sp_armor_break": "sp_lance", "sp_keen": "sp_torch",
+	"sp_cure": "sp_first_aid", "sp_whirl_blade": "sp_lance",
+	"sp_viper_needle": "sp_venom_knife", "sp_flame_strike": "sp_torch",
+	"sp_scatter": "sp_lance", "sp_twin_strike": "sp_lance",
+	"sp_godpierce": "sp_annihilate", "sp_reaper": "sp_annihilate",
+	"sp_plague": "sp_venom_knife", "sp_dragon_breath": "sp_torch",
+	"sp_absolute_guard": "sp_great_wall", "sp_citadel": "sp_great_wall",
+	"sp_aegis": "sp_great_wall", "sp_cleansing_shield": "sp_shield_wall",
+	"sp_life_bloom": "sp_miracle", "sp_sap": "sp_insight",
+	"sp_mark": "sp_insight", "sp_evil_eye": "sp_deep_channel",
+	"sp_chaos": "sp_insight", "sp_seed_blade": "sp_lance",
+	"sp_seed_shield": "sp_great_wall", "sp_stasis": "sp_deep_channel",
+	"sp_arcane_blast": "sp_annihilate",
+}
 
 const HERO_MAP := {
 	"H1": "HARE", "H2": "BADGER", "H3": "OWL",
@@ -82,10 +104,8 @@ static func face_map() -> Dictionary:
 		var def: Dictionary = GameData.heroes.get(new_id, {})
 		if def.is_empty():
 			continue
-		var pool := []
-		for lvl in ["2", "3", "4", "5", "6", "7"]:
-			if def.get("unlocks", {}).has(lvl):
-				pool.append(String(def.unlocks[lvl]))
+		# batch-shaped since round 13: flatten the unlock table in batch order
+		var pool := GameData.class_pool(new_id)
 		_map_list(OLD_UNLOCKS[old_id], pool)
 		_map_list(OLD_START[old_id], def.get("start", []))
 		_map_list(OLD_START_B[old_id], def.get("start_b", []))
@@ -99,6 +119,21 @@ static func _map_list(old_list: Array, new_list: Array) -> void:
 		var k := String(old_list[i])
 		if not _face_map.has(k):
 			_face_map[k] = String(new_list[i])
+
+
+## Remap one meta array of face ids through both migration tables, dropping
+## anything that still resolves to nothing.
+static func remap_face_list(meta: Dictionary, key: String) -> void:
+	GameData.load_all()
+	var out := []
+	for f in meta.get(key, []):
+		var fid := String(f)
+		fid = String(ROUND13_FACE_MAP.get(fid, fid))
+		fid = String(face_map().get(fid, fid))
+		fid = String(ROUND13_FACE_MAP.get(fid, fid))
+		if GameData.faces.has(fid) and fid not in out:
+			out.append(fid)
+	meta[key] = out
 
 
 static func is_legacy_hero(id: String) -> bool:
@@ -122,7 +157,6 @@ static func needs_meta_migration(meta: Dictionary) -> bool:
 ## Idempotent: running it on an already-migrated dict changes nothing.
 static func migrate_meta(meta: Dictionary) -> Dictionary:
 	GameData.load_all()
-	var fmap := face_map()
 
 	var xp: Dictionary = meta.get("xp", {})
 	var new_xp := {}
@@ -151,12 +185,7 @@ static func migrate_meta(meta: Dictionary) -> Dictionary:
 			unlocked.append(st)
 	meta["unlocked_heroes"] = unlocked
 
-	var seen := []
-	for f in meta.get("used_face_ids", []):
-		var nf := String(fmap.get(String(f), String(f)))
-		if GameData.faces.has(nf) and nf not in seen:
-			seen.append(nf)
-	meta["used_face_ids"] = seen
+	remap_face_list(meta, "used_face_ids")
 
 	meta["save_version"] = SAVE_VERSION
 	return meta
@@ -193,8 +222,12 @@ static func migrate_run(run: Dictionary) -> bool:
 			faces.append("blank")
 		for i in GameData.SLOTS:
 			var fid := String(faces[i])
+			# a retired universal face first follows the round-13 successor map,
+			# so a purchase keeps its shape instead of reverting to a start face
+			fid = String(ROUND13_FACE_MAP.get(fid, fid))
 			if GameData.faces.has(fid) and String(GameData.faces[fid].get("hero", "")) == "":
-				continue          # a shared-pool face: still valid, still theirs
+				faces[i] = fid    # a universal face: still valid, still theirs
+				continue
 			faces[i] = String(fresh[i])
 		h["faces"] = faces
 		# HP scales with the new character's constitution rather than dropping
@@ -233,5 +266,11 @@ static func _reseat_deleted_faces(team: Array) -> void:
 			var fid := String(faces[i])
 			if fid == "blank" or GameData.faces.has(fid):
 				continue
-			faces[i] = String(fresh[i]) if i < fresh.size() else "blank"
+			# a retired universal face keeps its shape via the round-13 map;
+			# only a face with no successor falls back to the starting slot
+			var mapped := String(ROUND13_FACE_MAP.get(fid, ""))
+			if mapped != "" and GameData.faces.has(mapped):
+				faces[i] = mapped
+			else:
+				faces[i] = String(fresh[i]) if i < fresh.size() else "blank"
 		h["faces"] = faces

@@ -93,6 +93,30 @@ func _ready() -> void:
 	# the game happened to choose — pin it so the suite tests the code rather
 	# than the developer's save file.
 	Game.settings.lang_mode = "both"
+	# Round 13 cut most of the old universal pool, but every ENGINE keyword the
+	# cut faces carried still exists and still has to be tested. Each fixture
+	# reproduces the retired face's exact stats, so the assertions below keep
+	# their old numbers.
+	_fixture("fx_atk7", {"zh": "重擊", "en": "Heavy Blow", "cat": "attack",
+			"rarity": "S", "atk": 7, "target": "enemy"})
+	_fixture("fx_pierce", {"zh": "破甲擊", "en": "Armor Break", "cat": "attack",
+			"rarity": "S", "atk": 4, "pierce": true, "target": "enemy"})
+	_fixture("fx_cleave", {"zh": "迴旋刃", "en": "Whirl Blade", "cat": "attack",
+			"rarity": "S", "atk": 5, "cleave": true, "target": "enemy"})
+	_fixture("fx_aoe", {"zh": "亂射", "en": "Scatter Shot", "cat": "attack",
+			"rarity": "S", "atk": 2, "aoe": true, "target": "none"})
+	_fixture("fx_weaken", {"zh": "削弱", "en": "Sap", "cat": "control",
+			"rarity": "S", "weaken": 2, "target": "enemy"})
+	_fixture("fx_expose", {"zh": "標記", "en": "Mark", "cat": "control",
+			"rarity": "S", "expose": true, "target": "enemy"})
+	_fixture("fx_combo", {"zh": "快擊", "en": "Quick Jab", "cat": "attack",
+			"rarity": "S", "atk": 4, "combo": true, "target": "enemy"})
+	_fixture("fx_wild", {"zh": "混沌", "en": "Chaos", "cat": "special",
+			"rarity": "S", "wild": true, "target": "wild"})
+	_fixture("fx_growth", {"zh": "成長之刃", "en": "Seed Blade", "cat": "attack",
+			"rarity": "S", "atk": 3, "growth": true, "target": "enemy"})
+	_fixture("fx_lucky", {"zh": "精準", "en": "Keen Strike", "cat": "attack",
+			"rarity": "S", "atk": 5, "lucky": true, "target": "enemy"})
 	_t_block()
 	_t_pierce()
 	_t_cleave()
@@ -208,7 +232,7 @@ func _t_pierce() -> void:
 	var bc := _mk(["BADGER", "HARE", "OWL", "HEDGE"], ["E01"])
 	_silence_enemies(bc)
 	bc.s.enemies[0].block = 5
-	_face(bc, 0, "sp_armor_break")
+	_face(bc, 0, "fx_pierce")
 	var hp0: int = bc.s.enemies[0].hp
 	bc.use_face(0, 0, {"target": 0})
 	_check(bc.s.enemies[0].hp == hp0 - 5, "pierce ignored block, 4 + sergeant 1 (hp %d→%d)" % [hp0, bc.s.enemies[0].hp])
@@ -220,7 +244,7 @@ func _t_cleave() -> void:
 	_silence_enemies(bc)
 	for e in bc.s.enemies:
 		e.block = 0   # setup may have rolled instant 格擋 (round 10, task 1)
-	_face(bc, 0, "sp_whirl_blade")
+	_face(bc, 0, "fx_cleave")
 	var hps := []
 	for e in bc.s.enemies:
 		hps.append(e.hp)
@@ -234,7 +258,7 @@ func _t_sweep() -> void:
 	_silence_enemies(bc)
 	for e in bc.s.enemies:
 		e.block = 0   # setup may have rolled instant 格擋 (round 10, task 1)
-	_face(bc, 0, "sp_scatter")
+	_face(bc, 0, "fx_aoe")
 	var hps := []
 	for e in bc.s.enemies:
 		hps.append(e.hp)
@@ -294,7 +318,7 @@ func _t_stun() -> void:
 func _t_weaken_enemy() -> void:
 	var bc := _mk(["HEDGE", "HARE", "BADGER", "OWL"], ["E01"])
 	_enemy_rolls(bc, 0, [{"atk": 4}])
-	_face(bc, 0, "sp_sap")
+	_face(bc, 0, "fx_weaken")
 	bc.use_face(0, 0, {"target": 0})
 	_check(bc.s.enemies[0].weaken == 2, "weaken 2 applied")
 	bc.s.heroes[0].taunt = true
@@ -308,10 +332,10 @@ func _t_expose() -> void:
 	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E04"])
 	_silence_enemies(bc)
 	bc.s.enemies[0].block = 0
-	_face(bc, 0, "sp_mark")
+	_face(bc, 0, "fx_expose")
 	bc.use_face(0, 0, {"target": 0})
 	_check(bc.s.enemies[0].expose, "expose applied")
-	_face(bc, 1, "sp_heavy_blow")
+	_face(bc, 1, "fx_atk7")
 	var hp0: int = bc.s.enemies[0].hp
 	bc.use_face(1, 0, {"target": 0})
 	_check(bc.s.enemies[0].hp == hp0 - 12, "exposed 8→12 (ceil 1.5x), dealt %d" % (hp0 - bc.s.enemies[0].hp))
@@ -362,7 +386,7 @@ func _t_taunt() -> void:
 	for h in bc.s.heroes:
 		hps.append(h.hp)
 	bc.end_turn()
-	_check(bc.s.heroes[0].hp == hps[0] - 1, "taunter took 6-5block=1, lost %d"
+	_check(bc.s.heroes[0].hp == hps[0], "taunter took 6-6block=0, lost %d"
 			% (hps[0] - bc.s.heroes[0].hp))
 	for i in [1, 2, 3]:
 		_check(bc.s.heroes[i].hp == hps[i], "non-taunter untouched (%d)" % i)
@@ -383,7 +407,7 @@ func _t_thorns_hero() -> void:
 func _t_thorns_enemy() -> void:
 	var bc := _mk(["BADGER", "HARE", "OWL", "HEDGE"], ["E06"], {"chapter": 1})
 	_silence_enemies(bc)
-	_face(bc, 0, "sp_heavy_blow")
+	_face(bc, 0, "fx_atk7")
 	var hp0: int = bc.s.heroes[0].hp
 	bc.use_face(0, 0, {"target": 0})
 	_check(bc.s.heroes[0].hp == hp0 - 2, "E06 thorns 2 reflected to attacker")
@@ -405,7 +429,7 @@ func _t_combo() -> void:
 	bc.s.enemies[0].block = 0
 	_face(bc, 0, "hare_quick3")
 	bc.use_face(0, 0, {"target": 0})
-	_face(bc, 1, "sp_quick_jab")     # atk 4, combo
+	_face(bc, 1, "fx_combo")     # atk 4, combo
 	var fd := bc.hero_face(1, 0)
 	_check(bc.attack_value(1, fd) == 7, "combo 4 + sergeant 1 + 2 = 7, got %d" % bc.attack_value(1, fd))
 
@@ -414,8 +438,8 @@ func _t_wild() -> void:
 	var bc := _mk(["BADGER", "HARE", "OWL", "HEDGE"], ["E04"])
 	_silence_enemies(bc)
 	bc.s.enemies[0].block = 0
-	_face(bc, 0, "sp_chaos")
-	_face(bc, 1, "sp_heavy_blow")
+	_face(bc, 0, "fx_wild")
+	_face(bc, 1, "fx_atk7")
 	var hp0: int = bc.s.enemies[0].hp
 	var res := bc.use_face(0, 0, {"copy_from": {"hero": 1, "die": 0}, "target": 0})
 	_check(res.ok, "wild copy ok")
@@ -424,7 +448,7 @@ func _t_wild() -> void:
 	var bc2 := _mk(["BADGER", "HARE", "OWL", "HEDGE"], ["E04"])
 	_silence_enemies(bc2)
 	bc2.s.enemies[0].block = 0
-	_face_b(bc2, 0, "sp_heavy_blow", "sp_chaos")
+	_face_b(bc2, 0, "fx_atk7", "fx_wild")
 	var hp1: int = bc2.s.enemies[0].hp
 	var res2 := bc2.use_face(0, 0, {"copy_from": {"hero": 0, "die": 1}, "target": 0})
 	_check(res2.ok, "wild copies the caster's own B die")
@@ -459,7 +483,7 @@ func _t_growth() -> void:
 	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E04"])
 	_silence_enemies(bc)
 	bc.s.enemies[0].block = 0
-	_face(bc, 0, "sp_seed_blade")
+	_face(bc, 0, "fx_growth")
 	var hp0: int = bc.s.enemies[0].hp
 	bc.use_face(0, 0, {"target": 0})
 	_check(bc.s.enemies[0].hp == hp0 - 3, "seed blade dealt 3")
@@ -490,7 +514,7 @@ func _t_pain() -> void:
 func _t_lucky() -> void:
 	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E01"])
 	for k in GameData.SLOTS:
-		bc.s.heroes[0].faces[k] = "sp_keen"
+		bc.s.heroes[0].faces[k] = "fx_lucky"
 	var r0: int = bc.s.rerolls
 	bc._roll_hero_die(0, 0)
 	_check(bc.s.rerolls == r0 + 1, "lucky granted +1 reroll")
@@ -559,10 +583,10 @@ func _t_steal_b4() -> void:
 func _t_zanshin() -> void:
 	var bc := _mk(["BADGER", "HARE", "OWL", "HEDGE"], ["E04"])
 	_silence_enemies(bc)
-	_face(bc, 0, "sp_focus")         # block 3, buff_next_atk 2
+	_face(bc, 0, "sp_focus")         # block 4, buff_next_atk 2
 	bc.use_face(0, 0)
 	# 老班長 already put 2 up at the top of the turn
-	_check(bc.s.heroes[0].block == 5, "focus block 3 on top of the sergeant's 2, got %d"
+	_check(bc.s.heroes[0].block == 6, "focus block 4 on top of the sergeant's 2, got %d"
 			% bc.s.heroes[0].block)
 	bc.end_turn()
 	_check(bc.s.heroes[0].zanshin == 2, "focus +2 active next turn")
@@ -647,9 +671,9 @@ func _t_reverb() -> void:
 	bc.s.heroes[1].hp = 10
 	_face(bc, 0, "sp_echo_crystal")
 	bc.use_face(0, 0, {"target": 1})
-	_check(bc.s.heroes[1].hp == 14, "reverb crystal healed 4")
+	_check(bc.s.heroes[1].hp == 16, "reverb crystal healed 6 (round 13: heal 6, ritual 1)")
 	_check(bc.s.echo_bonus == 2, "reverb bonus armed")
-	_face(bc, 1, "sp_heavy_blow")
+	_face(bc, 1, "fx_atk7")
 	var hp0: int = bc.s.enemies[0].hp
 	bc.use_face(1, 0, {"target": 0})
 	_check(bc.s.enemies[0].hp == hp0 - 10, "next face 7 + sergeant 1 + reverb 2 = 10, dealt %d"
@@ -669,7 +693,7 @@ func _t_potions() -> void:
 	_check(bc.s.enemies[0].poison == 3, "P04 poisoned enemies 3")
 	bc.use_potion(0)   # P06 team atk buff
 	_check(bc.s.team_atk_buff == 3, "P06 armed +3")
-	_face(bc, 1, "sp_heavy_blow")
+	_face(bc, 1, "fx_atk7")
 	var fd := bc.hero_face(1, 0)
 	_check(bc.attack_value(1, fd) == 11, "attack buffed 7 + sergeant 1 + potion 3, got %d" % bc.attack_value(1, fd))
 
@@ -764,13 +788,13 @@ func _t_face_plus() -> void:
 	# growth bumps the value without earning a "+"
 	var bc := _mk(["HARE", "BADGER", "OWL", "HEDGE"], ["E01"])
 	_silence_enemies(bc)
-	_face(bc, 0, "sp_seed_blade")
+	_face(bc, 0, "fx_growth")
 	bc.s.enemies[0].block = 0
 	bc.use_face(0, 0, {"target": 0})
 	_check(int(bc.s.heroes[0].face_mods[0]) == 1, "growth raised the value")
 	_check(int(bc.s.heroes[0].face_plus[0]) == 0, "growth earns no + mark")
 	# a swap clears both counters
-	RunState.apply_face_swap(run, 0, 0, "sp_heavy_blow")
+	RunState.apply_face_swap(run, 0, 0, "fx_atk7")
 	_check(int(hero.face_plus[0]) == 0 and int(hero.face_mods[0]) == 0, "swap resets the slot")
 
 
@@ -1109,9 +1133,9 @@ func _t_war_cry() -> void:
 	_silence_enemies(bc)
 	_face(bc, 0, "bdg_warcry")
 	bc.use_face(0, 0)
-	_check(bc.s.team_atk_buff == 1, "war cry armed +1 for the party")
+	_check(bc.s.team_atk_buff == 2, "war cry armed +2 for the party (round 13)")
 	_face(bc, 1, "hare_quick3")
-	_check(bc.attack_value(1, bc.hero_face(1, 0)) == 5, "an ally's 速射 is worth 4+1, got %d"
+	_check(bc.attack_value(1, bc.hero_face(1, 0)) == 6, "an ally's 速射 is worth 4+2, got %d"
 			% bc.attack_value(1, bc.hero_face(1, 0)))
 	bc.end_turn()
 	_check(bc.s.team_atk_buff == 0, "war cry expired")
@@ -1163,13 +1187,13 @@ func _t_heal_on_hit() -> void:
 func _t_last_ditch() -> void:
 	var bc := _mk(["BOAR", "HARE", "BADGER", "OWL"], ["E04"])
 	_silence_enemies(bc)
-	_face(bc, 0, "boar_lastditch")               # atk 4, becomes 7 at ≤50%
+	_face(bc, 0, "boar_lastditch")               # atk 5, becomes 9 at ≤50%
 	bc.s.heroes[0].hp = bc.s.heroes[0].max_hp
-	_check(bc.attack_value(0, bc.hero_face(0, 0)) == 4, "healthy: prints 4, got %d"
+	_check(bc.attack_value(0, bc.hero_face(0, 0)) == 5, "healthy: prints 5, got %d"
 			% bc.attack_value(0, bc.hero_face(0, 0)))
 	bc.s.heroes[0].hp = 12                       # 12/24 = 50%
-	# 7 from the face, +2 from 背水之勢 which is live at the same threshold
-	_check(bc.attack_value(0, bc.hero_face(0, 0)) == 9, "cornered: 7 + fury 2 = 9, got %d"
+	# 9 from the face, +2 from 背水之勢 which is live at the same threshold
+	_check(bc.attack_value(0, bc.hero_face(0, 0)) == 11, "cornered: 9 + fury 2 = 11, got %d"
 			% bc.attack_value(0, bc.hero_face(0, 0)))
 
 
@@ -1331,24 +1355,24 @@ func _t_attuned_aim_charge() -> void:
 	_silence_enemies(bc)
 	_face(bc, 0, "hare_attunedaim")
 	var m := int(bc.s.mana)
-	# cold: the printed 1
+	# cold: the printed 2 (round 13: mana 2)
 	_check(bc.use_face(0, 0).ok, "Attuned Aim resolves cold")
-	_check(bc.s.mana == m + 1, "cold Attuned Aim draws 1, got %d" % (bc.s.mana - m))
-	# two stacks banked: 1 + 2
+	_check(bc.s.mana == m + 2, "cold Attuned Aim draws 2, got %d" % (bc.s.mana - m))
+	# two stacks banked: 2 + 2
 	var bc2 := _mk(["HARE", "BADGER", "HEDGE", "FOX"], ["E01"])
 	_silence_enemies(bc2)
 	_face(bc2, 0, "hare_attunedaim")
 	bc2.s.heroes[0].face_charge[0] = 2
 	var m2 := int(bc2.s.mana)
 	_check(bc2.use_face(0, 0).ok, "Attuned Aim resolves charged")
-	_check(bc2.s.mana == m2 + 3,
-			"two layers of Charge make it 3, got %d" % (bc2.s.mana - m2))
+	_check(bc2.s.mana == m2 + 4,
+			"two layers of Charge make it 4, got %d" % (bc2.s.mana - m2))
 	# and the sentence agrees with the engine, which is what the cast strip shows
 	var bc3 := _mk(["HARE", "BADGER", "HEDGE", "FOX"], ["E01"])
 	_face(bc3, 0, "hare_attunedaim")
 	bc3.s.heroes[0].face_charge[0] = 2
 	var live := bc3.live_face(0, bc3.hero_face(0, 0))
-	_check(int(live.mana) == 3, "the live face reports 3, got %d" % int(live.mana))
+	_check(int(live.mana) == 4, "the live face reports 4, got %d" % int(live.mana))
 
 
 func _t_passive_call_and_answer() -> void:
@@ -1413,7 +1437,7 @@ func _t_enemy_counter_instant() -> void:
 	_enemy_rolls(bc, 0, [{"counter": 4}])
 	bc.enemy_instant_pass()
 	_check(int(bc.s.enemies[0].counter) == 4, "counter stance up before the player acts")
-	_face(bc, 0, "sp_heavy_blow")
+	_face(bc, 0, "fx_atk7")
 	var hp0: int = bc.s.heroes[0].hp
 	bc.use_face(0, 0, {"target": 0})
 	_check(bc.s.heroes[0].hp == hp0 - 4, "attacking into the stance cost 4, lost %d"
@@ -1503,7 +1527,7 @@ func _t_enemy_weaken_hero() -> void:
 	_enemy_rolls(bc, 0, [{"weaken": 2}])
 	bc.end_turn()
 	_check(int(bc.s.heroes[0].weaken) == 2, "weaken 2 live the next turn")
-	_face(bc, 0, "sp_heavy_blow")     # atk 7 on the Hare (no sergeant bonus)
+	_face(bc, 0, "fx_atk7")     # atk 7 on the Hare (no sergeant bonus)
 	_check(bc.attack_value(0, bc.hero_face(0, 0)) == 5, "7 − weaken 2 = 5, got %d"
 			% bc.attack_value(0, bc.hero_face(0, 0)))
 

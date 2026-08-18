@@ -217,7 +217,9 @@ func _t_relics() -> void:
 	bc2.use_face(1, 0, {"target": 0})
 	_check(ehp - e.hp == 12, "N02: great blade 10 + whetstone 1 + sergeant 1 = 12, dealt %d" % (ehp - e.hp))
 	_check(khp - bc2.s.heroes[1].hp == 2, "pain is untouched without the Chalice")
-	_face(bc2, 0, "sp_quick_jab")   # combo: 4 +2 (an attack landed) +1 (N02) = 7
+	GameData.faces["fx_combo4"] = {"zh": "快擊", "en": "Quick Jab", "cat": "attack",
+			"rarity": "S", "atk": 4, "combo": true, "target": "enemy"}
+	_face(bc2, 0, "fx_combo4")   # combo: 4 +2 (an attack landed) +1 (N02) = 7
 	var ehp2: int = e.hp
 	bc2.use_face(0, 0, {"target": 0})
 	_check(ehp2 - e.hp == 7, "combo w/ N02 dealt 7, dealt %d" % (ehp2 - e.hp))
@@ -313,10 +315,10 @@ func _t_advanced_relics() -> void:
 	_silence(bc2)
 	bc2.s.enemies[0].block = 0
 	bc2.s.enemies[0].hp = 40
-	_face(bc2, 0, "sp_leech_bite")     # atk 5, lifesteal
+	_face(bc2, 0, "sp_leech_bite")     # atk 4 (round 13), lifesteal
 	bc2.s.heroes[0].hp = 5
 	bc2.use_face(0, 0, {"target": 0})
-	_check(bc2.s.heroes[0].hp == 10, "A03: lifesteal healed the full 5, got %d"
+	_check(bc2.s.heroes[0].hp == 9, "A03: lifesteal healed the full 4, got %d"
 			% int(bc2.s.heroes[0].hp))
 	_face(bc2, 1, "sp_great_blade")          # pain 2 → 1
 	var khp: int = bc2.s.heroes[1].hp
@@ -358,16 +360,16 @@ func _t_advanced_relics() -> void:
 	for en in bc5.s.enemies:
 		en.block = 0
 		en.hp = 60
-	_face(bc5, 0, "sp_keen")           # atk 5, no combo
+	_face(bc5, 0, "owl_bolt4")         # atk 5, no combo, holder has no atk passive
 	var hp0: int = bc5.s.enemies[0].hp
 	bc5.use_face(0, 0, {"target": 0})
 	_check(hp0 - int(bc5.s.enemies[0].hp) == 5, "A06: the first attack is unbuffed")
-	_face(bc5, 1, "bdg_smash6")        # atk 6 → 7
+	_face(bc5, 1, "bdg_smash6")        # atk 7 (round 13) → 8
 	var hp1: int = bc5.s.enemies[0].hp
 	bc5.use_face(1, 0, {"target": 0})
-	_check(hp1 - int(bc5.s.enemies[0].hp) == 8, "A06: the next attack is +1 (6 + sergeant 1 + drum 1), dealt %d"
+	_check(hp1 - int(bc5.s.enemies[0].hp) == 9, "A06: the next attack is +1 (7 + sergeant 1 + drum 1), dealt %d"
 			% (hp1 - int(bc5.s.enemies[0].hp)))
-	_face(bc5, 2, "sp_armor_break")    # atk 4 pierce → 6 (two attacks banked)
+	_face(bc5, 2, "hare_pierce3")      # atk 4 pierce, held by OWL (no Held Breath) → 6
 	var hp2: int = bc5.s.enemies[0].hp
 	bc5.use_face(2, 0, {"target": 0})
 	_check(hp2 - int(bc5.s.enemies[0].hp) == 6, "A06: it stacks within the turn, dealt %d"

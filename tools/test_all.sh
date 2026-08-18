@@ -2,7 +2,7 @@
 # Runs every headless test suite and reports a single pass/fail summary.
 #   bash tools/test_all.sh
 cd "$(dirname "$0")/.."
-SUITES="engine_smoke font_coverage_test data_policy_test api_parity_test keywords_test save_migrate_test boss_test phase4_test meta_test run_flow_test ui_smoke layout_test screens_crawl charselect_input_test drag_input_test"
+SUITES="engine_smoke font_coverage_test data_policy_test value_band_test api_parity_test keywords_test save_migrate_test boss_test phase4_test meta_test run_flow_test ui_smoke layout_test screens_crawl charselect_input_test drag_input_test codex_scroll_test"
 FAILED=0
 for t in $SUITES; do
   printf '%-24s ' "$t"

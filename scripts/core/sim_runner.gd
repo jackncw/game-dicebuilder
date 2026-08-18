@@ -589,7 +589,9 @@ static func print_zero_use_audit(reports: Array, face_t: Dictionary, runs: int,
 		var owner := String(GameData.faces[fid4].get("hero", ""))
 		if owner != "" and owner not in team:
 			off_party[owner] = int(off_party.get(owner, 0)) + 1
-		elif owner != "" and String(GameData.faces[fid4].get("rarity", "")) == "U" 				and not unlocked_here.has(fid4):
+		elif owner != "" and String(GameData.faces[fid4].get("rarity", "")) in ["C", "R", "E"] 				and not unlocked_here.has(fid4):
+			# a class-pool face this party's level has not unlocked (round 13:
+			# rarity U retired, class faces carry C/R/E and gate on the table)
 			level_gated.append(fid4)
 		else:
 			in_scope.append(fid4)
@@ -603,7 +605,7 @@ static func print_zero_use_audit(reports: Array, face_t: Dictionary, runs: int,
 		print("  %-22s %-10s %-6s owner %s" % [fid5, String(f2.get("zh", "")),
 				String(f2.get("rarity", "")), String(f2.get("hero", "(shared)"))])
 	if not level_gated.is_empty():
-		print("  (plus %d U faces this party has not unlocked at level %d — out of "
+		print("  (plus %d class-pool faces this party has not unlocked at level %d — out of "
 				% [level_gated.size(), level] + "reach by the rules. Sweep: --levels)")
 	if not off_party.is_empty():
 		var owners: Array = off_party.keys()
@@ -729,7 +731,6 @@ static func _rarity_rank(face_id: String) -> int:
 	match String(GameData.faces.get(face_id, {}).get("rarity", "S")):
 		"E": return 4
 		"R": return 3
-		"U": return 3
 		"C": return 2
 		_: return 1
 
@@ -1596,11 +1597,11 @@ const POLICY_QUALIFIERS := ["aoe", "pain"]
 ## declared blind spot: the numbers in BALANCE.md do not include it, and saying
 ## so is the whole point of the entry.
 const POLICY_BLIND := {
-	"sp_chaos": "混沌 copies another die on the table. Choosing WHICH die is a "
-		+ "whole second policy — the copy inherits none of the original's "
-		+ "position bonuses, so the sim would have to re-score every other die "
-		+ "in the party from the copier's seat. Declared rather than guessed: a "
-		+ "bad copy policy would understate the face just as badly as no policy.",
+	# Empty since round 13: 混沌 sp_chaos — the one declared blind spot, whose
+	# copy-a-die choice the policy could never price — was cut with the old
+	# universal pool. The `wild` engine branch survives (keywords_test drives
+	# it with a fixture face), so a future wild face lands back here with a
+	# reason, not silently at zero.
 }
 
 
@@ -1861,11 +1862,8 @@ const LENS_UNPRICED := {
 		+ "the party's turn order, not about the face.",
 	"echo": "lifts every face the party plays for a turn; pricing it needs the "
 		+ "other five dice, which an offer-time lens does not have.",
-	"growth": "the face grows over a run, so its worth depends on when it was "
-		+ "picked up — the lens is asked at exactly one moment and cannot see it.",
 	"lifesteal": "rides the attack number already priced; the HP back is real "
 		+ "but small next to the damage line.",
-	"lucky": "a reroll-shaped rider on the die, not points on the face.",
 	"cleanse_self": "removes a debuff that may not be there. Priced at zero "
 		+ "rather than guessed, same as the other conditionals.",
 	"cleanse_target": "same as `cleanse_self`, one seat over: worth a lot on a "
@@ -1873,7 +1871,6 @@ const LENS_UNPRICED := {
 		+ "the battle that would decide which.",
 	"resonate_req": "a GATE, not a payoff — it makes the face harder to spend, "
 		+ "and the matching `resonate` bonus is what carries the value.",
-	"wild": "`sp_chaos` only, which is already declared in POLICY_BLIND.",
 }
 
 

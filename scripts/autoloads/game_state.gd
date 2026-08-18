@@ -112,7 +112,11 @@ func load_meta() -> void:
 		assert(after == before, "SaveMigrate lost XP")
 		save_meta()
 	elif int(meta.get("save_version", 0)) < SaveMigrate.SAVE_VERSION:
+		# v4 → v5 (round 13): no cast change, but retired universal faces have
+		# successors and the codex flags should follow them
+		SaveMigrate.remap_face_list(meta, "used_face_ids")
 		meta["save_version"] = SaveMigrate.SAVE_VERSION
+		save_meta()
 
 
 # ------------------------------------------------------------ codex discovery
