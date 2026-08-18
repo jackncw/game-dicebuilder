@@ -36,13 +36,24 @@ func _ready() -> void:
 		var card := UIKit.card(chapter)
 		var csb: StyleBoxFlat = card.get_theme_stylebox("panel")
 		csb.border_color = hue
+		# the icon leads: this is the picture the relic will wear in the battle
+		# strip for the rest of the run, so the chest is where it gets learned
+		var crow := HBoxContainer.new()
+		crow.add_theme_constant_override("separation", UIKit.S4)
+		card.add_child(crow)
+		var cicon := ItemIcon.for_relic(rid, 84.0)
+		cicon.interactive = false
+		cicon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cicon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		crow.add_child(cicon)
 		var cv := VBoxContainer.new()
 		cv.add_theme_constant_override("separation", UIKit.S2)
-		card.add_child(cv)
+		cv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		crow.add_child(cv)
 		cv.add_child(UIKit.text_block(Data.bi(String(rdef.zh), String(rdef.en)),
-				UIKit.F_H2, UITheme.CAT_ON_DARK.special, 600.0))
+				UIKit.F_H2, UITheme.CAT_ON_DARK.special, 500.0))
 		cv.add_child(UIKit.text_block(Data.bi2(String(rdef.desc_zh), String(rdef.desc_en)),
-				UIKit.F_BODY, UIKit.CREAM, 600.0))
+				UIKit.F_BODY, UIKit.CREAM, 500.0))
 		vb.add_child(card)
 		var take := UIKit.button(Data.t("ui_take"), UIKit.GREEN.lightened(0.3),
 				UIKit.F_H2, Vector2(300, 80))

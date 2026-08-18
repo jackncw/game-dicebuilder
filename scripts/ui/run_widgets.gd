@@ -30,7 +30,23 @@ static func topbar() -> Control:
 	# resources as chips: the top bar sits straight on the chapter sky, where
 	# loose coloured type never clears 4.5:1 on its own
 	bar.add_child(UIKit.chip("💰%d" % int(g.run.gold), UIKit.YELLOW, UIKit.F_BODY_SM))
-	bar.add_child(UIKit.chip("🧪%d" % g.run.potions.size(), UIKit.GREEN, UIKit.F_BODY_SM))
+	# the potion chip is the way into the potion list from every non-battle
+	# screen, and it wears the drawn bottle rather than the 🧪 emoji: the
+	# same picture the shop card and the battle tray use
+	var pot := UIKit.icon_chip("p_bottle", str(g.run.potions.size()), UIKit.GREEN,
+			UIKit.F_BODY_SM)
+	var open_p := Button.new()
+	open_p.flat = true
+	open_p.set_anchors_preset(Control.PRESET_FULL_RECT)
+	open_p.pressed.connect(func() -> void:
+		var host: Node = bar
+		while host != null and host.get_parent() is Control:
+			host = host.get_parent()
+		if host is Control:
+			Sfx.play("button")
+			DetailCard.show_potion_list(host, g.run.potions))
+	pot.add_child(open_p)
+	bar.add_child(pot)
 	# the relic count is the way into the relic list from every non-battle
 	# screen — a run-long passive the player cannot re-read is a rule they will
 	# simply forget they own
@@ -81,6 +97,8 @@ static func party_strip(ground_y: float, height := 150.0) -> Control:
 
 ## Width of the portrait gutter on an offer card bound to a character.
 const PORTRAIT_COL := 80.0
+## Same gutter, for an offer that is an object rather than a person.
+const ICON_COL := 64.0
 
 
 ## One offer in the run screens — face, relic, potion or service — all built to
@@ -89,17 +107,24 @@ const PORTRAIT_COL := 80.0
 ## `hero_id` ("H1"…"H6") puts that character's face and name down the left edge.
 ## Anything the player has to hand to somebody in particular says whose it is
 ## before it says what it does.
+##
+## `icon` is a glyph key (a relic's or a potion's) shown in a disc down the
+## left edge, where a character portrait would go. A shop row for an object the
+## player will later have to recognise in a 36px strip has to show them that
+## picture at the moment they buy it, or the strip is a row of strangers.
 static func offer_card(title_text: String, summary: String, subtitle: String,
 		hue: Color, on_press: Callable, min_size := Vector2(648, 108),
-		price := -1, hero_id := "") -> Button:
+		price := -1, hero_id := "", icon := "") -> Button:
 	var b := UIKit.button("", UIKit.CREAM, UIKit.F_BODY, min_size)
 	b.clip_contents = true
 	var sb: StyleBoxFlat = b.get_theme_stylebox("normal")
 	sb.border_color = hue
 	sb.set_border_width_all(UIKit.B_STRONG)
 	var has_portrait: bool = hero_id != "" and GameData.heroes.has(hero_id)
+	var has_icon: bool = icon != "" and not has_portrait
 	var text_w := min_size.x - 2 * UIKit.S5 - (84.0 if price >= 0 else 0.0) \
-			- (PORTRAIT_COL + UIKit.S3 if has_portrait else 0.0)
+			- (PORTRAIT_COL + UIKit.S3 if has_portrait else 0.0) \
+			- (ICON_COL + UIKit.S3 if has_icon else 0.0)
 	var vb := VBoxContainer.new()
 	vb.alignment = BoxContainer.ALIGNMENT_CENTER
 	vb.add_theme_constant_override("separation", 2)
@@ -120,6 +145,15 @@ static func offer_card(title_text: String, summary: String, subtitle: String,
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if has_portrait:
 		row.add_child(_portrait_col(hero_id, min_size.y))
+	if has_icon:
+		var badge := ItemIcon.new(icon, hue, minf(ICON_COL, min_size.y - 40.0))
+		badge.interactive = false
+		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var icc := CenterContainer.new()
+		icc.custom_minimum_size = Vector2(ICON_COL, 0)
+		icc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icc.add_child(badge)
+		row.add_child(icc)
 	row.add_child(vb)
 	b.add_child(row)
 	# a price is the one thing on a shop card the player scans for, so it gets
@@ -286,3 +320,57 @@ static func view_hero_dice(parent: Control, hero_i: int) -> Control:
 ## open the same one.
 static func show_relics(parent: Control) -> Control:
 	return DetailCard.show_relic_list(parent, game().run.get("relics", []))
+
+
+
+## What the party is carrying, as one row of icons — relics first, then
+## potions. Tap an icon for the full list, hold it to read that one thing.
+##
+## The shop is where this matters: "do I already own this?" and "what does the
+## one I own actually do?" were both questions you had to leave the counter to
+## answer. Same icons as the battle strip, same gesture as a die face.
+## `source` overrides where the two lists come from — the victory tally
+## passes the copy it was handed, because the run is already wiped by then.
+static func owned_strip(host: Control, source := {}) -> Control:
+	var g := game()
+	var bag: Dictionary = source if not source.is_empty() else g.run
+	var relics: Array = bag.get("relics", [])
+	var potions: Array = bag.get("potions", [])
+	var panel := UIKit.panel(UIKit.surface(int(g.run.get("chapter", 1))),
+			UIKit.R_MD, UIKit.B_HAIR)
+	var box: StyleBoxFlat = panel.get_theme_stylebox("panel")
+	box.set_content_margin_all(UIKit.S3)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", UIKit.S2)
+	panel.add_child(col)
+	col.add_child(UIKit.label(data().bi("攜帶中", "Carrying"), UIKit.F_CAPTION,
+			UIKit.CREAM_DARK))
+	if relics.is_empty() and potions.is_empty():
+		col.add_child(UIKit.label(data().bi("(空)", "(nothing yet)"), UIKit.F_CAPTION,
+				UIKit.CREAM_DARK))
+		return panel
+	var flow := HFlowContainer.new()
+	flow.add_theme_constant_override("h_separation", UIKit.S2)
+	flow.add_theme_constant_override("v_separation", UIKit.S2)
+	col.add_child(flow)
+	for rid_v in relics:
+		var rid := String(rid_v)
+		if not GameData.relics.has(rid):
+			continue
+		var ric := ItemIcon.for_relic(rid)
+		ric.pressed.connect(func() -> void:
+			Sfx.play("button")
+			DetailCard.show_relic_info(host, rid))
+		ric.long_pressed.connect(func() -> void: DetailCard.show_relic_info(host, rid))
+		flow.add_child(ric)
+	for pid_v in potions:
+		var pid := String(pid_v)
+		if not GameData.potions.has(pid):
+			continue
+		var pic := ItemIcon.for_potion(pid)
+		pic.pressed.connect(func() -> void:
+			Sfx.play("button")
+			DetailCard.show_potion(host, pid))
+		pic.long_pressed.connect(func() -> void: DetailCard.show_potion(host, pid))
+		flow.add_child(pic)
+	return panel

@@ -1,8 +1,8 @@
 {
-  "P01": {"zh": "治療藥", "en": "Healing Potion", "desc_zh": "使一位英雄回復 8 點 HP", "desc_en": "Heal a hero for 8", "effect": "heal", "value": 8, "target": "ally"},
-  "P02": {"zh": "團隊藥", "en": "Party Tonic", "desc_zh": "全隊回復 4 點 HP", "desc_en": "Heal the party for 4", "effect": "team_heal", "value": 4, "target": "none"},
-  "P03": {"zh": "重擲藥", "en": "Reroll Brew", "desc_zh": "本場戰鬥重擲 +3", "desc_en": "+3 rerolls this battle", "effect": "rerolls", "value": 3, "target": "none"},
-  "P04": {"zh": "猛毒瓶", "en": "Venom Flask", "desc_zh": "使全體敵人中毒 3 層", "desc_en": "All enemies gain Poison 3", "effect": "poison_all", "value": 3, "target": "none"},
-  "P05": {"zh": "石膚藥", "en": "Stoneskin Draught", "desc_zh": "全隊獲得 5 點格擋", "desc_en": "Party gains Block 5", "effect": "team_block", "value": 5, "target": "none"},
-  "P06": {"zh": "狂暴藥", "en": "Rage Elixir", "desc_zh": "本回合全隊攻擊面 +3", "desc_en": "Party attack faces +3 this turn", "effect": "team_atk_buff", "value": 3, "target": "none"}
+  "P01": {"zh": "治療藥", "en": "Healing Potion", "glyph": "p_heal", "desc_zh": "使一位英雄回復 8 點 HP", "desc_en": "Heal a hero for 8", "effect": "heal", "value": 8, "target": "ally"},
+  "P02": {"zh": "團隊藥", "en": "Party Tonic", "glyph": "p_tonic", "desc_zh": "全隊回復 4 點 HP", "desc_en": "Heal the party for 4", "effect": "team_heal", "value": 4, "target": "none"},
+  "P03": {"zh": "重擲藥", "en": "Reroll Brew", "glyph": "p_reroll", "desc_zh": "本場戰鬥重擲 +3", "desc_en": "+3 rerolls this battle", "effect": "rerolls", "value": 3, "target": "none"},
+  "P04": {"zh": "猛毒瓶", "en": "Venom Flask", "glyph": "p_venom", "desc_zh": "使全體敵人中毒 3 層", "desc_en": "All enemies gain Poison 3", "effect": "poison_all", "value": 3, "target": "none"},
+  "P05": {"zh": "石膚藥", "en": "Stoneskin Draught", "glyph": "p_stone", "desc_zh": "全隊獲得 5 點格擋", "desc_en": "Party gains Block 5", "effect": "team_block", "value": 5, "target": "none"},
+  "P06": {"zh": "狂暴藥", "en": "Rage Elixir", "glyph": "p_rage", "desc_zh": "本回合全隊攻擊面 +3", "desc_en": "Party attack faces +3 this turn", "effect": "team_atk_buff", "value": 3, "target": "none"}
 }

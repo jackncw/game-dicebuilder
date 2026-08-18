@@ -720,7 +720,11 @@ class _FaceArt:
 	func refresh() -> void:
 		if _num == null:
 			return
-		var txt := Glossary.main_number(fd) if not fd.is_empty() else ""
+		# A pip face carries its value as dots, so there is no number to print
+		# over them (see Glyphs._pips and DiceCheck).
+		var txt := ""
+		if not fd.is_empty() and not fd.has("pip"):
+			txt = Glossary.main_number(fd)
 		_num.text = txt
 		_num.add_theme_font_size_override("font_size", 80 if txt.length() <= 2 else 50)
 		_num.add_theme_color_override("font_color",
@@ -730,7 +734,7 @@ class _FaceArt:
 	func _draw() -> void:
 		var s := size
 		var hue: Color = UITheme.cat_color(String(fd.get("cat", "special")))
-		if fd.is_empty() or fd.get("blank", false):
+		if fd.is_empty() or (fd.get("blank", false) and not fd.has("pip")):
 			hue = Color("8a8a8a")
 		var fill := UITheme.deepen(hue)
 		var rim := hue.lightened(0.22)
@@ -748,7 +752,11 @@ class _FaceArt:
 		var tint := UITheme.CREAM.lerp(rim, 0.55 if has_num else 0.0)
 		if dimmed:
 			tint = tint.darkened(0.3)
-		Glyphs.draw_glyph(self, Glossary.glyph_key(String(Glossary.main_effect(fd).key)),
+		var gkey := Glossary.glyph_key(String(Glossary.main_effect(fd).key))
+		if fd.has("pip"):
+			gkey = "pip%d" % clampi(int(fd.pip), 1, 6)
+			tint = UITheme.CREAM
+		Glyphs.draw_glyph(self, gkey,
 				Rect2(Vector2((s.x - g) * 0.5, (s.y - g) * 0.5 + s.y * 0.05), Vector2(g, g)),
 				tint, UITheme.OUTLINE)
 

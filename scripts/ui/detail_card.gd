@@ -186,6 +186,7 @@ static func relic_head(rid: String, disc := 92.0) -> Control:
 	var badge := _IconBadge.new()
 	badge.key = String(rd.get("glyph", "relic"))
 	badge.hue = hue
+	badge.ink = UITheme.OUTLINE
 	badge.custom_minimum_size = Vector2(disc, disc)
 	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(badge)
@@ -260,6 +261,7 @@ static func relic_row(rid: String) -> Control:
 	var badge := _IconBadge.new()
 	badge.key = String(rd.get("glyph", "relic"))
 	badge.hue = hue
+	badge.ink = UITheme.OUTLINE
 	badge.custom_minimum_size = Vector2(44, 44)
 	badge.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	row.add_child(badge)
@@ -277,6 +279,134 @@ static func relic_row(rid: String) -> Control:
 			UITheme.F_CAPTION, UITheme.INK, PANEL_W - 64.0, HORIZONTAL_ALIGNMENT_LEFT))
 	row.add_child(col)
 	return row
+
+
+## One relic on its own, read-only — what a hold on an owned relic raises. The
+## acquisition card (`show_relic`) is a different moment: it blocks, it demands
+## a confirm, and it says "gained". This one is just the rules, and it closes
+## the way every other detail card closes.
+##
+## The text comes from `GameData.relics[rid]`, the same dict BattleCore and
+## RunState switch on — there is no second copy of a relic's wording in the UI.
+static func show_relic_info(parent: Control, rid: String) -> Control:
+	if not GameData.relics.has(rid):
+		return null
+	var rd: Dictionary = GameData.relics[rid]
+	var rows: Array = [
+		relic_head(rid, 76.0),
+		_rule(),
+		UIKit.text_block(Data.bi2(String(rd.desc_zh), String(rd.desc_en)),
+				UITheme.F_BODY, UITheme.INK, PANEL_W - 8.0, HORIZONTAL_ALIGNMENT_LEFT),
+		term_row("relic"),
+	]
+	return _present(parent, rows, null, {"accent": relic_hue(rid)})
+
+
+# ============================================================ potions
+
+## Green for the two that heal, purple for the rest — the same split the battle
+## tray has always drawn, kept in one place now that four screens need it.
+static func potion_hue(pid: String) -> Color:
+	var pd: Dictionary = GameData.potions.get(pid, {})
+	return UITheme.GREEN if String(pd.get("effect", "")) in ["heal", "team_heal"] 			else UITheme.PURPLE
+
+
+## The glyph key for a potion, straight off its definition.
+static func potion_glyph(pid: String) -> String:
+	return String((GameData.potions.get(pid, {}) as Dictionary).get("glyph", "r_vial"))
+
+
+## Heading block: big icon on a disc, bilingual name, "potion" chip.
+static func potion_head(pid: String, disc := 84.0) -> Control:
+	var pd: Dictionary = GameData.potions[pid]
+	var hue := potion_hue(pid)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", UITheme.S4)
+	var badge := _IconBadge.new()
+	badge.key = potion_glyph(pid)
+	badge.hue = hue
+	badge.ink = UITheme.OUTLINE
+	badge.custom_minimum_size = Vector2(disc, disc)
+	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	head.add_child(badge)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", UITheme.S1)
+	col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	col.add_child(UIKit.text_block(Data.bi(String(pd.zh), String(pd.en)), UITheme.F_H2,
+			UITheme.deepen(hue), PANEL_W - disc - 40.0, HORIZONTAL_ALIGNMENT_LEFT))
+	var tags := HBoxContainer.new()
+	tags.add_theme_constant_override("separation", UITheme.S2)
+	tags.add_child(UIKit.chip(Data.bi("藥水", "Potion"), hue, UITheme.F_CAPTION, UITheme.S2))
+	col.add_child(tags)
+	head.add_child(col)
+	return head
+
+
+## One potion as a list row: icon, name, what it does.
+static func potion_row(pid: String) -> Control:
+	var pd: Dictionary = GameData.potions[pid]
+	var hue := potion_hue(pid)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", UITheme.S3)
+	var badge := _IconBadge.new()
+	badge.key = potion_glyph(pid)
+	badge.hue = hue
+	badge.ink = UITheme.OUTLINE
+	badge.custom_minimum_size = Vector2(44, 44)
+	badge.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	row.add_child(badge)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 0)
+	col.add_child(UIKit.text_block(Data.bi(String(pd.zh), String(pd.en)),
+			UITheme.F_BODY_SM, UITheme.deepen(hue), PANEL_W - 64.0,
+			HORIZONTAL_ALIGNMENT_LEFT))
+	col.add_child(UIKit.text_block(Data.bi2(String(pd.desc_zh), String(pd.desc_en)),
+			UITheme.F_CAPTION, UITheme.INK, PANEL_W - 64.0, HORIZONTAL_ALIGNMENT_LEFT))
+	row.add_child(col)
+	return row
+
+
+## What a potion does. Two moods, one card:
+##   · held (no `use`) — read-only, closes like any other detail card;
+##   · tapped (`use` given) — the same page plus a Use button, because a potion
+##     is spent forever and a mis-tap in the tray used to drink it outright.
+## Cancelling is tapping outside, or the ✕, exactly as everywhere else.
+static func show_potion(parent: Control, pid: String, opts := {}) -> Control:
+	if not GameData.potions.has(pid):
+		return null
+	var pd: Dictionary = GameData.potions[pid]
+	var rows: Array = [
+		potion_head(pid),
+		_rule(),
+		UIKit.text_block(Data.bi2(String(pd.desc_zh), String(pd.desc_en)),
+				UITheme.F_BODY, UITheme.INK, PANEL_W - 8.0, HORIZONTAL_ALIGNMENT_LEFT),
+	]
+	if String(pd.get("target", "none")) == "ally":
+		rows.append(UIKit.text_block(Data.bi("使用後選擇一位英雄", "Pick a hero after using"),
+				UITheme.F_BODY_SM, UITheme.INK_SOFT, PANEL_W - 8.0,
+				HORIZONTAL_ALIGNMENT_LEFT))
+	var use: Callable = opts.get("use", Callable())
+	var card_opts := {"accent": potion_hue(pid)}
+	if use.is_valid():
+		card_opts["confirm"] = Data.bi("使用", "Use")
+		card_opts["on_confirm"] = use
+	return _present(parent, rows, null, card_opts)
+
+
+## Everything the party is carrying to drink, as a list. The run top bar's
+## potion chip opens this.
+static func show_potion_list(parent: Control, ids: Array) -> Control:
+	var rows: Array = [UIKit.text_block(Data.bi("我的藥水", "My Potions"), UITheme.F_H2,
+			UITheme.INK, PANEL_W - 8.0, HORIZONTAL_ALIGNMENT_LEFT)]
+	if ids.is_empty():
+		rows.append(UIKit.text_block(Data.bi("暫時冇藥水", "No potions yet"),
+				UITheme.F_BODY_SM, UITheme.INK_SOFT, PANEL_W - 8.0,
+				HORIZONTAL_ALIGNMENT_LEFT))
+	for pid in ids:
+		if GameData.potions.has(pid):
+			rows.append(_rule())
+			rows.append(potion_row(String(pid)))
+	return _present(parent, rows, null)
 
 
 ## One glossary entry as a row: its icon in a category-coloured disc, then the
@@ -390,6 +520,9 @@ static func _present(parent: Control, rows: Array, viewer: Control, opts := {}) 
 			var cb: Callable = opts.get("on_confirm", Callable())
 			if cb.is_valid():
 				cb.call())
+		# the browser regression has no DOM to find this with (see Safe.publish_hud)
+		ok.item_rect_changed.connect(func() -> void:
+			Safe.publish_hud("card_confirm", ok.get_global_rect()))
 		bar.add_child(ok)
 		vb.add_child(UIKit.spacer(UITheme.S2))
 		vb.add_child(bar)
@@ -463,6 +596,11 @@ class _IconBadge:
 	extends Control
 	var key := "atk"
 	var hue := UITheme.ORANGE
+	## Transparent by default: a keyword glyph is a flat silhouette on the
+	## disc. Object glyphs (relics, potions) carry their detail INSIDE the
+	## silhouette — the cross in the bottle, the hole in the coin — and those
+	## marks are drawn in the ink colour, so those callers pass a real one.
+	var ink := Color(0, 0, 0, 0)
 
 	func _init() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -473,4 +611,4 @@ class _IconBadge:
 		draw_circle(c, r, UITheme.deepen(hue))
 		draw_arc(c, r, 0.0, TAU, 26, UITheme.OUTLINE, 2.5, true)
 		Glyphs.draw_glyph(self, key, Rect2(c - Vector2(r, r) * 0.66, Vector2(r, r) * 1.32),
-				hue.lightened(0.45), Color(0, 0, 0, 0))
+				hue.lightened(0.45), ink)

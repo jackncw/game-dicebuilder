@@ -422,3 +422,54 @@ bug 只有真 touch 先驗到 —— 已寫入 memory。
 - ⚠ creep:L1 38 → L8 45(n300,+7pt)超任務 ≤2pt 線 —— 按指示未 nerf,
   元兇表+三個選項喺 BALANCE.md §7 等 Jack 裁。
 - 18 suites 全綠;web 重出;live URL 三重驗證(pck 對數/真 touch/console)。
+
+---
+
+# 第十四輪(2026-08-18):Event 擲骰互動 + 遺物/藥水圖示系統
+
+純 UI/UX 輪。**零平衡改動**:`-- --balance 150`(3 seed sets)前後逐行對齊
+(pristine HEAD worktree 重跑做對照),value_band / creep / 池結構 suites 原封綠。
+
+## 任務A:event 擲骰要真係擲
+
+賭骰攤(V03)改成互動:出一粒骰 + 講明條件(「擲出 ≥4 成功」)→ 玩家 tap
+先擲 → 0.66s tumble → 點數同判詞停喺畫面 → 確認先入 outcome。
+- **誠實鐵律機器化**:引擎先擲(RNG 調用次序一個字冇改),個數字交畀
+  `DiceCheck` 展示;驗證係由 widget **讀返 cube 面上嗰粒數**同引擎個數比,
+  headless 逐個 1-6 揸過,web spec 再用獨立 RNG replay 對一次。
+- 視覺沿用戰鬥骰:同一個 `Die3D`(同一 cube/atlas/材質/throw 曲線),
+  face 內容係點數(`{"pip": n}` → `Glyphs._pips`)—— 運氣骰唔係英雄骰面。
+- Sim/headless 繞過動畫直取結果(`DisplayServer.get_name() == "headless"` 或
+  `Fx.reduced()`),sim 本來就唔賭,event 數字零變化。
+- 新 `?boot=event:V03` deep-boot(`Safe.boot_arg`),畀 CDP 真 touch 直入。
+
+## 任務B:遺物 + 藥水全面圖示化
+
+- 六個新藥水圖(共用樽身,樽入面分別),一個通用樽(頂欄);全部原創,
+  同遺物/keyword 同一套 32×32 flat fill + 重墨邊語言。
+- 出齊各位:商店卡(遺物+藥水,新 `offer_card(icon:)` 左欄)、寶箱掉落卡、
+  獎勵/進階遺物卡(本來已有)、event 獲得(本來已有)、關卡 HUD(遺物條
+  轉 `ItemIcon`;藥水格加圖)、商店「攜帶中」欄、勝利結算戰利品欄、
+  頂欄藥水 chip(🧪 emoji → 畫出嚟嘅樽,同時變成可撳入藥水清單)。
+- **第 19 套 icon coverage linter**:逐個 relic/potion id 驗有 glyph、
+  key 有登記、**glyphs.gd 真係有 match arm**、冇撞圖。負向驗過會紅。
+
+## 任務C:長按睇效果
+
+- `PressGesture` 抽出嚟(0.45s / 24px TAP_SLOP / SCROLL_BEGIN 取消),
+  FaceTile、新 `ItemIcon`、battle 嘅 `_attach_longpress` 三方共用一份;
+  戰鬥畫面嗰個裸 timer(冇死區、捲動途中彈卡)刪咗。
+- 遺物:長按 = 呢件嘅效果卡,短 tap = 成個遺物清單(舊行為保住)。
+  關卡 HUD 同商店「攜帶中」欄都係同一套。
+- 藥水:tap = 「使用/取消」卡(卡身就係效果),長按 = 淨係睇。
+  已 armed 等目標嗰支再 tap 照樣取消。
+- 效果文字全部讀 `GameData.relics/potions` 同一份 dict,UI 層冇第二份描述。
+
+## 驗證
+
+- 20 suites 全綠(18 → 20:新增 icon coverage linter + round14 UI spec 59 checks)。
+- web CDP 真 touch 兩 viewport(390×664 / 360×640):
+  `round14dice.spec.js`(骰出現 → tap 擲 → 點數 === 引擎結果 → outcome 正確)、
+  `round14items.spec.js`(長按遺物/藥水出卡、tap 藥水要確認先減、短 tap 唔誤觸)。
+- 順手清咗兩個 console error 來源(lambda 捉住已 free 嘅 node):
+  signal 改連 method callable,`Fx.burst` cleanup timer 直連 `p.queue_free`。

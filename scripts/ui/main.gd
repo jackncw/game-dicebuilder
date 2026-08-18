@@ -142,8 +142,15 @@ func _ready() -> void:
 ## of the menu. The web layout regression has to photograph the battle HUD, and
 ## clicking a whole run together through a canvas with no DOM in it would be
 ## testing the click path rather than the layout.
-func _boot_direct(screen: String) -> void:
+func _boot_direct(p_screen: String) -> void:
 	GameData.load_all()
+	# `?boot=event:V03` — everything after the colon is a deep-boot argument the
+	# target screen reads off `Safe.boot_arg`
+	var screen := p_screen
+	if screen.contains(":"):
+		var parts := screen.split(":")
+		screen = parts[0]
+		Safe.boot_arg = parts[1]
 	match screen:
 		"battle":
 			var team := []
@@ -162,13 +169,24 @@ func _boot_direct(screen: String) -> void:
 				bteam.append(GameData.new_hero(String(id3)))
 			Game.goto("battle", {"team": bteam, "enemies": ["B1"],
 				"opts": {"chapter": 1}, "battle_seed": 91117, "kind": "boss"})
+		"battleitems":
+			# round 14: a battle that is actually CARRYING things — the relic strip
+			# and the potion tray are what the hold-to-read regression drives, and
+			# the plain `battle` boot deliberately has neither
+			var iteam := []
+			for id4 in GameData.starter_hero_ids():
+				iteam.append(GameData.new_hero(String(id4)))
+			Game.goto("battle", {"team": iteam, "enemies": ["E01", "E02"],
+				"opts": {"chapter": 1, "relics": ["N02", "A01", "N09"],
+					"potions": ["P02", "P01"]}, "battle_seed": 91117})
 		"treasure", "shop", "rest", "event":
 			# 呢啲 screen 要有個 run 先企得住;canned run 就夠
 			Game.run = RunState.new_run(GameData.starter_hero_ids(), 4242)
 			Game.goto(screen)
 		"victory":
 			Game.goto("victory", {"stats": {"battles": 9, "elites": 2, "nodes": 14},
-				"duration": 1234})
+				"duration": 1234,
+				"carried": {"relics": ["N02", "A01", "N09"], "potions": ["P05"]}})
 		"gameover":
 			Game.goto("gameover", {"chapter": 2, "stats": {"battles": 5, "nodes": 7}})
 		"reward":

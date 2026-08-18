@@ -1,0 +1,106 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+balance matrix: 3 seed sets x 150 runs…
+=== SIM REPORT (150 runs, seed 20260805) ===
+ch1 clear: 85%   ch2 clear: 62%   full clear: 41%
+avg battle turns: 4.22   avg dmg taken/battle: 17.5
+deaths by node:
+  ch1:boss: 23
+  ch2:battle: 1
+  ch2:boss: 33
+  ch3:battle: 6
+  ch3:boss: 25
+advanced relic pick → win rate:
+  A01 雙月徽記   picked  74   win  50  (68%)
+  A02 荊棘王冠   picked  56   win  38  (68%)
+  A04 賭徒之骨   picked  15   win   6  (40%)
+  A05 森之心    picked  49   win  18  (37%)
+  A06 獸王戰鼓   picked  26   win  12  (46%)
+
+=== SIM REPORT (150 runs, seed 987654) ===
+ch1 clear: 79%   ch2 clear: 61%   full clear: 34%
+avg battle turns: 4.29   avg dmg taken/battle: 17.5
+deaths by node:
+  ch1:boss: 31
+  ch2:battle: 4
+  ch2:boss: 23
+  ch3:battle: 6
+  ch3:boss: 35
+advanced relic pick → win rate:
+  A01 雙月徽記   picked  58   win  34  (59%)
+  A02 荊棘王冠   picked  57   win  31  (54%)
+  A04 賭徒之骨   picked  11   win   4  (36%)
+  A05 森之心    picked  58   win  22  (38%)
+  A06 獸王戰鼓   picked  27   win  11  (41%)
+
+=== SIM REPORT (150 runs, seed 424242) ===
+ch1 clear: 85%   ch2 clear: 72%   full clear: 40%
+avg battle turns: 4.13   avg dmg taken/battle: 17.6
+deaths by node:
+  ch1:boss: 22
+  ch2:battle: 3
+  ch2:boss: 17
+  ch3:battle: 9
+  ch3:boss: 39
+advanced relic pick → win rate:
+  A01 雙月徽記   picked  70   win  43  (61%)
+  A02 荊棘王冠   picked  49   win  31  (63%)
+  A04 賭徒之骨   picked  26   win   7  (27%)
+  A05 森之心    picked  56   win  22  (39%)
+  A06 獸王戰鼓   picked  35   win  17  (49%)
+
+=== TARGETS vs RESULT (3 seeds x 150 runs, hero level 1, offers: rarity, judged on median) ===
+metric                20260805  987654  424242   median  verdict
+ch1 clear 80-90%         85%     79%     85%    85.0%  in band
+ch2 clear 60-70%         62%     61%     72%    62.0%  in band (edge, 2.0pt — rerun at n=300)
+full clear 30-40%        41%     34%     40%    40.0%  in band (edge, 0.0pt — rerun at n=300)
+avg turns 4-6           4.22    4.29    4.13    4.22
+
+!! at least one median sits within 3pt of a band edge — that is inside this harness's noise. Rerun: --balance 300
+
+=== ADVANCED RELICS, all seed sets pooled ===
+advanced relic pick → win rate:
+  A01 雙月徽記   picked 202   win 127  (63%)
+  A02 荊棘王冠   picked 162   win 100  (62%)
+  A04 賭徒之骨   picked  52   win  17  (33%)
+  A05 森之心    picked 163   win  62  (38%)
+  A06 獸王戰鼓   picked  88   win  40  (45%)
+
+=== ZERO-USE AUDIT (450 runs, hero level 1) — anything the harness never played ===
+threshold: a face spent on 0.5% or fewer of the turns it was rolled;
+           a relic carried by 0.5% or fewer of the runs.
+Every line below needs a written explanation in BALANCE.md before the
+numbers in this report count as read — see round 6's 豎棘 (0/3491, a
+missing policy branch rather than a dead face).
+
+--- faces rolled but (near enough) never spent: 0 ---
+  (none)
+
+--- faces never rolled at all, party BADGER+HARE+HEDGE+OWL: 0 in scope ---
+  (none — every reachable shared-pool and party face reached a die)
+  (plus 56 class-pool faces this party has not unlocked at level 1 — out of reach by the rules. Sweep: --levels)
+  (plus BOAR 24, FOX 23 faces belonging to heroes outside this party — expected)
+
+--- relics, share of runs that ended holding one ---
+id    name             runs    share
+A01   雙月徽記              202   44.89%
+A02   荊棘王冠              162   36.00%
+A03   血之聖杯                0    0.00%
+A04   賭徒之骨               52   11.56%
+A05   森之心               163   36.22%
+A06   獸王戰鼓               88   19.56%
+N01   導靈杖                94   20.89%
+N02   磨刀石               100   22.22%
+N03   盾徽                 94   20.89%
+N04   橡果護符              101   22.44%
+N05   靈息水晶               97   21.56%
+N06   蜜糖罐                99   22.00%
+N07   聖泉水                90   20.00%
+N08   銅錢                 87   19.33%
+N09   毒瓶                 91   20.22%
+N10   火絨盒                75   16.67%
+N11   幸運兔腳               99   22.00%
+N12   靈息迴環               94   20.89%
+N13   骰匠工具               95   21.11%
+N14   望遠鏡                94   20.89%
+  → EXPLAIN: A03

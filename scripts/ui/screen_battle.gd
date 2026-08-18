@@ -20,7 +20,6 @@ var pending_theft := {}      # die theft: picked die awaiting target
 var pending_potion := -1     # potion slot awaiting an ally target
 
 # tooltip long-press
-var _lp_timer: SceneTreeTimer = null
 var _tooltip: Control = null
 
 # ui refs
@@ -251,6 +250,7 @@ func _build_static() -> void:
 	# is one pip wide, so it wraps into a column down the left edge.
 	relic_row = VBoxContainer.new()
 	relic_row.add_theme_constant_override("separation", 2)
+	relic_row.sort_children.connect(_publish_item_rects)
 	relic_scroll.add_child(relic_row)
 	_build_relic_row()
 
@@ -344,6 +344,7 @@ func _build_static() -> void:
 	potion_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	potion_row.add_theme_constant_override("separation", UIKit.S3)
 	potion_row.custom_minimum_size = Vector2(0, 68)
+	potion_row.sort_children.connect(_publish_item_rects)
 	tray_v.add_child(potion_row)
 
 	var actions := HBoxContainer.new()
@@ -537,6 +538,26 @@ func _publish_deferred() -> void:
 		if is_instance_valid(dv) and _laid_out(dv):
 			Safe.publish_hud("die0", (dv as Control).get_global_rect())
 			break
+	_publish_item_rects()
+
+
+## The relic strip and the potion tray, for the browser regression.
+##
+## Published on the ROWS' own sort rather than once per rebuild: drinking a
+## potion re-centres the tray, and the deferred publish that follows the
+## rebuild runs before the container has re-laid-out — which is how the page
+## ended up holding a rect for where the potion used to be.
+func _publish_item_rects() -> void:
+	if not OS.has_feature("web"):
+		return
+	if is_instance_valid(relic_row) and relic_row.get_child_count() > 0:
+		var line := relic_row.get_child(0)
+		if line.get_child_count() > 0 and _laid_out(line.get_child(0)):
+			Safe.publish_hud("relic0", (line.get_child(0) as Control).get_global_rect())
+	if is_instance_valid(potion_row) and potion_row.get_child_count() > 0 \
+			and _laid_out(potion_row.get_child(0)):
+		Safe.publish_hud("potion0", (potion_row.get_child(0) as Control).get_global_rect())
+	Safe.publish_hud_value("potion_count", str(bc.s.potions.size()))
 
 
 ## The arena: chapter sky, a dark canopy the enemies stand under, a horizon
@@ -924,20 +945,20 @@ const RELICS_PER_ROW := 10
 
 
 func _relic_pip(rid: String) -> Control:
-	var rd: Dictionary = GameData.relics[rid]
-	var hue := DetailCard.relic_hue(rid)
-	var advanced: bool = GameData.relic_rarity(rid) == "advanced"
-	var pip := PanelContainer.new()
-	var sb := UIKit.flat_box(UITheme.deepen(hue), UIKit.R_CHIP,
-			UIKit.B_BASE if advanced else UIKit.B_HAIR,
-			UITheme.YELLOW.lightened(0.25) if advanced else hue.lightened(0.25), 2)
-	pip.add_theme_stylebox_override("panel", sb)
-	pip.custom_minimum_size = Vector2(RELIC_PIP, RELIC_PIP)
-	pip.add_child(Glyphs.icon(String(rd.get("glyph", "relic")), RELIC_PIP - 10.0,
-			hue.lightened(0.5)))
-	_attach_longpress(pip, func() -> void:
+	# Hold reads THIS relic; a tap still opens the whole pack. Before round 14
+	# both gestures landed on the list, so finding one rule among twenty meant
+	# scrolling a card — on the screen where the rule was about to matter.
+	var pip := ItemIcon.for_relic(rid, RELIC_PIP)
+	pip.pressed.connect(func() -> void:
 		_hide_tooltip()
-		_tooltip = DetailCard.show_relic_list(self, bc.s.relics))
+		_tooltip = DetailCard.show_relic_list(self, bc.s.relics)
+		_note_card("relic_list"))
+	# no `_lp_fired` here: PressGesture never emits a tap after a hold, so the
+	# flag would only sit armed and swallow the NEXT widget's tap
+	pip.long_pressed.connect(func() -> void:
+		_hide_tooltip()
+		_tooltip = DetailCard.show_relic_info(self, rid)
+		_note_card("relic_info"))
 	return pip
 
 
@@ -1807,30 +1828,67 @@ func _refresh_potions() -> void:
 	for slot in bc.s.potions.size():
 		var pid: String = bc.s.potions[slot]
 		var pd: Dictionary = GameData.potions[pid]
-		var col := UIKit.GREEN if pd.effect in ["heal", "team_heal"] else UIKit.PURPLE
+		var col := DetailCard.potion_hue(pid)
 		if pending_potion == slot:
 			col = UIKit.YELLOW
-		var b := UIKit.button(Data.bi(String(pd.zh), String(pd.en)), col.lightened(0.35),
-				UIKit.F_BODY_SM, Vector2(252, 66))
-		b.clip_text = true
+		var b := UIKit.button("", col.lightened(0.35), UIKit.F_BODY_SM, Vector2(252, 66))
+		# icon beside the name: the tray is the one place a potion has to be
+		# picked out at a glance, mid-turn, with the enemy intent already read
+		var row := HBoxContainer.new()
+		row.set_anchors_preset(Control.PRESET_FULL_RECT)
+		row.offset_left = UIKit.S3
+		row.offset_right = -UIKit.S3
+		row.add_theme_constant_override("separation", UIKit.S2)
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# the same disc badge the relic strip and the shop gutter draw, so one
+		# potion is one picture wherever it turns up
+		var ic := ItemIcon.for_potion(pid, 42.0)
+		ic.interactive = false
+		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(ic)
+		var nm := UIKit.text_block(Data.bi(String(pd.zh), String(pd.en)),
+				UIKit.F_BODY_SM, UITheme.INK, 172.0)
+		nm.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(nm)
+		b.add_child(row)
 		b.pressed.connect(func() -> void: _on_potion_tapped(slot))
 		_attach_longpress(b, func() -> void:
-			_show_tooltip("%s\n%s" % [Data.bi(String(pd.zh), String(pd.en)),
-					Data.bi2(String(pd.desc_zh), String(pd.desc_en))]))
+			_hide_tooltip()
+			_tooltip = DetailCard.show_potion(self, pid)
+			_note_card("potion_info"))
 		potion_row.add_child(b)
 
 
+## A tap on a potion asks first. A potion is gone for good once it is drunk,
+## the tray sits directly under the dice, and before round 14 the only way to
+## READ one was to hold it — which is not where a thumb goes when the player
+## wants to know what something is. Now: hold to read, tap to be asked.
 func _on_potion_tapped(slot: int) -> void:
-	if bc.s.over:
+	if bc.s.over or _consume_longpress():
+		return
+	if pending_potion == slot:
+		# already armed and waiting for a target: tapping it again cancels it,
+		# the way it always did — the confirm is for DRINKING, not for aiming
+		pending_potion = -1
+		_refresh()
 		return
 	var pid: String = bc.s.potions[slot]
-	var pd: Dictionary = GameData.potions[pid]
+	_hide_tooltip()
+	_tooltip = DetailCard.show_potion(self, pid,
+			{"use": func() -> void: _use_potion_confirmed(slot)})
+	_note_card("potion_use")
+
+
+## The player has confirmed. From here on this is exactly what a tap used to do.
+func _use_potion_confirmed(slot: int) -> void:
+	if bc.s.over or slot >= bc.s.potions.size():
+		return
+	var pd: Dictionary = GameData.potions[bc.s.potions[slot]]
 	if String(pd.target) == "ally":
-		if pending_potion == slot:
-			pending_potion = -1
-		else:
-			_deselect()
-			pending_potion = slot
+		_deselect()
+		pending_potion = slot
 		_refresh()
 		return
 	_deselect()
@@ -2854,19 +2912,14 @@ func _show_tutorial(step: int) -> void:
 ## Button the release reaches this handler first and `_lp_fired` is already set
 ## by the time `pressed` goes off. Tap handlers call `_consume_longpress()` so
 ## holding an enemy card to read its forecast does not ALSO throw a die at it.
+## Hold-to-read on a plain Control (a Button, a bar, a pip). The gesture is
+## `PressGesture` — the same deadzone and scroll-cancel rules the die faces
+## use, so a hold behaves identically whichever object it lands on. The local
+## timer this used to run had neither, and fired cards mid-scroll.
 func _attach_longpress(ctrl: Control, cb: Callable) -> void:
-	ctrl.gui_input.connect(func(ev: InputEvent) -> void:
-		if ev is InputEventMouseButton or ev is InputEventScreenTouch:
-			var pressed: bool = ev.pressed
-			if pressed:
-				var t := get_tree().create_timer(0.5)
-				_lp_timer = t
-				t.timeout.connect(func() -> void:
-					if _lp_timer == t:
-						_lp_fired = true
-						cb.call())
-			else:
-				_lp_timer = null)
+	PressGesture.attach(ctrl, Callable(), func() -> void:
+		_lp_fired = true
+		cb.call())
 
 
 var _lp_fired := false
@@ -2905,10 +2958,26 @@ func _show_tooltip(text: String) -> void:
 	_tooltip = root
 
 
+## What card is up, for the browser regression: the game draws it inside the
+## canvas, so a Playwright test cannot see it any other way.
+func _note_card(kind: String) -> void:
+	Safe.publish_hud_value("battle_card", '"%s"' % kind)
+	# closing by tapping the scrim never comes back through _hide_tooltip, so
+	# the card clears itself. A method callable, not a lambda: the engine drops
+	# a connection whose target is gone.
+	if is_instance_valid(_tooltip):
+		_tooltip.tree_exited.connect(_note_card_closed, CONNECT_ONE_SHOT)
+
+
+func _note_card_closed() -> void:
+	Safe.publish_hud_value("battle_card", "null")
+
+
 func _hide_tooltip() -> void:
 	if is_instance_valid(_tooltip):
 		_tooltip.queue_free()
 	_tooltip = null
+	Safe.publish_hud_value("battle_card", "null")
 
 
 func _hero_tooltip(i: int) -> String:

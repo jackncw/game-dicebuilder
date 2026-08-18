@@ -558,5 +558,11 @@ func _on_chapter_cleared() -> void:
 				break
 	save_meta()
 	var stats: Dictionary = run.stats.duplicate()
+	# what the party finished carrying, copied out before the run is wiped —
+	# a presentation channel, like the defeat screen's chapter (round 11).
+	# The victory tally shows the relics and potions they ended with, and
+	# `clear_run()` runs first, so reading them off `run` there would be empty.
+	var carried := {"relics": run.get("relics", []).duplicate(),
+			"potions": run.get("potions", []).duplicate()}
 	clear_run()
-	goto("victory", {"stats": stats, "duration": dur})
+	goto("victory", {"stats": stats, "duration": dur, "carried": carried})

@@ -1421,3 +1421,63 @@ n=300 覆核先算數。** `print_matrix` 已經對「驗收 band 邊緣」自�
 (`round11perf.spec.js`)鎖住 58.5fps/67ms/7 條線,邊個回退邊個現形。
 順帶:perf 一定要 headed + 清走共用 config 嗰句 `--use-angle=swiftshader`,
 唔係量出嚟係 SwiftShader 嘅 29fps,同遊戲無關。
+
+# 第十四輪:Event 擲骰互動 + 遺物/藥水圖示(2026-08-18)
+
+本輪純 UI/UX。零數值、零池結構改動 —— `--balance 150`(3 seed sets)前後
+逐行對齊,value_band / creep / 池 suites 原封綠。
+
+## 「誠實擲骰」點做到唔係口號
+
+Event 嘅擲骰判定(V03 賭骰攤)以前係「撳選項 → 即刻出一句『擲出 4 —— 贏了』」。
+新做法係:**引擎先擲,widget 只負責展示**,而且呢個次序係機器可驗嘅:
+
+- `screen_event._resolve()` 嘅 RNG 調用次序**一個字都冇改**:扣注金 →
+  `rng.randi_range(1,6)` → `save_rng`。個數字擲完先交畀 `DiceCheck.open()`,
+  所以 sim 同存檔嘅 RNG 流完全一樣(sim 本來就唔賭,`_do_event` 嗰路唔經呢度)。
+- `Die3D.throw(final_face)` 本身就係「話畀佢聽落邊面」嘅 API —— 冇「演完先抽數」
+  嘅位。**驗法唔係睇 code**:`tests/round14_ui_test.gd` 逐個 1-6 揸過,由
+  widget 讀返 cube 面上嗰粒數(`_shown_pip()` 讀 `die.faces[die.shown].pip`)
+  同引擎個數比;`round14dice.spec.js` 喺真 browser 度用 CDP 真 touch 再驗一次,
+  仲會用一條**獨立 RNG replay**(`RunState.rng_of` 係純函數)預測應該擲幾多,
+  再對住個 cube。兩層都係「讀返畫面」而唔係「讀返 caller 個變數」。
+- 錢包喺確認之前唔郁。贏嘅金幣係 `on_done` 先入賬 —— 玩家見到粒骰停低、
+  見到判詞,撳咗確認,先至埋單。
+
+## 點解係點數骰(pip)而唔係戰鬥骰面
+
+「沿用戰鬥骰美術」執行成:**同一個 `Die3D`** —— 同一舊倒角立方體、同一個
+atlas SubViewport、同一套 flat fill + 重墨邊、同一條 throw 曲線。差別淨係
+face 內容:`{"pip": n}` 行 `Glyphs._pips`,畫傳統六面點數。
+理由:運氣判定唔係一個英雄骰面。喺一個「數字決定成敗」嘅畫面,如果粒骰印住
+「4」而個 4 平時代表傷害,兩個意思會撞;點數係全世界都識嘅「呢粒係運氣骰」。
+呢個係**內容**上嘅分別,唔係第二套美術 —— 一行 `pip` 分支住喺 `_FaceArt`,
+冇新 widget、冇新 shader、冇新 atlas。
+
+## 手勢:抽出嚟,而唔係再寫一次
+
+`FaceTile` 本來有一套好嘅按壓規則(0.45s 長按、24px TAP_SLOP、
+`NOTIFICATION_SCROLL_BEGIN` 取消),而 `screen_battle._attach_longpress` 另外
+有一個裸 timer —— 冇死區、冇 scroll 取消,喺捲動途中會彈卡。呢輪抽咗做
+`PressGesture`,三方(FaceTile / ItemIcon / _attach_longpress)共用一份。
+順手修咗兩個「lambda 捉住已 free 嘅 node」嘅 console error 來源:
+signal 連 method callable(engine 會自動斷)而唔係連 lambda(唔會),
+`Fx.burst` 嗰個 cleanup timer 亦同理改成 `p.queue_free` 直連。
+
+## 藥水:tap 係「問」,唔係「飲」
+
+藥水格就喺骰下面,一支藥水飲咗冇得返轉頭 —— 而且改之前**要睇效果就要長按**,
+偏偏「我想知呢個係乜」嘅本能動作係 tap。而家反過嚟:tap 出「使用/取消」卡
+(卡身就係效果卡),長按淨係睇。取消 = 撳卡外/✕,同全遊戲其他卡一致,冇多寫
+一個 dialog。已經 armed 等目標嗰支再 tap 一下照樣係取消 —— 確認係為咗「飲」,
+唔係為咗「瞄」。
+
+## 圖示:數據驅動 + linter 守
+
+遺物本來就喺 `relics.json` 帶住 `glyph`;藥水而家一樣(六個新圖,同遺物一套
+32×32 物件語言:共用樽身 `_flask`,樽入面嘅嘢先係分別)。UI 層一律讀
+`GameData` 個 `glyph`/`desc_*`,冇第二份手抄描述。
+`tests/icon_coverage_test.gd`(第 19 套 Godot suite)逐個 id 驗四件事:有 `glyph`、
+key 喺 `Glyphs.KEYS`、**glyphs.gd 真係有 match arm 畫佢**(淨係喺 KEYS 度掛名
+會靜靜地跌落 `_unknown` 空碟)、同埋冇兩件嘢撞圖。負向驗過:抽走 P06 個 glyph
++ 畀 P05 一個唔存在嘅 key → 3 條 FAIL,exit 1。

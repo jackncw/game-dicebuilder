@@ -50,7 +50,15 @@ const KEYS := ["atk", "block", "heal", "mana", "poison", "burn", "stun", "weaken
 	"r_sigil", "r_whetstone", "r_crest", "r_acorn", "r_crystal", "r_honey",
 	"r_spring", "r_coin", "r_vial", "r_tinderbox", "r_foot", "r_metronome",
 	"r_kit", "r_spyglass", "r_rod", "r_loop",
-	"r_twinmoon", "r_crown", "r_chalice", "r_bone", "r_heart", "r_drum"]
+	"r_twinmoon", "r_crown", "r_chalice", "r_bone", "r_heart", "r_drum",
+	# One per potion. They share a bottle silhouette on purpose — a potion is a
+	# consumable, and the family read ("this is a drink") has to survive the 30px
+	# slot in the battle tray. What is INSIDE the bottle is the part that differs.
+	"p_heal", "p_tonic", "p_reroll", "p_venom", "p_stone", "p_rage",
+	# the empty bottle: the generic "potions" mark on the run top bar
+	"p_bottle",
+	# The event check die (see DiceCheck): a plain d6 pip face, one key per value.
+	"pip1", "pip2", "pip3", "pip4", "pip5", "pip6"]
 
 
 static func resolve(key: String) -> String:
@@ -134,6 +142,15 @@ static func draw_glyph(ci: CanvasItem, key: String, rect: Rect2, tint: Color,
 		"r_bone": _r_bone(ci, c, u, tint, ink)
 		"r_heart": _r_heart(ci, c, u, tint, ink)
 		"r_drum": _r_drum(ci, c, u, tint, ink)
+		"p_heal": _p_heal(ci, c, u, tint, ink)
+		"p_tonic": _p_tonic(ci, c, u, tint, ink)
+		"p_reroll": _p_reroll(ci, c, u, tint, ink)
+		"p_venom": _p_venom(ci, c, u, tint, ink)
+		"p_stone": _p_stone(ci, c, u, tint, ink)
+		"p_rage": _p_rage(ci, c, u, tint, ink)
+		"p_bottle": _flask(ci, c, u, tint, ink)
+		"pip1", "pip2", "pip3", "pip4", "pip5", "pip6":
+			_pips(ci, c, u, tint, ink, int(k.substr(3)))
 		_: _unknown(ci, c, u, tint, ink)
 
 
@@ -728,6 +745,80 @@ static func _r_drum(ci: CanvasItem, c: Vector2, u: float, t: Color, k: Color) ->
 	for sgn2 in [-1.0, 1.0]:
 		_line(ci, c, u, [sgn2 * 13, -15], [sgn2 * 6, -6], k, 2.6)
 		_disc(ci, c, u, [sgn2 * 14, -15], 2.6, t, k, 1.4)
+
+
+# ============================================================ the potions
+
+## Every potion is the same bottle: a corked neck over a round-shouldered body.
+## Drawn once here so the six of them read as one family in the battle tray —
+## what changes between them is the emblem floating in the liquid.
+static func _flask(ci: CanvasItem, c: Vector2, u: float, t: Color, k: Color) -> void:
+	_poly(ci, c, u, [[-9, -4], [9, -4], [11, 6], [7, 15], [-7, 15], [-11, 6]], t, k, 2.4)
+	_poly(ci, c, u, [[-4, -12], [4, -12], [4, -4], [-4, -4]], t, k, 2.0)
+	_poly(ci, c, u, [[-6, -16], [6, -16], [6, -12], [-6, -12]], k, Color(0, 0, 0, 0))
+
+
+## P01 治療藥 — the heal cross, floating in the bottle.
+static func _p_heal(ci: CanvasItem, c: Vector2, u: float, t: Color, k: Color) -> void:
+	_flask(ci, c, u, t, k)
+	_poly(ci, c, u, [[-2, 1], [2, 1], [2, 5], [6, 5], [6, 9], [2, 9], [2, 13],
+			[-2, 13], [-2, 9], [-6, 9], [-6, 5], [-2, 5]], k, Color(0, 0, 0, 0))
+
+
+## P02 團隊藥 — three heads in the liquid: the whole party drinks.
+static func _p_tonic(ci: CanvasItem, c: Vector2, u: float, t: Color, k: Color) -> void:
+	_flask(ci, c, u, t, k)
+	for at in [[-5, 9], [0, 4], [5, 9]]:
+		_disc(ci, c, u, at, 2.8, k, Color(0, 0, 0, 0))
+
+
+## P03 重擲藥 — a bottle with the reroll loop turning inside it.
+static func _p_reroll(ci: CanvasItem, c: Vector2, u: float, t: Color, k: Color) -> void:
+	_flask(ci, c, u, t, k)
+	_ring(ci, c, u, [0, 7], 5.2, k, 2.2, -PI * 0.6, PI * 0.85)
+	_poly(ci, c, u, [[2, 0], [8, 3], [2, 6]], k, Color(0, 0, 0, 0))
+
+
+## P04 猛毒瓶 — the poison droplet, with the fumes coming off it.
+static func _p_venom(ci: CanvasItem, c: Vector2, u: float, t: Color, k: Color) -> void:
+	_flask(ci, c, u, t, k)
+	_poly(ci, c, u, [[0, 1], [4, 7], [3, 11], [0, 13], [-3, 11], [-4, 7]],
+			k, Color(0, 0, 0, 0))
+	_disc(ci, c, u, [-6, 4], 1.8, k, Color(0, 0, 0, 0))
+	_disc(ci, c, u, [6, 6], 1.6, k, Color(0, 0, 0, 0))
+
+
+## P05 石膚藥 — a shield facet set in the bottle.
+static func _p_stone(ci: CanvasItem, c: Vector2, u: float, t: Color, k: Color) -> void:
+	_flask(ci, c, u, t, k)
+	_poly(ci, c, u, [[0, 0], [6, 2], [6, 8], [0, 13], [-6, 8], [-6, 2]],
+			k, Color(0, 0, 0, 0))
+
+
+## P06 狂暴藥 — a flame standing up out of the liquid.
+static func _p_rage(ci: CanvasItem, c: Vector2, u: float, t: Color, k: Color) -> void:
+	_flask(ci, c, u, t, k)
+	_poly(ci, c, u, [[0, 0], [-4, 6], [-2.6, 7.4], [-4.6, 11], [0, 13], [4.6, 11],
+			[3.2, 6.6]], k, Color(0, 0, 0, 0))
+
+
+# ============================================================ the check die
+
+## Pips 1…6, the face of an ordinary d6. Only the event check die wears these:
+## a luck test is not a hero face, and printing "4" on it would have read as a
+## damage number on the very screen where a number decides the outcome.
+static func _pips(ci: CanvasItem, c: Vector2, u: float, t: Color, k: Color,
+		n: int) -> void:
+	const LAYOUT := {
+		1: [[0, 0]],
+		2: [[-7, -7], [7, 7]],
+		3: [[-7, -7], [0, 0], [7, 7]],
+		4: [[-7, -7], [7, -7], [-7, 7], [7, 7]],
+		5: [[-7, -7], [7, -7], [0, 0], [-7, 7], [7, 7]],
+		6: [[-7, -8], [7, -8], [-7, 0], [7, 0], [-7, 8], [7, 8]],
+	}
+	for at in LAYOUT.get(clampi(n, 1, 6), LAYOUT[1]):
+		_disc(ci, c, u, at, 3.4, t, k, 1.8)
 
 
 # ============================================================ node wrapper

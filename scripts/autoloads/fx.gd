@@ -68,9 +68,11 @@ func burst(parent: CanvasItem, pos: Vector2, color: Color, n := 14,
 	p.color_ramp = _fade_ramp(color)
 	parent.add_child(p)
 	p.emitting = true
-	get_tree().create_timer(life + 0.3).timeout.connect(func() -> void:
-		if is_instance_valid(p):
-			p.queue_free())
+	# `p.queue_free` and not a lambda that checks `is_instance_valid(p)`: the
+	# check runs too late — a lambda holding a freed node errors on the way
+	# in — while a connection whose target is freed is simply dropped. Every
+	# screen torn down inside a second of a burst used to log one of these.
+	get_tree().create_timer(life + 0.3).timeout.connect(p.queue_free)
 
 
 ## A soft landing puff: low, slow, grey-green — dice hitting the forest floor.

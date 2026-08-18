@@ -50,6 +50,17 @@ func _ready() -> void:
 			dur / 60, dur % 60], UIKit.F_BODY, UIKit.CREAM, 600.0))
 	vb.add_child(card)
 
+	# what the party finished the run carrying. A relic strip the player
+	# never sees again at the end reads as if none of it counted; the icons
+	# are the same ones they were reading in the battle HUD all run, and a
+	# hold still opens the rules.
+	var carried: Dictionary = args.get("carried", {})
+	if not carried.get("relics", []).is_empty() \
+			or not carried.get("potions", []).is_empty():
+		var spoils := CenterContainer.new()
+		spoils.add_child(RunWidgets.owned_strip(self, carried))
+		vb.add_child(spoils)
+
 	if Game.meta.pending_hero_pick:
 		vb.add_child(UIKit.spacer(UIKit.S2))
 		vb.add_child(UIKit.outlined(UIKit.text_block(

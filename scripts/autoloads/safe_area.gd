@@ -272,6 +272,26 @@ func publish_hud(key: String, r: Rect2) -> void:
 	""" % [key, r.position.x * k, r.position.y * k, r.size.x * k, r.size.y * k], true)
 
 
+## Same bridge, for a value that is not a rect: a state string, a number, a
+## small object. `json_value` is written into `window.__dgHUD[key]` verbatim, so
+## the caller supplies valid JSON.
+func publish_hud_value(key: String, json_value: String) -> void:
+	if not OS.has_feature("web"):
+		return
+	JavaScriptBridge.eval("""
+		(function () {
+			window.__dgHUD = window.__dgHUD || {};
+			window.__dgHUD['%s'] = %s;
+		})()
+	""" % [key, json_value], true)
+
+
+## The part after the colon in `?boot=event:V03` — a deep-boot argument, so a
+## browser test can land on one specific event rather than whatever the seed
+## deals. Empty in normal play.
+var boot_arg := ""
+
+
 ## `?boot=battle` in the web build, `--boot battle` natively: skip the menu and
 ## open one screen directly. The Playwright regression needs to photograph the
 ## battle HUD, and clicking a run together through a canvas that has no DOM is

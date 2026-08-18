@@ -38,6 +38,13 @@ func _build() -> void:
 
 	list_vb.add_child(UIKit.title(Data.t("ui_shop"), UIKit.F_H1))
 
+	# what the party already carries, before what is for sale: the shop is the
+	# one screen where the answer to "do I own this / what does mine do" decides
+	# the purchase. Hold any icon to read it.
+	var owned := CenterContainer.new()
+	owned.add_child(RunWidgets.owned_strip(self))
+	list_vb.add_child(owned)
+
 	# faces — a class face is bound to the party member it belongs to: the card
 	# carries their portrait (face_card reads fd.hero) and only they can buy it
 	for i in stock.faces.size():
@@ -58,7 +65,8 @@ func _build() -> void:
 		var price2 := int(GameData.balance.shop_prices.relic)
 		var rb := RunWidgets.offer_card(Data.bi(String(rdef.zh), String(rdef.en)),
 				Data.bi2(String(rdef.desc_zh), String(rdef.desc_en)),
-				"", UIKit.ORANGE, Callable(), Vector2(648, 108), price2)
+				"", DetailCard.relic_hue(String(stock.relic)), Callable(),
+				Vector2(648, 108), price2, "", String(rdef.get("glyph", "relic")))
 		var rid := String(stock.relic)
 		rb.pressed.connect(func() -> void:
 			if int(Game.run.gold) >= price2:
@@ -83,7 +91,8 @@ func _build() -> void:
 		var idx2: int = i
 		var pb := RunWidgets.offer_card(Data.bi(String(pdef.zh), String(pdef.en)),
 				Data.bi2(String(pdef.desc_zh), String(pdef.desc_en)),
-				"", UIKit.GREEN, Callable(), Vector2(648, 108), price3)
+				"", DetailCard.potion_hue(pid), Callable(), Vector2(648, 108), price3,
+				"", DetailCard.potion_glyph(pid))
 		pb.pressed.connect(func() -> void:
 			if Game.run.potions.size() >= int(GameData.balance.potion_cap):
 				Sfx.play("block", 0.5)

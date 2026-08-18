@@ -4,6 +4,7 @@ extends Control
 
 var event_id := ""
 var vb: VBoxContainer
+var _topbar: Control
 
 
 func setup(_args: Dictionary) -> void:
@@ -14,6 +15,13 @@ func _ready() -> void:
 	var rng := RunState.rng_of(Game.run)
 	if not Game.run.has("seen_events"):
 		Game.run["seen_events"] = []
+	# `?boot=event:V03` lands the browser regression on one named event instead
+	# of whatever the seed deals. Never set in normal play.
+	if Safe.boot_arg != "" and GameData.events.has(Safe.boot_arg):
+		event_id = Safe.boot_arg
+		Game.run.seen_events.append(event_id)
+		_build()
+		return
 	var pool := []
 	for eid in GameData.events:
 		if eid not in Game.run.seen_events:
@@ -33,7 +41,8 @@ func _build() -> void:
 		c.queue_free()
 	var chapter := int(Game.run.chapter)
 	add_child(UIKit.background(chapter, 104.0, 1010.0))
-	add_child(RunWidgets.topbar())
+	_topbar = RunWidgets.topbar()
+	add_child(_topbar)
 	add_child(RunWidgets.party_strip(1014.0, 152.0))
 
 	var ev: Dictionary = GameData.events[event_id]
@@ -85,6 +94,26 @@ func _build() -> void:
 		var cc := CenterContainer.new()
 		cc.add_child(b)
 		vb.add_child(cc)
+	_publish_options()
+
+
+## The option buttons' rects, for the browser-side regression — the game has no
+## DOM, so a Playwright test cannot find a button any other way.
+func _publish_options() -> void:
+	Safe.publish_hud_value("event_id", JSON.stringify(event_id))
+	Safe.publish_hud_value("event_gold", str(int(Game.run.gold)))
+	# republished on every sort rather than after an `await`: the rects only
+	# mean anything once the column has laid out, and a screen freed mid-await
+	# leaves a coroutine holding a freed self
+	if not vb.sort_children.is_connected(_publish_options):
+		vb.sort_children.connect(_publish_options)
+	if not is_instance_valid(vb):
+		return
+	var n := 0
+	for c in vb.get_children():
+		if c is CenterContainer and c.get_child_count() > 0 				and c.get_child(0) is Button:
+			Safe.publish_hud("event_opt%d" % n, (c.get_child(0) as Control).get_global_rect())
+			n += 1
 
 
 func _resolve(opt: Dictionary) -> void:
@@ -104,14 +133,30 @@ func _resolve(opt: Dictionary) -> void:
 			Game.run.gold = maxi(int(Game.run.gold) - int(opt.value), 0)
 			outcome = Data.bi("失去金幣", "Lost gold")
 		"gamble":
+			# The engine rolls FIRST, off the run RNG, in exactly the order it
+			# always did — `DiceCheck` is handed that number and shows it. The
+			# stake leaves the purse before the throw, as it did before; only
+			# the winnings wait for the player to have seen the die land.
 			Game.run.gold = int(Game.run.gold) - int(opt.cost)
 			var roll := rng.randi_range(1, 6)
-			if roll >= 4:
-				Game.run.gold = int(Game.run.gold) + int(opt.win)
-				outcome = Data.bi("擲出 %d — 贏得 %d 金幣!" % [roll, int(opt.win)],
-						"Rolled %d — won %d gold!" % [roll, int(opt.win)])
-			else:
-				outcome = Data.bi("擲出 %d — 全部輸掉……" % roll, "Rolled %d — lost it all…" % roll)
+			var need := int(opt.get("need", 4))
+			var win_gold := int(opt.win)
+			RunState.save_rng(Game.run, rng)
+			DiceCheck.open(self, {
+				"roll": roll, "need": need,
+				"title": Data.bi("骰盅一開,願賭服輸。", "The cup lifts. No takebacks."),
+				"win": Data.bi("贏得 %d 金幣!" % win_gold, "Won %d gold!" % win_gold),
+				"lose": Data.bi("全部輸掉……", "Lost it all…"),
+				"on_done": func(ok: bool) -> void:
+					if ok:
+						Game.run.gold = int(Game.run.gold) + win_gold
+						_show_outcome(Data.bi("擲出 %d — 贏得 %d 金幣!" % [roll, win_gold],
+								"Rolled %d — won %d gold!" % [roll, win_gold]))
+					else:
+						_show_outcome(Data.bi("擲出 %d — 全部輸掉……" % roll,
+								"Rolled %d — lost it all…" % roll)),
+			})
+			return
 		"sacrifice_relic":
 			for h in Game.run.team:
 				if h.hp > 0:
@@ -272,6 +317,13 @@ func _pick_hero(cb: Callable) -> void:
 
 
 func _show_outcome(text: String) -> void:
+	# the purse changed while the outcome was being read — the top bar is
+	# built once per screen, so a wager that has already been paid out would
+	# otherwise sit next to a gold count from before the bet
+	if is_instance_valid(_topbar):
+		_topbar.queue_free()
+	_topbar = RunWidgets.topbar()
+	add_child(_topbar)
 	for c in vb.get_children():
 		c.queue_free()
 	var panel := UIKit.panel(UIKit.CREAM, 16, 4)
@@ -290,3 +342,5 @@ func _show_outcome(text: String) -> void:
 	var bc := CenterContainer.new()
 	bc.add_child(b)
 	vb.add_child(bc)
+	Safe.publish_hud_value("event_outcome",
+			JSON.stringify({"gold": int(Game.run.gold), "text": text}))

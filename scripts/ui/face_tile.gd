@@ -16,10 +16,11 @@ signal long_pressed()
 ## Room for two stacked lines at F_MICRO — bilingual mode prints the Chinese
 ## name over the English one, and clipping the second was worse than nothing.
 const NAME_H := 42.0
-const LONG_PRESS := 0.45
-## A press that travels further than this (canvas px, summed) is a scroll or a
-## drag, not a tap. Matches the ScrollContainer deadzone the list screens use.
-const TAP_SLOP := 24.0
+## The press/hold rules live in `PressGesture` now — every surface that says
+## "hold to read" shares them. Kept as aliases because the codex and the tests
+## quote the tile's numbers.
+const LONG_PRESS := PressGesture.LONG_PRESS
+const TAP_SLOP := PressGesture.TAP_SLOP
 
 var fd := {}                 # a resolved face dict (see BattleCore.hero_face)
 var tile := 92.0             # side of the square part
@@ -30,9 +31,7 @@ var interactive := true
 
 var _num: Label
 var _name: Label
-var _pressing := false
-var _press_at := Vector2.ZERO
-var _lp_token: SceneTreeTimer = null
+var _press: PressGesture = null
 
 
 func _init(p_fd := {}, p_tile := 92.0, p_show_name := true) -> void:
@@ -187,30 +186,21 @@ func _draw() -> void:
 func _gui_input(event: InputEvent) -> void:
 	if not interactive:
 		return
-	if event is InputEventMouseMotion or event is InputEventScreenDrag:
-		# position, not relative: relative is unreliable across synthetic and
-		# emulated event streams, the distance from the press point is not
-		if _pressing and (event.position as Vector2).distance_to(_press_at) > TAP_SLOP:
-			cancel_press()
-		return
-	if not (event is InputEventMouseButton or event is InputEventScreenTouch):
-		return
-	if event is InputEventMouseButton and event.button_index != MOUSE_BUTTON_LEFT:
-		return
-	if event.pressed:
-		_pressing = true
-		_press_at = event.position
-		var t := get_tree().create_timer(LONG_PRESS)
-		_lp_token = t
-		t.timeout.connect(func() -> void:
-			if _lp_token == t and _pressing:
-				_pressing = false
-				long_pressed.emit())
-	else:
-		_lp_token = null
-		if _pressing:
-			_pressing = false
-			pressed.emit()
+	if _press == null:
+		_press = PressGesture.new(self)
+		# method callables, not lambdas: a connection to a freed object is
+		# dropped by the engine, a lambda holding `self` is not
+		_press.tapped.connect(_emit_pressed)
+		_press.long_pressed.connect(_emit_long)
+	_press.feed(event)
+
+
+func _emit_pressed() -> void:
+	pressed.emit()
+
+
+func _emit_long() -> void:
+	long_pressed.emit()
 
 
 ## The containing ScrollContainer has decided the finger is scrolling; whatever
@@ -221,5 +211,5 @@ func _notification(what: int) -> void:
 
 
 func cancel_press() -> void:
-	_pressing = false
-	_lp_token = null
+	if _press != null:
+		_press.cancel()
