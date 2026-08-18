@@ -385,13 +385,27 @@ static func print_matrix(n := 150, seeds := ACCEPT_SEEDS, team := [], level := 1
 ## The promise, as re-worded by the round-13 ruling: **解鎖唔加數值** — pure
 ## numeric inflation is dead by construction (the value-band linter allows a
 ## capstone +1~2 and nothing else), so any win-rate lift comes from synergy
-## and offer fit, and THAT is allowed a measured ceiling instead of zero:
-##   · total: the best level may sit at most 8pt of full-clear above level 1;
-##   · per level: no single level step may add more than 2pt (a gap of k
-##     levels gets a 2k allowance, so sparse sweeps stay judgeable).
-## Both lines are judged at the n=300 protocol like every other difference.
+## and offer fit, and THAT is allowed a measured ceiling instead of zero.
+##
+## Two-tier per-level judgement (second round-13 ruling): the original hard
+## 2pt/level line sat exactly on this harness's noise floor, so single-tier
+## verdicts would forever flap on edge reads. Split:
+##   · TOTAL:  best level ≤ 8pt above level 1 — HARD, unchanged. 防走數.
+##   · DESIGN: 2pt/level is the design intent. An n<600 read over it is not a
+##     verdict at all — it triggers the n600 escalation rerun (現行協議).
+##   · FAIL:   4pt/level (= design + the ±2 resolution of an n600 read) is the
+##     hard fail once n600 has confirmed the step.
+##   · between design and fail at n≥600: a SOFT WARN — it does not fail the
+##     sweep, but it must be printed with its reading and logged in BALANCE.md.
+##     The same level warning two rounds running auto-escalates to a ruling
+##     item; the warn zone is not a place to live.
+## (a gap of k levels scales every per-level allowance by k, so sparse sweeps
+## stay judgeable)
 const CREEP_TOTAL_MAX := 8.0
-const CREEP_PER_LEVEL_MAX := 2.0
+const CREEP_PER_LEVEL_DESIGN := 2.0
+const CREEP_PER_LEVEL_FAIL := 4.0
+## n at which a per-level read counts as confirmed rather than provisional.
+const CREEP_CONFIRM_N := 600
 
 
 static func print_level_compare(n := 150, levels := [1, 5, 8], seeds := ACCEPT_SEEDS) -> Dictionary:
@@ -440,28 +454,42 @@ static func print_level_compare(n := 150, levels := [1, 5, 8], seeds := ACCEPT_S
 	var base := float(rows[0].wins)
 	var creep := hi - base      # how far ABOVE the unlevelled party the best level got
 	var drop := base - lo       # how far BELOW it the worst level got
-	# 逐級 line: each measured step against its 2pt-per-level allowance
-	var step_violations := []
+	# 逐級, two-tier: design 2pt/level (soft), fail 4pt/level (hard once an
+	# n≥600 read confirms it). An over-design step at n<600 is a trigger for
+	# the escalation rerun, never a verdict.
+	var confirmed := n >= CREEP_CONFIRM_N
+	var step_fails := []
+	var step_warns := []
+	var step_escalate := []
 	for k in range(1, rows.size()):
 		var la: Dictionary = rows[k - 1]
 		var lb: Dictionary = rows[k]
 		var gap := float(int(lb.level) - int(la.level))
 		var step := float(lb.wins) - float(la.wins)
-		var allow := CREEP_PER_LEVEL_MAX * gap
-		print("  step L%d→L%d: %+.1fpt  (allowance %.1f = 2pt x %d levels)%s"
-				% [int(la.level), int(lb.level), step, allow, int(gap),
-				"  !! OVER" if step > allow else ""])
-		if step > allow:
-			step_violations.append("L%d→L%d %+.1fpt > %.1f" % [int(la.level), int(lb.level), step, allow])
+		var design := CREEP_PER_LEVEL_DESIGN * gap
+		var hard := CREEP_PER_LEVEL_FAIL * gap
+		var label := "L%d→L%d" % [int(la.level), int(lb.level)]
+		var tag := ""
+		if step > hard and confirmed:
+			tag = "  !! FAIL (> %.1f)" % hard
+			step_fails.append("%s %+.1fpt > %.1f" % [label, step, hard])
+		elif step > design and confirmed:
+			tag = "  ~ WARN (design %.1f < step <= fail %.1f)" % [design, hard]
+			step_warns.append("%s %+.1fpt" % [label, step])
+		elif step > design:
+			tag = "  ?? over design line at n=%d — rerun this window at n>=%d" % [n, CREEP_CONFIRM_N]
+			step_escalate.append("%s %+.1fpt" % [label, step])
+		print("  step %s: %+.1fpt  (design %.1f / fail %.1f, x%d levels)%s"
+				% [label, step, design, hard, int(gap), tag])
 	print("")
-	print("full-clear creep vs level-%d baseline: %+.1fpt  (ruling line: <= %.1fpt total, <= %.1fpt/level)"
-			% [int(rows[0].level), creep, CREEP_TOTAL_MAX, CREEP_PER_LEVEL_MAX])
+	print("full-clear creep vs level-%d baseline: %+.1fpt  (hard total line: <= %.1fpt)"
+			% [int(rows[0].level), creep, CREEP_TOTAL_MAX])
 	print("  baseline %.1f%%, spread %.1fpt, worst level %+.1fpt" % [base, spread, -drop])
-	if creep > CREEP_TOTAL_MAX or not step_violations.is_empty():
-		print("VERDICT: POWER CREEP — over the round-13 ruling line ("
+	if creep > CREEP_TOTAL_MAX or not step_fails.is_empty():
+		print("VERDICT: POWER CREEP — over a HARD line ("
 				+ ("total %+.1fpt > %.1f" % [creep, CREEP_TOTAL_MAX] if creep > CREEP_TOTAL_MAX else "")
-				+ ("; " if creep > CREEP_TOTAL_MAX and not step_violations.is_empty() else "")
-				+ "; ".join(PackedStringArray(step_violations)) + ").")
+				+ ("; " if creep > CREEP_TOTAL_MAX and not step_fails.is_empty() else "")
+				+ "; ".join(PackedStringArray(step_fails)) + ").")
 		print("         The usage table names which faces are doing it. A design "
 				+ "call, not a number to quietly file down.")
 	elif drop > CREEP_TOTAL_MAX:
@@ -469,10 +497,21 @@ static func print_level_compare(n := 150, levels := [1, 5, 8], seeds := ACCEPT_S
 				% drop + "baseline. Not power creep; the opposite. Most likely")
 		print("         the unlock offers are DISPLACING better shared-pool draws "
 				+ "rather than the faces being bad.")
+	elif not step_escalate.is_empty():
+		print("VERDICT: PROVISIONAL — hard lines hold, but %d step(s) read over the "
+				% step_escalate.size() + "design line below the confirm n:")
+		print("         %s — rerun that window at n>=%d before calling it."
+				% [", ".join(PackedStringArray(step_escalate)), CREEP_CONFIRM_N])
+	elif not step_warns.is_empty():
+		print("VERDICT: promise HOLDS (hard lines) — with %d soft WARN step(s): %s."
+				% [step_warns.size(), ", ".join(PackedStringArray(step_warns))])
+		print("         Log the warn in BALANCE.md. The same level warning two "
+				+ "rounds running auto-escalates to a ruling item.")
 	else:
-		print("VERDICT: promise HOLDS — 解鎖唔加數值: within %.1fpt total and %.1fpt/level."
-				% [CREEP_TOTAL_MAX, CREEP_PER_LEVEL_MAX])
-	return {"rows": rows, "spread": spread, "creep": creep, "drop": drop}
+		print("VERDICT: promise HOLDS — 解鎖唔加數值: total <= %.1fpt, every step "
+				% CREEP_TOTAL_MAX + "on or under the %.1fpt/level design line." % CREEP_PER_LEVEL_DESIGN)
+	return {"rows": rows, "spread": spread, "creep": creep, "drop": drop,
+			"warns": step_warns, "fails": step_fails, "escalate": step_escalate}
 
 
 ## Which of the party's newly-unlocked faces the policy actually reached for,

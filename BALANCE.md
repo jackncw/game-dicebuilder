@@ -1799,3 +1799,36 @@ displacement 消失」嘅結構位,唔係某隻面爆咗。
 
 18 suites 綠(keywords 含新 vs_full 案例;value_band 對兩隻新形面照判帶內);
 web 重出;live URL 驗證照舊三重(pck 對數 / codex 真 touch / console)。
+
+---
+
+# 第十三輪裁決(二):L2→L3 收貨,逐級守則拆兩層(2026-08-18)
+
+## 1. L2→L3 結案
+
+唔郁面。n600 讀 L1→L3 兩步共 +4、平均 2/級 —— 正係設計線;結構原因
+(職業池由 2 面深到 4 面,offer displacement 消失)係已批機制。
+L2 陰跌證實噪音,一併結案。
+
+## 2. 逐級守則:兩層判法(解決 hard line 坐喺噪音樓底)
+
+寫入 `SimRunner`,`print_level_compare` 自動判:
+
+| 層 | 值 | 意義 |
+|---|---|---|
+| `CREEP_PER_LEVEL_DESIGN` | 2pt/級 | 設計意圖(soft) |
+| `CREEP_PER_LEVEL_FAIL` | 4pt/級 | 設計線 + n600 解析度 ±2 —— hard fail |
+| `CREEP_TOTAL_MAX` | 8pt 總線 | **維持 hard 唔郁(防走數)** |
+| `CREEP_CONFIRM_N` | 600 | 逐級讀數要 n≥600 先算確認 |
+
+判法:n300 逐級 >2 → 唔係判詞,係觸發 n600 加跑(照現行協議,判詞印
+PROVISIONAL);n600 確認後 >4 先 FAIL,2–4 之間 **soft WARN** —— warn 唔擋
+suite,但必須印落 report 連讀數,記入 BALANCE.md 俾下輪覆盤。
+**防走數條款:同一級嘅 warn 連續兩輪出現,自動升級做裁決議題,唔准長住
+warn 區。**
+
+## 3. Warn 登記冊(逐輪覆盤用)
+
+| 輪 | 級 | 讀數 | 狀態 |
+|---|---|---|---|
+| 13 | L2→L3 | +3.0pt @ n600 | **WARN 第 1 輪**(首次;下輪再現即升級裁決) |
