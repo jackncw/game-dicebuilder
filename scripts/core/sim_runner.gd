@@ -253,11 +253,12 @@ const BAND_EDGE_MARGIN := 3
 ## An edge reading at this size is a fact about the build, not about the sample.
 const ACCEPT_N_FULL := 300
 
-## Target bands, in the order they are printed.
+## Target bands, in the order they are printed. Round 13 pinned them to the
+## brief's 章節曲線: ch1 85±5 / ch2 65±5 / 全通 35±5.
 const TARGET_BANDS := [
-	{"label": "ch1 clear", "key": "ch1", "lo": 85, "hi": 92},
-	{"label": "ch2 clear", "key": "ch2", "lo": 62, "hi": 72},
-	{"label": "full clear", "key": "wins", "lo": 30, "hi": 45},
+	{"label": "ch1 clear", "key": "ch1", "lo": 80, "hi": 90},
+	{"label": "ch2 clear", "key": "ch2", "lo": 60, "hi": 70},
+	{"label": "full clear", "key": "wins", "lo": 30, "hi": 40},
 ]
 
 

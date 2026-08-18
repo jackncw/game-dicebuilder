@@ -1,0 +1,65 @@
+cut 27: sp_absolute_guard sp_aegis sp_arcane_blast sp_armor_break sp_chaos sp_citadel sp_cleansing_shield sp_cure sp_dragon_breath sp_evil_eye sp_flame_strike sp_godpierce sp_heavy_blow sp_keen sp_life_bloom sp_mark sp_plague sp_quick_jab sp_reaper sp_sap sp_scatter sp_seed_blade sp_seed_shield sp_stasis sp_twin_strike sp_viper_needle sp_whirl_blade
+new 23: bdg_essenceaxe bdg_essencebulwark bdg_oakheart bdg_rally bdg_spiritshield boar_frenzy boar_painbrew boar_worldbreaker fox_crossparry fox_essencefeint fox_spiritwaltz hare_galestorm hare_hawkfeather hare_longshot hare_moonpiercer hare_pinning hare_windarrow hedge_ironquills hedge_quillsurge hedge_quillvolley hedge_thornaegis owl_blessing owl_moonbeam
+moved-to-hero 19: sp_briar_mail sp_chain_strike sp_charged_shot sp_die_theft sp_echo_crystal sp_echo_cut sp_focus sp_freeze sp_gambit sp_great_blade sp_leech_bite sp_mass_mend sp_protect sp_reckless sp_regenerate sp_sweep_cut sp_thorn_shield sp_time_stop sp_trickery
+stat-changed 61:
+  bdg_chop3guard3      {'rarity': ('U', 'C')}
+  bdg_guard4thorn      {'thorns': (1, 2), 'block': (4, 6), 'rarity': ('U', 'E')}
+  bdg_heal3            {'heal': (3, 5), 'rarity': ('U', 'R')}
+  bdg_heavy5           {'atk': (5, 6), 'rarity': ('U', 'C')}
+  bdg_infusedsmash     {'atk': (6, 11), 'rarity': ('U', 'R')}
+  bdg_smash6           {'atk': (6, 7), 'rarity': ('U', 'R')}
+  bdg_warcry           {'team_block': (None, 1), 'team_atk': (1, 2), 'cat': ('special', 'defense'), 'rarity': ('U', 'E')}
+  boar_avalanche8      {'atk': (8, 11), 'rarity': ('U', 'E')}
+  boar_bloodhit5       {'rarity': ('U', 'R')}
+  boar_bloodsurge      {'spell': (3, 2), 'atk': (8, 13), 'rarity': ('U', 'R')}
+  boar_finale10        {'atk': (10, 12), 'rarity': ('U', 'E')}
+  boar_ironhide        {'block': (4, 5), 'rarity': ('U', 'C')}
+  boar_lastditch       {'atk': (4, 5), 'rarity': ('U', 'R'), 'low_hp_atk': (7, 9)}
+  boar_smash6          {'atk': (6, 7), 'rarity': ('U', 'C')}
+  fox_echo4            {'rarity': ('U', 'R')}
+  fox_essencewaltz     {'atk': (4, 8), 'rarity': ('U', 'R')}
+  fox_guard3           {'zh': ('格擋', '迴身格擋'), 'en': ('Guard', 'Turning Guard'), 'resonate': (None, 2), 'rarity': ('U', 'C'), 'resonate_cat': (None, 'attack'), 'block': (3, 4)}
+  fox_phantom          {'rarity': ('U', 'E')}
+  fox_shadow3          {'rarity': ('U', 'R')}
+  fox_stab2x2          {'rarity': ('U', 'C'), 'combo': (None, True)}
+  fox_twindance        {'rarity': ('U', 'E')}
+  hare_attunedaim      {'rarity': ('U', 'C'), 'mana': (1, 2)}
+  hare_deadly7         {'rarity': ('U', 'E')}
+  hare_essencearrow    {'atk': (4, 5)}
+  hare_guard3          {'block': (3, 6), 'rarity': ('U', 'R')}
+  hare_hawkeye         {'rarity': ('U', 'E')}
+  hare_pierce3         {'rarity': ('U', 'C')}
+  hare_snipe6          {'rarity': ('U', 'R')}
+  hare_volley          {'atk': (2, 3), 'rarity': ('U', 'R')}
+  hedge_bristle        {'rarity': ('U', 'E')}
+  hedge_essencebloom   {'rarity': ('U', 'R')}
+  hedge_guard4thorn2   {'block': (4, 5), 'rarity': ('U', 'R')}
+  hedge_guard5         {'block': (5, 6), 'rarity': ('U', 'C')}
+  hedge_recoil4        {'rarity': ('U', 'R')}
+  hedge_shieldbash     {'rarity': ('U', 'E')}
+  hedge_thorns3        {'block': (None, 2), 'rarity': ('U', 'C')}
+  owl_bolt4            {'rarity': ('U', 'C')}
+  owl_essenceward      {'rarity': ('U', 'R')}
+  owl_gather3          {'rarity': ('U', 'C')}
+  owl_greatheal        {'heal': (6, 12), 'rarity': ('U', 'R')}
+  owl_meditate         {'rarity': ('U', 'R')}
+  owl_meteor           {'hits': (2, 3), 'atk': (4, 6), 'rarity': ('U', 'E')}
+  owl_starfall         {'atk': (7, 11)}
+  owl_starshower       {'atk': (5, 8), 'rarity': ('U', 'E')}
+  owl_wardshield       {'block': (4, 7)}
+  owlb_moonheal        {'heal': (4, 8)}
+  sp_annihilate        {'atk': (13, 12)}
+  sp_briar_mail        {'thorns': (5, 3)}
+  sp_charged_shot      {'atk': (3, 5)}
+  sp_echo_crystal      {'spell': (None, 1), 'heal': (4, 6)}
+  sp_echo_cut          {'atk': (3, 4)}
+  sp_focus             {'block': (3, 4)}
+  sp_freeze            {'spell': (None, 1), 'weaken': (1, 2)}
+  sp_great_wall        {'block': (10, 8)}
+  sp_greater_cure      {'heal': (9, 6)}
+  sp_leech_bite        {'atk': (5, 4), 'rarity': ('R', 'C')}
+  sp_mass_mend         {'team_heal': (3, 2)}
+  sp_miracle           {'regen': (None, 1), 'cleanse_target': (None, True), 'heal': (12, 4)}
+  sp_protect           {'block': (5, 6), 'rarity': ('C', 'R')}
+  sp_sweep_cut         {'atk': (3, 4)}
+  sp_torch             {'atk': (3, 4)}

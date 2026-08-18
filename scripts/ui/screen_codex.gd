@@ -12,6 +12,7 @@ var tab := "chars"
 var scroll: ScrollContainer
 var body: VBoxContainer
 var tab_buttons := {}
+var _first_tile: Control = null
 
 
 func setup(_args: Dictionary) -> void:
@@ -54,6 +55,13 @@ func _ready() -> void:
 	scroll.offset_right = -UIKit.S4
 	Safe.pin_bottom(scroll, 128)
 	add_child(scroll)
+	# web-only probes for the Playwright touch regression: where the scroll
+	# area is, and how far it has scrolled (encoded in y, canvas units)
+	scroll.resized.connect(func() -> void:
+		Safe.publish_hud("codex_scroll", scroll.get_global_rect()))
+	scroll.get_v_scroll_bar().value_changed.connect(func(v: float) -> void:
+		Safe.publish_hud("codex_scroll_v", Rect2(0.0, v, 1.0, 1.0)))
+	Safe.publish_hud("codex_scroll_v", Rect2(0.0, 0.0, 1.0, 1.0))
 	body = VBoxContainer.new()
 	body.add_theme_constant_override("separation", UIKit.S3)
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -71,6 +79,7 @@ func _ready() -> void:
 
 
 func _build() -> void:
+	_first_tile = null
 	for c in body.get_children():
 		c.queue_free()
 	for key in tab_buttons:
@@ -84,6 +93,15 @@ func _build() -> void:
 	# panels and art holders are STOP by default and would eat the touch drag
 	# the ScrollContainer scrolls by — see the codex_scroll_test
 	UIKit.scroll_passthrough(body)
+	_publish_probes.call_deferred()
+
+
+## Web-only: the first tappable tile's rect, once the containers have sorted.
+func _publish_probes() -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if is_instance_valid(_first_tile):
+		Safe.publish_hud("codex_tile0", _first_tile.get_global_rect())
 
 
 # ============================================================ shared bits
@@ -126,8 +144,14 @@ func _face_grid(ids: Array, cols := 6) -> Control:
 			tile.dimmed = true
 			tile.interactive = false
 		else:
-			tile.long_pressed.connect(func() -> void: DetailCard.show_face(self, fd))
-			tile.pressed.connect(func() -> void: DetailCard.show_face(self, fd))
+			var open := func() -> void:
+				DetailCard.show_face(self, fd)
+				# the web touch regression asserts a tap opened this
+				Safe.publish_hud("codex_detail", tile.get_global_rect())
+			tile.long_pressed.connect(open)
+			tile.pressed.connect(open)
+			if _first_tile == null:
+				_first_tile = tile
 		grid.add_child(tile)
 	var cc := CenterContainer.new()
 	cc.add_child(grid)

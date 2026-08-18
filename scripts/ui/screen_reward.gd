@@ -77,7 +77,9 @@ func _show_levelups(ups: Dictionary) -> void:
 ## The tiles of every batch `levels` just opened for hero `id`, in one row.
 ## Tapping a tile opens the standard detail card — the popup a new player
 ## needs most at exactly this moment.
-func _batch_tiles(id: String, levels: Array) -> Control:
+func _batch_tiles(id: String, levels) -> Control:
+	if not (levels is Array):
+		levels = [levels]     # the canned ?boot=reward route passes one int
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", UIKit.S2)
@@ -95,7 +97,7 @@ func _batch_tiles(id: String, levels: Array) -> Control:
 
 
 ## One hero's level-up entry in the folded popup: the line, then the batch.
-func _levelup_block(id: String, levels: Array, width: float) -> Control:
+func _levelup_block(id: String, levels, width: float) -> Control:
 	var hdef: Dictionary = GameData.heroes[id]
 	var vb := VBoxContainer.new()
 	vb.add_theme_constant_override("separation", UIKit.S1)
