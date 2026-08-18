@@ -86,11 +86,11 @@
 | **L4** `hare_hawkfeather` | 鷹羽靈箭 Hawk-feather Arrow | 攻擊 | R | 攻5 靈息+1 | 7.0 ✦|  |
 | **L5** `hare_volley` | 連珠 Rapid Volley | 攻擊 | R | 攻3×2 | 6.0 |  |
 | **L5** `hare_windarrow` | 御風箭 Gale Arrow | 攻擊 | R | 攻9 靈術1 | 7.0 ✦|  |
-| **L6** `hare_snipe6` | 狙殺 Snipe | 攻擊 | R | 攻7 蓄力+3 | 7.0 |  |
+| **L6** `hare_snipe6` | 狙殺 Snipe | 攻擊 | R | 攻5 先手+4(目標滿血時) | 7.0 |  |
 | **L6** `hare_pinning` | 標靈箭 Marking Shot | 攻擊 | R | 攻3 靈息+1 標記 | 8.0 ✦|  |
 | **L7** `hare_hawkeye` | 鷹眼 Hawkeye | 特殊 | E | 全隊穿透 | 0.0 | 越帶白名單 |
 | **L7** `hare_moonpiercer` | 穿雲月箭 Moon Piercer | 攻擊 | E | 攻7 穿透 | 9.0 |  |
-| **L8** `hare_deadly7` | 致命箭 Killing Arrow | 攻擊 | E | 攻8 蓄力+2 | 8.0 |  |
+| **L8** `hare_deadly7` | 致命箭 Killing Arrow | 攻擊 | E | 攻6 先手+5(目標滿血時) | 8.5 |  |
 | **L8** `hare_galestorm` | 破空靈嵐 Spirit Gale | 攻擊 | E | 攻10 穿透 靈術2 | 8.0 ✦|  |
 
 ## 刺蝟盾衛 Hedgehog Bulwark
